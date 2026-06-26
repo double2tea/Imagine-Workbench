@@ -2,11 +2,13 @@ import assert from "node:assert/strict";
 import test from "node:test";
 import type { QueryResult, QueryResultRow } from "pg";
 
+import { ApiError } from "../lib/api/errors";
 import type { BoardDocument, BoardSummary } from "../lib/board/types";
 import type { PostgresQueryable } from "../lib/storage/postgres/connection";
 import { hashTeamSessionToken } from "../lib/storage/team-auth";
-import { listTeamBoardSummaries } from "../lib/storage/team-boards";
+import { getTeamBoardDocument, listTeamBoardSummaries, saveTeamBoardDocument } from "../lib/storage/team-boards";
 import { GET as getTeamBoards } from "../app/api/storage/team/boards/route";
+import { PUT as putTeamBoard } from "../app/api/storage/team/boards/[boardId]/route";
 
 const RAW_SESSION_TOKEN = "raw-session-token";
 const WORKSPACE_ID = "workspace_1";
@@ -74,33 +76,147 @@ test("team boards route rejects invalid query params before opening a database c
   }
 });
 
+test("getTeamBoardDocument returns a redacted versioned board document", async () => {
+  const result = await getTeamBoardDocument(
+    createTeamBoardsQueryable(),
+    { databaseUrl: "postgres://localhost/imagine", mediaDir: "/srv/imagine/media" },
+    requestWithSession(),
+    BOARD_ID,
+  );
+
+  assert.equal(result.version, 7);
+  assert.equal(result.board.nodes[0]?.kind, "runninghub-app");
+  assert.equal("accessPassword" in (result.board.nodes[0] ?? {}), false);
+  assert.deepEqual(result.summary, createBoardSummary());
+});
+
+test("saveTeamBoardDocument updates only the expected board version", async () => {
+  const queries: Array<{ text: string; values?: readonly unknown[] }> = [];
+  const board = createBoardDocument({ includeSecret: false });
+  const result = await saveTeamBoardDocument(
+    createTeamBoardsQueryable(queries, { role: "editor", updateVersion: 8 }),
+    { databaseUrl: "postgres://localhost/imagine", mediaDir: "/srv/imagine/media" },
+    requestWithSession(),
+    board,
+    7,
+  );
+
+  assert.equal(result.version, 8);
+  const updateQuery = queries.find(query => query.text.trim().startsWith("update boards"));
+  assert.deepEqual(updateQuery?.values, [WORKSPACE_ID, BOARD_ID, board, 7]);
+  assert.equal(queries.at(-1)?.text, "commit");
+});
+
+test("saveTeamBoardDocument rejects secret fields and version conflicts", async () => {
+  await assert.rejects(
+    () => saveTeamBoardDocument(
+      createTeamBoardsQueryable(),
+      { databaseUrl: "postgres://localhost/imagine", mediaDir: "/srv/imagine/media" },
+      requestWithSession(),
+      createBoardDocument({ includeSecret: true }),
+      7,
+    ),
+    (error: unknown) => error instanceof ApiError && error.status === 400 && error.code === "team_board_secret_fields_unsupported",
+  );
+
+  const queries: Array<{ text: string; values?: readonly unknown[] }> = [];
+  await assert.rejects(
+    () => saveTeamBoardDocument(
+      createTeamBoardsQueryable(queries, { conflictVersion: 9, role: "editor" }),
+      { databaseUrl: "postgres://localhost/imagine", mediaDir: "/srv/imagine/media" },
+      requestWithSession(),
+      createBoardDocument({ includeSecret: false }),
+      7,
+    ),
+    (error: unknown) => error instanceof ApiError && error.status === 409 && error.code === "team_board_version_conflict",
+  );
+  assert.equal(queries.at(-1)?.text, "rollback");
+});
+
+test("team board route rejects missing write versions before opening a database client", async () => {
+  const originalEnv = {
+    APP_URL: process.env.APP_URL,
+    DATABASE_URL: process.env.DATABASE_URL,
+    IMAGINE_MEDIA_DIR: process.env.IMAGINE_MEDIA_DIR,
+    IMAGINE_STORAGE_TARGET: process.env.IMAGINE_STORAGE_TARGET,
+  };
+  try {
+    process.env.APP_URL = "http://localhost:3000";
+    process.env.DATABASE_URL = "postgres://localhost/imagine";
+    process.env.IMAGINE_MEDIA_DIR = "/srv/imagine/media";
+    process.env.IMAGINE_STORAGE_TARGET = "postgres";
+
+    const response = await putTeamBoard(new Request("http://localhost:3000/api/storage/team/boards/board_1", {
+      body: JSON.stringify(createBoardDocument({ includeSecret: false })),
+      headers: {
+        cookie: "imagine_team_csrf=csrf-token",
+        origin: "http://localhost:3000",
+        "x-imagine-csrf-token": "csrf-token",
+      },
+      method: "PUT",
+    }), routeContext());
+    assert.equal(response.status, 400);
+    assert.deepEqual(await response.json(), {
+      code: "missing_team_board_version",
+      error: "If-Match version is required",
+    });
+  } finally {
+    restoreEnv("APP_URL", originalEnv.APP_URL);
+    restoreEnv("DATABASE_URL", originalEnv.DATABASE_URL);
+    restoreEnv("IMAGINE_MEDIA_DIR", originalEnv.IMAGINE_MEDIA_DIR);
+    restoreEnv("IMAGINE_STORAGE_TARGET", originalEnv.IMAGINE_STORAGE_TARGET);
+  }
+});
+
 function requestWithSession(): Request {
   return new Request("http://localhost:3000/api/storage/team/boards", {
     headers: { cookie: `imagine_team_session=${RAW_SESSION_TOKEN}` },
   });
 }
 
+function routeContext(): { params: Promise<{ boardId: string }> } {
+  return { params: Promise.resolve({ boardId: BOARD_ID }) };
+}
+
 function createTeamBoardsQueryable(
   queries: Array<{ text: string; values?: readonly unknown[] }> = [],
+  options: { conflictVersion?: number; role?: "owner" | "admin" | "editor" | "viewer"; updateVersion?: number } = {},
 ): PostgresQueryable {
   return {
     query: async <T extends QueryResultRow = QueryResultRow>(text: string, values?: readonly unknown[]) => {
       queries.push({ text, values });
+      if (text === "begin" || text === "commit" || text === "rollback") {
+        return typedQueryResult<T>([]);
+      }
       if (text.includes("from sessions")) {
         return typedQueryResult<T>([{
           email: "viewer@example.com",
           expires_at: "2026-07-03T00:00:00.000Z",
-          role: "viewer",
+          role: options.role ?? "viewer",
           session_id: hashTeamSessionToken(RAW_SESSION_TOKEN),
           team_id: "team_1",
           user_id: "user_1",
           workspace_id: WORKSPACE_ID,
         }]);
       }
+      if (text.trim().startsWith("update boards")) {
+        return typedQueryResult<T>(
+          options.updateVersion === undefined ? [] : [{ version: options.updateVersion }],
+        );
+      }
+      if (text.startsWith("select version from boards")) {
+        return typedQueryResult<T>(
+          options.conflictVersion === undefined ? [] : [{ version: options.conflictVersion }],
+        );
+      }
+      if (text.trim().startsWith("insert into board_summaries")) {
+        return typedQueryResult<T>([]);
+      }
       if (text.startsWith("select boards.board")) {
         return typedQueryResult<T>([{
-          board: createBoardDocument(),
+          board: createBoardDocument({ includeSecret: true }),
           summary: createBoardSummary(),
+          version: 7,
         }]);
       }
       return typedQueryResult<T>([]);
@@ -118,7 +234,7 @@ function createBoardSummary(): BoardSummary {
   };
 }
 
-function createBoardDocument(): BoardDocument {
+function createBoardDocument(options: { includeSecret: boolean }): BoardDocument {
   return {
     config: {
       showGrid: true,
@@ -129,13 +245,19 @@ function createBoardDocument(): BoardDocument {
     edges: [],
     id: BOARD_ID,
     nodes: [{
-      body: "notes",
+      accessPassword: options.includeSecret ? "secret-password" : undefined,
+      bindings: [],
       createdAt: "2026-06-26T00:00:00.000Z",
-      id: "note_1",
-      kind: "note",
+      id: "runninghub_1",
+      kind: "runninghub-app",
+      outputType: "image",
       position: { x: 0, y: 0 },
+      prompt: "prompt",
+      status: "idle",
       size: { height: 120, width: 240 },
-      title: "Note",
+      targetId: "app_1",
+      targetType: "ai-app",
+      title: "RunningHub",
       updatedAt: "2026-06-26T01:00:00.000Z",
     }],
     title: "Shared Board",

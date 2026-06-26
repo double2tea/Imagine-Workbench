@@ -1,11 +1,11 @@
 import { API_ROUTES } from "@/lib/api/routes";
-import type { BoardSummary } from "@/lib/board/types";
+import type { BoardDocument, BoardSummary } from "@/lib/board/types";
 import { readFetchError } from "@/lib/client-fetch-error";
 import type { StorageItemMeta } from "@/lib/db";
 import type { PublicLocalStorageRuntimeStatus } from "@/lib/storage/local-public-runtime";
 import type { WORKSPACE_STORAGE_SCHEMA_VERSION } from "@/lib/storage/schema";
 import type { PublicTeamAssetPayload, PublicTeamAssetRecord, TeamAssetListResult } from "@/lib/storage/team-asset-types";
-import type { TeamBoardSummaryListResult } from "@/lib/storage/team-board-types";
+import type { TeamBoardDocumentResult, TeamBoardSummaryListResult } from "@/lib/storage/team-board-types";
 
 export interface TeamStorageMigrationStatus {
   appliedMigrationIds: string[];
@@ -133,6 +133,45 @@ export async function fetchTeamBoardSummaries(
   return parseTeamBoardSummaryListResult(body);
 }
 
+export async function fetchTeamBoardDocument(
+  boardId: string,
+  fetcher: Fetcher = fetch,
+): Promise<TeamBoardDocumentResult> {
+  const response = await fetcher(API_ROUTES.storage.teamBoard(boardId), { cache: "no-store" });
+  const body: unknown = await response.json();
+  if (!response.ok) {
+    const error = readStringField(body, "error") ?? "Team board read failed";
+    throw new Error(error);
+  }
+  return parseTeamBoardDocumentResult(body);
+}
+
+export async function saveTeamBoardDocument(
+  board: BoardDocument,
+  version: number,
+  csrfToken: string,
+  fetcher: Fetcher = fetch,
+): Promise<TeamBoardDocumentResult> {
+  const token = csrfToken.trim();
+  if (!token) throw new Error("CSRF token is required");
+  const response = await fetcher(API_ROUTES.storage.teamBoard(board.id), {
+    cache: "no-store",
+    body: JSON.stringify(board),
+    headers: {
+      "content-type": "application/json",
+      "if-match": String(version),
+      "x-imagine-csrf-token": token,
+    },
+    method: "PUT",
+  });
+  const body: unknown = await response.json();
+  if (!response.ok) {
+    const error = readStringField(body, "error") ?? "Team board save failed";
+    throw new Error(error);
+  }
+  return parseTeamBoardDocumentResult(body);
+}
+
 export async function loginTeamSession(
   input: { email: string; password: string },
   fetcher: Fetcher = fetch,
@@ -250,6 +289,11 @@ function parseTeamBoardSummaryListResult(value: unknown): TeamBoardSummaryListRe
   return value;
 }
 
+function parseTeamBoardDocumentResult(value: unknown): TeamBoardDocumentResult {
+  if (!isTeamBoardDocumentResult(value)) throw new Error("Team board response is invalid");
+  return value;
+}
+
 function teamAssetsUrl(options: TeamAssetListOptions): string {
   const searchParams = new URLSearchParams();
   if (options.boardId) searchParams.set("boardId", options.boardId);
@@ -319,6 +363,17 @@ function isTeamBoardSummaryListResult(value: unknown): value is TeamBoardSummary
   );
 }
 
+function isTeamBoardDocumentResult(value: unknown): value is TeamBoardDocumentResult {
+  if (!isRecord(value)) return false;
+  return (
+    value.targetKind === "postgres" &&
+    typeof value.workspaceId === "string" &&
+    Number.isInteger(value.version) &&
+    isBoardDocument(value.board) &&
+    isBoardSummary(value.summary)
+  );
+}
+
 function isPublicTeamAssetRecord(value: unknown): value is PublicTeamAssetRecord {
   if (!isRecord(value)) return false;
   const payload = value.payload;
@@ -362,6 +417,26 @@ function isBoardSummary(value: unknown): value is BoardSummary {
     typeof value.createdAt === "string" &&
     typeof value.updatedAt === "string"
   );
+}
+
+function isBoardDocument(value: unknown): value is BoardDocument {
+  if (!isRecord(value)) return false;
+  return (
+    typeof value.id === "string" &&
+    typeof value.title === "string" &&
+    isRecord(value.config) &&
+    Array.isArray(value.nodes) &&
+    value.nodes.every(isPublicTeamBoardNode) &&
+    Array.isArray(value.edges) &&
+    isRecord(value.viewport) &&
+    typeof value.createdAt === "string" &&
+    typeof value.updatedAt === "string"
+  );
+}
+
+function isPublicTeamBoardNode(value: unknown): boolean {
+  if (!isRecord(value)) return false;
+  return value.kind !== "runninghub-app" || !("accessPassword" in value);
 }
 
 function isStorageItemStatus(value: unknown): value is StorageItemMeta["status"] {

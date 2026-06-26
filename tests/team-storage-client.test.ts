@@ -1,8 +1,10 @@
 import assert from "node:assert/strict";
 import test from "node:test";
+import type { BoardDocument, BoardSummary } from "../lib/board/types";
 
 import {
   bootstrapTeamOwner,
+  fetchTeamBoardDocument,
   fetchTeamAssets,
   fetchTeamBoardSummaries,
   fetchTeamStorageHealth,
@@ -10,6 +12,7 @@ import {
   loginTeamSession,
   logoutTeamSession,
   readTeamCsrfToken,
+  saveTeamBoardDocument,
   teamAssetMediaUrl,
   fetchWorkspaceStorageRuntimeStatus,
   runTeamStorageMigrations,
@@ -163,6 +166,65 @@ test("fetchTeamBoardSummaries sends list filters and validates summaries", async
   );
 });
 
+test("team board document client reads redacted boards and saves with version headers", async () => {
+  const board = createBoardDocument();
+  const readResult = await fetchTeamBoardDocument("board_1", async input => {
+    assert.equal(String(input), "/api/storage/team/boards/board_1");
+    return jsonResponse({
+      board,
+      summary: createBoardSummary(),
+      targetKind: "postgres",
+      version: 7,
+      workspaceId: "workspace_1",
+    });
+  });
+
+  assert.equal(readResult.version, 7);
+  assert.equal(readResult.board.title, "Shared Board");
+
+  let requestBody = "";
+  let ifMatchHeader: string | null = null;
+  let csrfHeader: string | null = null;
+  const saveResult = await saveTeamBoardDocument(board, 7, "csrf-token", async (input, init) => {
+    assert.equal(String(input), "/api/storage/team/boards/board_1");
+    assert.equal(init?.method, "PUT");
+    requestBody = String(init?.body ?? "");
+    const headers = new Headers(init?.headers);
+    ifMatchHeader = headers.get("if-match");
+    csrfHeader = headers.get("x-imagine-csrf-token");
+    return jsonResponse({
+      board,
+      summary: createBoardSummary(),
+      targetKind: "postgres",
+      version: 8,
+      workspaceId: "workspace_1",
+    });
+  });
+
+  assert.equal(saveResult.version, 8);
+  assert.equal(ifMatchHeader, "7");
+  assert.equal(csrfHeader, "csrf-token");
+  assert.deepEqual(JSON.parse(requestBody), board);
+
+  await assert.rejects(
+    saveTeamBoardDocument(board, 7, " "),
+    /CSRF token is required/,
+  );
+});
+
+test("team board document client rejects secret-bearing board responses", async () => {
+  await assert.rejects(
+    fetchTeamBoardDocument("board_1", async () => jsonResponse({
+      board: createBoardDocument({ includeSecret: true }),
+      summary: createBoardSummary(),
+      targetKind: "postgres",
+      version: 7,
+      workspaceId: "workspace_1",
+    })),
+    /Team board response is invalid/,
+  );
+});
+
 test("fetchTeamStorageHealth surfaces server errors without exposing config values", async () => {
   await assert.rejects(
     fetchTeamStorageHealth(async () => jsonResponse({
@@ -174,6 +236,44 @@ test("fetchTeamStorageHealth surfaces server errors without exposing config valu
     /DATABASE_URL is required/,
   );
 });
+
+function createBoardSummary(): BoardSummary {
+  return {
+    createdAt: "2026-06-26T00:00:00.000Z",
+    id: "board_1",
+    nodeCount: 1,
+    title: "Shared Board",
+    updatedAt: "2026-06-26T01:00:00.000Z",
+  };
+}
+
+function createBoardDocument(options: { includeSecret?: boolean } = {}): BoardDocument {
+  return {
+    config: { showGrid: true, showMiniMap: true, snapToGrid: true },
+    createdAt: "2026-06-26T00:00:00.000Z",
+    edges: [],
+    id: "board_1",
+    nodes: [{
+      ...(options.includeSecret ? { accessPassword: "secret-password" } : {}),
+      createdAt: "2026-06-26T00:00:00.000Z",
+      bindings: [],
+      id: "runninghub_1",
+      kind: "runninghub-app",
+      outputType: "image",
+      position: { x: 0, y: 0 },
+      prompt: "prompt",
+      status: "idle",
+      size: { height: 120, width: 240 },
+      targetId: "app_1",
+      targetType: "ai-app",
+      title: "RunningHub",
+      updatedAt: "2026-06-26T01:00:00.000Z",
+    }],
+    title: "Shared Board",
+    updatedAt: "2026-06-26T01:00:00.000Z",
+    viewport: { x: 0, y: 0, zoom: 1 },
+  };
+}
 
 test("team session client parses session context and login requests", async () => {
   const session = await fetchTeamSession(async () => jsonResponse({

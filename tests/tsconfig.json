@@ -136,6 +136,7 @@
     "../app/api/storage/team/bootstrap/route.ts",
     "../app/api/storage/team/assets/route.ts",
     "../app/api/storage/team/assets/[assetId]/media/route.ts",
+    "../app/api/storage/team/boards/[boardId]/route.ts",
     "../app/api/storage/team/boards/route.ts",
     "../app/api/storage/team/session/route.ts",
     "../app/api/storage/local/status/route.ts",
