@@ -54,11 +54,7 @@ Implemented typed model parameter descriptors, shared capability controls, and R
 
 ### Main Changes
 
-- Enforced a single board result rule: generated media is represented by connected media nodes with source lines.
-- Cleared persisted source metadata before detaching source-to-media edges so reload/sync cannot recreate detached lines.
-- Routed canvas and Inspector edge deletion through the same detach handler and notice.
-- Polished board UI copy, accessibility labels, task actions, and side-panel wording around Media/Source.
-- Added regression coverage for detach persistence and user-facing Media/Source copy.
+(Add details)
 
 ### Git Commits
 
@@ -68,10 +64,7 @@ Implemented typed model parameter descriptors, shared capability controls, and R
 
 ### Testing
 
-- [OK] Focused board regression and port tests passed.
-- [OK] `tsc --noEmit` passed.
-- [OK] `oxlint .` passed.
-- [OK] Full compiled Node test suite passed during implementation.
+- [OK] (Add test results)
 
 ### Status
 
@@ -1696,7 +1689,11 @@ Unified board generated media around source-connected media nodes, fixed source 
 
 ### Main Changes
 
-(Add details)
+- Enforced a single board result rule: generated media is represented by connected media nodes with source lines.
+- Cleared persisted source metadata before detaching source-to-media edges so reload/sync cannot recreate detached lines.
+- Routed canvas and Inspector edge deletion through the same detach handler and notice.
+- Polished board UI copy, accessibility labels, task actions, and side-panel wording around Media/Source.
+- Added regression coverage for detach persistence and user-facing Media/Source copy.
 
 ### Git Commits
 
@@ -1707,7 +1704,10 @@ Unified board generated media around source-connected media nodes, fixed source 
 
 ### Testing
 
-- [OK] (Add test results)
+- [OK] Focused board regression and port tests passed.
+- [OK] `tsc --noEmit` passed.
+- [OK] `oxlint .` passed.
+- [OK] Full compiled Node test suite passed during implementation.
 
 ### Status
 
