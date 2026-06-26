@@ -25,6 +25,7 @@
     "./board-deletion.test.ts",
     "./board-interaction-regression.test.ts",
     "./board-model-options.test.ts",
+    "./board-ports.test.ts",
     "./board-result-stack.test.ts",
     "./board-text-node-size.test.ts",
     "./openrouter-capabilities.test.ts",

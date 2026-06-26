@@ -378,7 +378,8 @@ export function resolveBoardConnectionKind(nodes: BoardNode[], from: BoardPortRe
 
   if (
     isExecutableNode(source.node) &&
-    (target.node.kind === "asset" || target.node.kind === "result") &&
+    target.node.kind === "result" &&
+    target.node.sourceNodeId === source.node.id &&
     source.port.id === BOARD_PORT_IDS.resultOut &&
     target.port.id === BOARD_PORT_IDS.assetIn
   ) {

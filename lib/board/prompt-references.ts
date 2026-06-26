@@ -285,11 +285,10 @@ export function assetCompareReferenceUrl(
   edges: BoardEdge[],
   index = buildBoardPromptReferenceGraphIndex(nodes, edges),
 ): string | null {
-  const resultEdge = (index.incomingEdgesByTargetNode.get(assetNodeId) ?? [])
-    .find(edge => edge.from.portId === "result-out");
-  if (!resultEdge) return null;
-  const sourceNode = index.nodeById.get(resultEdge.from.nodeId);
-  if (sourceNode?.kind !== "image-generate" && sourceNode?.kind !== "video-generate" && sourceNode?.kind !== "audio-operation" && sourceNode?.kind !== "runninghub-app") return null;
-  const references = generateReferenceCandidatesFromIndex(index, sourceNode.id);
-  return references[0]?.url ?? null;
+  const node = index.nodeById.get(assetNodeId);
+  if (node?.kind !== "asset" || node.asset.type !== "image") return null;
+  const sourceEdge = (index.incomingEdgesByTargetNode.get(assetNodeId) ?? [])
+    .find(edge => edge.from.portId === "asset-out" && edge.to.portId === "asset-in");
+  const reference = sourceEdge ? boardNodeReferences(index.nodeById.get(sourceEdge.from.nodeId))[0] : undefined;
+  return reference?.type === "image" ? reference.url : null;
 }

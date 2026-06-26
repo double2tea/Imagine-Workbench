@@ -68,6 +68,66 @@ test("downloaded media filenames include a label and timestamp", () => {
   assert.match(boardPageSource, /fileNameLabel: item => selectedDownloadableBoardItemLabels\.get\(item\.id\)/);
 });
 
+test("adding a library asset to the board does not recreate result provenance edges", () => {
+  const source = readWorkspaceFile("components/board/BoardPageClient.tsx");
+  const addAssetToBoard = sourceBetween(source, "const addAssetToBoard", "const handleImportFilesToLibrary");
+
+  assert.match(addAssetToBoard, /boardController\.addAssetNode/);
+  assert.doesNotMatch(addAssetToBoard, /connectPorts/);
+  assert.doesNotMatch(addAssetToBoard, /findResultNodeForSourceStack/);
+  assert.doesNotMatch(source, /function hasResultAssetConnection/);
+});
+
+test("agent image-to-video continuation references result nodes, not result-to-asset provenance edges", () => {
+  const source = readWorkspaceFile("components/board/BoardPageClient.tsx");
+  const imageToVideoBranch = sourceBetween(source, "if (isAgentImageToVideoAction(action))", "if (isAgentBoardUpdateAction(action))");
+
+  assert.match(imageToVideoBranch, /findConnectedResultNodeForSourceStack/);
+  assert.match(imageToVideoBranch, /referenceSourceNodeId/);
+  assert.doesNotMatch(imageToVideoBranch, /portId: BOARD_PORT_IDS\.resultOut[\s\S]*portId: BOARD_PORT_IDS\.assetIn/);
+});
+
+test("deleting or detaching result nodes clears source result metadata", () => {
+  const source = readWorkspaceFile("hooks/useBoardState.ts");
+  const deletePlan = sourceBetween(source, "function planDeleteBoardNodes", "function createAssetBoardNode");
+  const deleteEdge = sourceBetween(source, "const deleteEdge", "const reconnectEdge");
+
+  assert.match(source, /function clearSourceResultForDetachedResult/);
+  assert.match(deletePlan, /deletedResultNodes/);
+  assert.match(deletePlan, /clearSourceResultForDetachedResult/);
+  assert.match(deleteEdge, /clearSourceResultForDetachedResult/);
+});
+
+test("reconnecting or restoring result edges keeps result ownership metadata consistent", () => {
+  const source = readWorkspaceFile("hooks/useBoardState.ts");
+  const reconnectEdge = sourceBetween(source, "const reconnectEdge", "const restoreNodeWithEdges");
+  const restoreNodeWithEdges = sourceBetween(source, "const restoreNodeWithEdges", "const duplicateNodes");
+  const updateResultNodeAsset = sourceBetween(source, "const updateResultNodeAsset", "const updateAssetReferenceUrls");
+
+  assert.match(source, /function assetNodeFromDetachedResult/);
+  assert.match(source, /function syncSourceResultForConnectedResult/);
+  assert.match(reconnectEdge, /isRetargetingResultEdge/);
+  assert.match(reconnectEdge, /assetNodeFromDetachedResult/);
+  assert.match(reconnectEdge, /syncSourceResultForConnectedResult/);
+  assert.match(restoreNodeWithEdges, /syncSourceResultForConnectedResult/);
+  assert.match(updateResultNodeAsset, /hasLiveResultEdge/);
+  assert.match(updateResultNodeAsset, /hasLiveResultEdge &&/);
+});
+
+test("plain asset compare uses asset derivation edges instead of result provenance edges", () => {
+  const promptReferences = readWorkspaceFile("lib/board/prompt-references.ts");
+  const workspace = readWorkspaceFile("components/board/BoardWorkspace.tsx");
+  const page = readWorkspaceFile("components/board/BoardPageClient.tsx");
+  const compareReferenceUrl = sourceBetween(promptReferences, "export function assetCompareReferenceUrl", "}");
+  const workspaceCompareReference = sourceBetween(workspace, "const assetCompareReferenceForNode", "const resolveCompareReferenceUrl");
+
+  assert.doesNotMatch(compareReferenceUrl, /result-out/);
+  assert.doesNotMatch(workspaceCompareReference, /result-out/);
+  assert.match(compareReferenceUrl, /asset-out/);
+  assert.match(workspaceCompareReference, /BOARD_PORT_IDS\.assetOut/);
+  assert.doesNotMatch(page, /selectedAssetCompareReference/);
+});
+
 test("generate node run controls expose accessible labels", () => {
   const source = readWorkspaceFile("components/board/GenerateBoardNode.tsx");
   const cancelButton = sourceBetween(source, "title={t(\"node.generateNode.cancelTask\")}", "<Loader2");

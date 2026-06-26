@@ -42,7 +42,7 @@ import { downloadStorageItemsZip, storageItemDownloadFileName } from "@/lib/asse
 import { saveItemWithPreview } from "@/lib/assets/previews";
 import { resolveAssetOriginalUrl } from "@/lib/assets/resolve-url";
 import { estimateBoardNoteSize, estimateBoardPromptSize } from "@/lib/board/text-node-size";
-import { findConnectedResultNodeForSourceStack, findResultNodeForSourceStack } from "@/lib/board/utils";
+import { findConnectedResultNodeForSourceStack } from "@/lib/board/utils";
 import { buildBoardResultStackKey, type BoardResultStackValue } from "@/lib/board/result-stack";
 import { generateReferenceCandidates } from "@/lib/board/prompt-references";
 import { useBoardState } from "@/hooks/useBoardState";
@@ -554,9 +554,7 @@ function activeExecutableResultItem(
     const resultItem = items.find(item => item.id === resultNode.activeAssetId && item.status === "complete");
     if (resultItem) return resultItem;
   }
-  return node.resultAssetId
-    ? items.find(item => item.id === node.resultAssetId && item.status === "complete")
-    : undefined;
+  return undefined;
 }
 
 function isMediaStorageItem(item: StorageItem): item is StorageItem & { type: MediaReferenceType } {
@@ -1294,19 +1292,6 @@ function detailBoardNodeForAgent(node: BoardDocument["nodes"][number], draftText
     default:
       return summary;
   }
-}
-
-function findBoardAssetNodeByAssetId(nodes: BoardDocument["nodes"], assetId: string) {
-  return nodes.find(node => node.kind === "asset" && node.asset.assetId === assetId);
-}
-
-function hasResultAssetConnection(edges: BoardDocument["edges"], sourceNodeId: string, assetNodeId: string): boolean {
-  return edges.some(edge => (
-    edge.from.nodeId === sourceNodeId &&
-    edge.from.portId === BOARD_PORT_IDS.resultOut &&
-    edge.to.nodeId === assetNodeId &&
-    edge.to.portId === BOARD_PORT_IDS.assetIn
-  ));
 }
 
 function storageItemToBoardAssetReference(item: StorageItem): BoardAssetReference {
@@ -3137,6 +3122,9 @@ export default function BoardPage({ boardId = DEFAULT_BOARD_ID }: BoardPageProps
         pushWorkspaceNotice("error", "Source node for video continuation not found");
         return handledBoardAction(false);
       }
+      const sourceResultNode = sourceNode.kind === "image-generate"
+        ? findConnectedResultNodeForSourceStack(boardController.board.nodes, boardController.board.edges, sourceNode.id, sourceNode.resultStackKey ?? "")
+        : undefined;
       const sourceReference = sourceNode.kind === "asset" && sourceNode.asset.type === "image"
         ? {
           assetId: sourceNode.asset.assetId,
@@ -3171,32 +3159,16 @@ export default function BoardPage({ boardId = DEFAULT_BOARD_ID }: BoardPageProps
 
       const sourcePosition = boardNodeAbsolutePosition(boardController.board.nodes, sourceNode.id) ?? sourceNode.position;
       boardController.beginUndoGesture();
-      let assetNodeId = sourceNode.kind === "asset"
+      const referenceSourceNodeId = sourceNode.kind === "asset"
         ? sourceNode.id
-        : findBoardAssetNodeByAssetId(boardController.board.nodes, sourceReference.assetId)?.id ?? "";
+        : sourceResultNode?.id ?? "";
+      if (!referenceSourceNodeId) {
+        boardController.endUndoGesture();
+        pushWorkspaceNotice("error", "Source node has no connected result node");
+        return handledBoardAction(false);
+      }
       let videoNodeId = "";
       try {
-        if (!assetNodeId) {
-          assetNodeId = boardController.addAssetNode({
-            asset: {
-              assetId: sourceReference.assetId,
-              type: "image",
-              model: sourceReference.model,
-              prompt: sourceReference.prompt,
-              url: sourceReference.url,
-            },
-            position: { x: sourcePosition.x + 360, y: sourcePosition.y + 220 },
-          });
-          boardController.connectPorts(
-            { nodeId: sourceNode.id, portId: BOARD_PORT_IDS.resultOut, portKind: "result" },
-            { nodeId: assetNodeId, portId: BOARD_PORT_IDS.assetIn, portKind: "asset" },
-          );
-        } else if (sourceNode.kind === "image-generate") {
-          boardController.connectPorts(
-            { nodeId: sourceNode.id, portId: BOARD_PORT_IDS.resultOut, portKind: "result" },
-            { nodeId: assetNodeId, portId: BOARD_PORT_IDS.assetIn, portKind: "asset" },
-          );
-        }
         videoNodeId = boardController.addGenerateNode({
           kind: "video-generate",
           title: action.params?.title ?? t("board.agent.imageToVideoTitle"),
@@ -3212,7 +3184,7 @@ export default function BoardPage({ boardId = DEFAULT_BOARD_ID }: BoardPageProps
           ...(action.params?.videoReferenceMode ? { videoReferenceMode: action.params.videoReferenceMode } : {}),
         });
         boardController.connectPorts(
-          { nodeId: assetNodeId, portId: BOARD_PORT_IDS.assetOut, portKind: "asset" },
+          { nodeId: referenceSourceNodeId, portId: BOARD_PORT_IDS.assetOut, portKind: "asset" },
           { nodeId: videoNodeId, portId: BOARD_PORT_IDS.referenceIn, portKind: "asset" },
         );
         selectOnlyBoardNode(videoNodeId);
@@ -3918,30 +3890,10 @@ export default function BoardPage({ boardId = DEFAULT_BOARD_ID }: BoardPageProps
   }, [boardController, cancelBoardGenerationTask, generationTasks]);
 
   const addAssetToBoard = useCallback((asset: StorageItem, position?: BoardPoint): string => {
-    const assetNodeId = boardController.addAssetNode({
+    return boardController.addAssetNode({
       asset: boardAssetReferenceFromStorageItem(asset),
       position,
     });
-
-    if (asset.sourceBoardNodeId) {
-      const sourceNode = findExecutableNodeById(boardController.board.nodes, asset.sourceBoardNodeId);
-      if (
-        sourceNode &&
-        findResultNodeForSourceStack(
-          boardController.board.nodes,
-          sourceNode.id,
-          asset.sourceBoardResultStackKey ?? sourceNode.resultStackKey ?? "",
-        )?.resultAssetIds.includes(asset.id) &&
-        !hasResultAssetConnection(boardController.board.edges, sourceNode.id, assetNodeId)
-      ) {
-        boardController.connectPorts(
-          { nodeId: sourceNode.id, portId: BOARD_PORT_IDS.resultOut, portKind: "result" },
-          { nodeId: assetNodeId, portId: BOARD_PORT_IDS.assetIn, portKind: "asset" },
-        );
-      }
-    }
-
-    return assetNodeId;
   }, [boardController]);
 
   const handleImportFilesToLibrary = useCallback(async (files: File[]) => {
@@ -5105,14 +5057,6 @@ export default function BoardPage({ boardId = DEFAULT_BOARD_ID }: BoardPageProps
     [boardController.board.nodes],
   );
   const highlightAssetId = selectedBoardNode?.kind === "asset" ? selectedBoardNode.asset.assetId : undefined;
-  const selectedAssetCompareReference = useMemo(() => {
-    if (selectedBoardNode?.kind !== "asset" || selectedBoardNode.asset.type !== "image") return null;
-    const resultEdge = boardController.board.edges.find(edge =>
-      edge.to.nodeId === selectedBoardNode.id && edge.from.portId === "result-out"
-    );
-    if (!resultEdge) return null;
-    return generateReferenceCandidates(boardController.board.nodes, boardController.board.edges, resultEdge.from.nodeId)[0] ?? null;
-  }, [boardController.board.edges, boardController.board.nodes, selectedBoardNode]);
   useEffect(() => {
     const selectedAssetIds: string[] = [];
     for (const nodeId of selectedNodeIds) {
@@ -5341,19 +5285,6 @@ export default function BoardPage({ boardId = DEFAULT_BOARD_ID }: BoardPageProps
               outgoingCount={selectedOutgoingEdges.length}
               selectedNodeCount={selectedNodeIds.length}
               videoModelGroups={videoModelGroups}
-              onCompareAsset={selectedAssetCompareReference && selectedBoardNode?.kind === "asset"
-                ? () => {
-                  const item = items.find(candidate => candidate.id === selectedBoardNode.asset.assetId);
-                  if (!item) return;
-                  void Promise.all([resolveOriginalReferences([selectedAssetCompareReference]), resolveOriginalStorageItem(item)]).then(
-                    ([references, originalItem]) => setAssetCompareRequest({
-                      originalUrl: references[0]?.url ?? selectedAssetCompareReference.url,
-                      resultUrl: originalItem.url,
-                    }),
-                    error => pushWorkspaceNotice("error", toErrorMessage(error, "Original media read failed")),
-                  );
-                }
-                : undefined}
               onDeleteEdge={boardController.deleteEdge}
               onEditAssetImage={selectedBoardNode?.kind === "asset"
                 ? () => editBoardAssetImage(selectedBoardNode.id)

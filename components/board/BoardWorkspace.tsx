@@ -1608,10 +1608,14 @@ export default function BoardWorkspace({
   }, [galleryItemById]);
 
   const assetCompareReferenceForNode = useCallback((assetNodeId: string): ReferenceImageRef | null => {
-    const resultEdge = (boardPromptReferenceGraphIndex.incomingEdgesByTargetNode.get(assetNodeId) ?? [])
-      .find(edge => edge.from.portId === "result-out");
-    if (!resultEdge) return null;
-    return boardPromptReferenceGraphIndex.referenceCandidatesByGenerateNode.get(resultEdge.from.nodeId)?.[0] ?? null;
+    const node = boardPromptReferenceGraphIndex.nodeById.get(assetNodeId);
+    if (node?.kind !== "asset" || node.asset.type !== "image") return null;
+    const sourceEdge = (boardPromptReferenceGraphIndex.incomingEdgesByTargetNode.get(assetNodeId) ?? [])
+      .find(edge => edge.from.portId === BOARD_PORT_IDS.assetOut && edge.to.portId === BOARD_PORT_IDS.assetIn);
+    if (!sourceEdge) return null;
+    const sourceNode = boardPromptReferenceGraphIndex.nodeById.get(sourceEdge.from.nodeId);
+    if (!isBoardMediaSourceNode(sourceNode) || sourceNode.asset.type !== "image") return null;
+    return { id: sourceNode.asset.assetId, role: "general", type: "image", url: sourceNode.asset.url };
   }, [boardPromptReferenceGraphIndex]);
 
   const resolveCompareReferenceUrl = useCallback(async (reference: ReferenceImageRef): Promise<string> => {
