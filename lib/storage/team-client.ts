@@ -1,7 +1,9 @@
 import { API_ROUTES } from "@/lib/api/routes";
 import { readFetchError } from "@/lib/client-fetch-error";
+import type { StorageItemMeta } from "@/lib/db";
 import type { PublicLocalStorageRuntimeStatus } from "@/lib/storage/local-public-runtime";
 import type { WORKSPACE_STORAGE_SCHEMA_VERSION } from "@/lib/storage/schema";
+import type { PublicTeamAssetPayload, PublicTeamAssetRecord, TeamAssetListResult } from "@/lib/storage/team-asset-types";
 
 export interface TeamStorageMigrationStatus {
   appliedMigrationIds: string[];
@@ -46,6 +48,14 @@ export interface TeamBootstrapOwnerInput {
   setupToken: string;
 }
 
+export interface TeamAssetListOptions {
+  boardId?: string;
+  ids?: string[];
+  limit?: number;
+  offset?: number;
+  statuses?: StorageItemMeta["status"][];
+}
+
 type Fetcher = typeof fetch;
 
 export function teamAssetMediaUrl(assetId: string, options: { download?: boolean } = {}): string {
@@ -87,6 +97,19 @@ export async function fetchTeamSession(fetcher: Fetcher = fetch): Promise<TeamSe
     throw new Error(error);
   }
   return parseTeamSessionContext(body);
+}
+
+export async function fetchTeamAssets(
+  options: TeamAssetListOptions = {},
+  fetcher: Fetcher = fetch,
+): Promise<TeamAssetListResult> {
+  const response = await fetcher(teamAssetsUrl(options), { cache: "no-store" });
+  const body: unknown = await response.json();
+  if (!response.ok) {
+    const error = readStringField(body, "error") ?? "Team asset list failed";
+    throw new Error(error);
+  }
+  return parseTeamAssetListResult(body);
 }
 
 export async function loginTeamSession(
@@ -196,6 +219,22 @@ function parseTeamSessionContext(value: unknown): TeamSessionContext {
   return value as unknown as TeamSessionContext;
 }
 
+function parseTeamAssetListResult(value: unknown): TeamAssetListResult {
+  if (!isTeamAssetListResult(value)) throw new Error("Team asset list response is invalid");
+  return value;
+}
+
+function teamAssetsUrl(options: TeamAssetListOptions): string {
+  const searchParams = new URLSearchParams();
+  if (options.boardId) searchParams.set("boardId", options.boardId);
+  for (const id of options.ids ?? []) searchParams.append("id", id);
+  if (options.limit !== undefined) searchParams.set("limit", String(options.limit));
+  if (options.offset !== undefined) searchParams.set("offset", String(options.offset));
+  for (const status of options.statuses ?? []) searchParams.append("status", status);
+  const query = searchParams.toString();
+  return query ? `${API_ROUTES.storage.teamAssets}?${query}` : API_ROUTES.storage.teamAssets;
+}
+
 function readStringField(value: unknown, field: string): string | null {
   if (!isRecord(value)) return null;
   const fieldValue = value[field];
@@ -219,4 +258,62 @@ function isPublicLocalStorageRuntimeStatus(value: unknown): value is PublicLocal
     isRecord(value.cleanupPolicy) &&
     isRecord(value.syncPolicy)
   );
+}
+
+function isTeamAssetListResult(value: unknown): value is TeamAssetListResult {
+  if (!isRecord(value)) return false;
+  return (
+    value.targetKind === "postgres" &&
+    typeof value.workspaceId === "string" &&
+    Number.isInteger(value.limit) &&
+    Number.isInteger(value.offset) &&
+    Array.isArray(value.assets) &&
+    value.assets.every(isPublicTeamAssetRecord)
+  );
+}
+
+function isPublicTeamAssetRecord(value: unknown): value is PublicTeamAssetRecord {
+  if (!isRecord(value)) return false;
+  const payload = value.payload;
+  const preview = value.preview;
+  return (
+    isStorageItemMeta(value.meta) &&
+    optionalString(value.mediaUrl) &&
+    optionalString(value.downloadUrl) &&
+    (payload === undefined || isPublicTeamAssetPayload(payload)) &&
+    (preview === undefined || isPublicTeamAssetPayload(preview))
+  );
+}
+
+function isPublicTeamAssetPayload(value: unknown): value is PublicTeamAssetPayload {
+  if (!isRecord(value)) return false;
+  return (
+    !("uri" in value) &&
+    isPayloadKind(value.kind) &&
+    optionalString(value.contentHash) &&
+    optionalString(value.mimeType) &&
+    (value.sizeBytes === undefined || typeof value.sizeBytes === "number")
+  );
+}
+
+function isStorageItemMeta(value: unknown): value is StorageItemMeta {
+  if (!isRecord(value)) return false;
+  return (
+    typeof value.id === "string" &&
+    typeof value.type === "string" &&
+    isStorageItemStatus(value.status) &&
+    typeof value.hasBlob === "boolean"
+  );
+}
+
+function isStorageItemStatus(value: unknown): value is StorageItemMeta["status"] {
+  return value === "complete" || value === "processing" || value === "pending" || value === "failed";
+}
+
+function isPayloadKind(value: unknown): value is PublicTeamAssetPayload["kind"] {
+  return value === "indexeddb" || value === "inline" || value === "local-file" || value === "object-storage";
+}
+
+function optionalString(value: unknown): boolean {
+  return value === undefined || typeof value === "string";
 }

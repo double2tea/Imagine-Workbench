@@ -28,6 +28,7 @@ export const API_ROUTES = {
   storage: {
     localStatus: "/api/storage/local/status",
     teamBootstrap: "/api/storage/team/bootstrap",
+    teamAssets: "/api/storage/team/assets",
     teamAssetMedia: (assetId: string, options: { download?: boolean } = {}) => {
       const url = `/api/storage/team/assets/${encodeURIComponent(assetId)}/media`;
       return options.download ? `${url}?download=1` : url;

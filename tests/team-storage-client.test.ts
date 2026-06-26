@@ -3,6 +3,7 @@ import test from "node:test";
 
 import {
   bootstrapTeamOwner,
+  fetchTeamAssets,
   fetchTeamStorageHealth,
   fetchTeamSession,
   loginTeamSession,
@@ -51,6 +52,69 @@ test("teamAssetMediaUrl encodes asset ids and download intent", () => {
   assert.equal(
     teamAssetMediaUrl("asset/with/slash", { download: true }),
     "/api/storage/team/assets/asset%2Fwith%2Fslash/media?download=1",
+  );
+});
+
+test("fetchTeamAssets sends list filters and rejects payload storage keys", async () => {
+  let requestedUrl = "";
+  const result = await fetchTeamAssets({
+    boardId: "board_1",
+    ids: ["asset_1", "asset with spaces"],
+    limit: 20,
+    offset: 5,
+    statuses: ["complete", "failed"],
+  }, async input => {
+    requestedUrl = String(input);
+    return jsonResponse({
+      assets: [{
+        downloadUrl: "/api/storage/team/assets/asset_1/media?download=1",
+        mediaUrl: "/api/storage/team/assets/asset_1/media",
+        meta: {
+          hasBlob: true,
+          id: "asset_1",
+          status: "complete",
+          type: "image",
+        },
+        payload: {
+          contentHash: "sha256:abc",
+          kind: "local-file",
+          mimeType: "image/png",
+          sizeBytes: 12,
+        },
+      }],
+      limit: 20,
+      offset: 5,
+      targetKind: "postgres",
+      workspaceId: "workspace_1",
+    });
+  });
+
+  assert.equal(
+    requestedUrl,
+    "/api/storage/team/assets?boardId=board_1&id=asset_1&id=asset+with+spaces&limit=20&offset=5&status=complete&status=failed",
+  );
+  assert.equal(result.assets[0]?.payload?.kind, "local-file");
+
+  await assert.rejects(
+    fetchTeamAssets(undefined, async () => jsonResponse({
+      assets: [{
+        meta: {
+          hasBlob: true,
+          id: "asset_1",
+          status: "complete",
+          type: "image",
+        },
+        payload: {
+          kind: "local-file",
+          uri: "originals/image/secret.png",
+        },
+      }],
+      limit: 100,
+      offset: 0,
+      targetKind: "postgres",
+      workspaceId: "workspace_1",
+    })),
+    /Team asset list response is invalid/,
   );
 });
 
