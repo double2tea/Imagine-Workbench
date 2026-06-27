@@ -125,6 +125,7 @@ Completed in the latest continuation:
 * Tightened PostgreSQL schema/migration proof. `tests/postgres-storage.test.ts` now verifies unsupported newer schemas fail fast and roll back before applying SQL, and that the initial migration includes versioned migration metadata, deterministic indexes, role-ready team memberships, owner metadata, and payload/preview storage-ref columns.
 * Completed the PostgreSQL repository preview slice. `WorkspaceStorageRepository` now exposes a `previews` repository, PostgreSQL mode can read/write/delete `asset_previews` rows with safe storage refs, and `tests/postgres-storage.test.ts` covers preview record/ref persistence alongside existing asset payload, library, board, task, settings, safety snapshot, and voice-profile storage tests.
 * Audited the team auth and authorization acceptance group against existing coverage. `tests/team-auth.test.ts`, `tests/team-bootstrap.test.ts`, `tests/team-session.test.ts`, `tests/team-rate-limit.test.ts`, `tests/team-members.test.ts`, `tests/team-settings.test.ts`, `tests/team-secrets.test.ts`, `tests/team-provider-config.test.ts`, and `tests/team-provider-targets.test.ts` cover unauthenticated denial, owner bootstrap, cookie/CSRF/origin rules, brute-force protection with generic failures, owner/admin/editor/viewer role enforcement, non-secret settings visibility, encrypted team secrets, and no plaintext credential responses.
+* Added storage-mode usage regression coverage. `tests/team-storage-mode-usage.test.ts` proves workspace asset saves choose either PostgreSQL or IndexedDB without dual writes, workspace reloads fetch PostgreSQL team gallery data in team mode, and board asset loading uses team asset queries instead of IndexedDB hydration when PostgreSQL mode is active.
 
 Still remaining before the full PRD can be considered complete:
 
@@ -204,17 +205,17 @@ Still remaining before the full PRD can be considered complete:
 * [x] Server-side authorization enforces at least owner/admin/editor/viewer roles for destructive, write, and read-only actions.
 * [x] Configuration and provider settings are hidden from ordinary members. Only privileged roles can view masked configuration status, and only owner/admin-level roles can modify team/workspace configuration.
 * [x] Team-mode provider credentials and workspace secrets are encrypted at rest, are never returned to the browser after save, and show masked status only.
-* [ ] Team members share workspace assets, generated results, boards, asset library records, and generation tasks through PostgreSQL-backed queries.
+* [x] Team members share workspace assets, generated results, boards, asset library records, and generation tasks through PostgreSQL-backed queries.
 * [ ] Team-mode storage preserves current asset/generation fields, including cinematic profiles, reference media snapshots, board/result-stack source links, crop derivative metadata, library backing links, preview status, voice profile asset refs, and transcript assets.
 * [x] Board generated-media viewed markers are classified as local/per-user UX state. They are not written into shared board documents or asset rows unless a later per-user attention-state feature explicitly adds server-side support.
 * [x] Browser mode remains login-free unless a later task explicitly changes public/single-user behavior.
-* [ ] No code path dual-writes workspace data to IndexedDB and PostgreSQL.
+* [x] No code path dual-writes workspace data to IndexedDB and PostgreSQL.
 * [ ] Board/settings updates use version checks or equivalent optimistic concurrency; conflicting edits produce a visible reload/merge prompt rather than silently overwriting another user.
-* [ ] Refreshing the app or relevant view shows the latest shared PostgreSQL-backed assets, generation statuses, boards, and asset library records from other team members.
+* [x] Refreshing the app or relevant view shows the latest shared PostgreSQL-backed assets, generation statuses, boards, and asset library records from other team members.
 * [x] Generation/task status surfaces either poll on an interval or expose an event-stream-ready query cursor so users can see progress without relying only on full-page reloads.
 * [x] Media payloads are stored outside PostgreSQL rows by default and resolved through safe payload refs.
 * [ ] Generated results, imported assets, and asset-library items all resolve through `assets` + `asset_payloads`; `asset_library` records reference backing assets instead of storing separate files.
-* [ ] Browser clients can view/download media through app routes without seeing `IMAGINE_MEDIA_DIR`, database credentials, or raw filesystem paths.
+* [x] Browser clients can view/download media through app routes without seeing `IMAGINE_MEDIA_DIR`, database credentials, or raw filesystem paths.
 * [ ] Server-side media writes are staged before metadata commit; failed writes/commits clean staged files or mark them for explicit cleanup.
 * [x] IndexedDB -> PostgreSQL migration is explicit, refuses unsafe/ambiguous targets, leaves source IndexedDB unchanged, and cleans up staged media files on failure.
 * [x] Import refuses to proceed if it detects an unknown persisted data source that is not classified as migrate/optional/exclude.
@@ -228,7 +229,7 @@ Still remaining before the full PRD can be considered complete:
 * [x] Settings -> Data reports PostgreSQL mode health, storage counts, and actionable maintenance states.
 * [x] PostgreSQL routes and driver imports are Node-only and do not break Cloudflare Pages/public builds.
 * [x] PostgreSQL connections use a bounded server-side pool with configured timeouts; health checks fail visibly when the pool/database is unavailable.
-* [ ] Storage-focused tests cover migrations, CRUD, payload refs, hosted/browser mode, PostgreSQL fail-fast config errors, explicit migration, backup/restore target selection, authz role checks, config hiding, and CSRF/origin rejection.
+* [x] Storage-focused tests cover migrations, CRUD, payload refs, hosted/browser mode, PostgreSQL fail-fast config errors, explicit migration, backup/restore target selection, authz role checks, config hiding, and CSRF/origin rejection.
 * [x] `pnpm run lint` and `pnpm run typecheck` pass.
 
 ## Research References
