@@ -1,6 +1,7 @@
 import type { BoardDocument } from "@/lib/board/types";
 import type { LibraryAssetRecord, StorageItem } from "@/lib/db";
 import type { GenerationTask } from "@/lib/generation-tasks";
+import type { WorkspaceSettingGroup } from "@/lib/storage/schema";
 import type { WorkspaceSafetySnapshotReason } from "@/lib/storage/schema";
 import type { VoiceProfile } from "@/lib/voice-profiles";
 
@@ -43,8 +44,16 @@ export interface WorkspaceBackupAssetRecord extends Omit<StorageItem, "url"> {
   url?: string;
 }
 
+export interface WorkspaceBackupTeamSetting {
+  group: WorkspaceSettingGroup;
+  key: string;
+  value: string;
+}
+
 export interface WorkspaceBackupSettings {
   localStorage: Record<string, string>;
+  teamSecrets?: WorkspaceBackupTeamSetting[];
+  teamSettings?: WorkspaceBackupTeamSetting[];
 }
 
 export interface ParsedBackup {

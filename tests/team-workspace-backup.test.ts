@@ -12,6 +12,11 @@ import type { GenerationTask } from "../lib/generation-tasks";
 import type { PostgresQueryable } from "../lib/storage/postgres/connection";
 import { hashTeamSessionToken } from "../lib/storage/team-auth";
 import {
+  decryptWorkspaceSecret,
+  encryptWorkspaceSecret,
+  isEncryptedWorkspaceSecret,
+} from "../lib/storage/team-secret-crypto";
+import {
   exportTeamWorkspaceBackup,
   restoreTeamWorkspaceBackup,
 } from "../lib/storage/team-workspace-backup";
@@ -31,6 +36,7 @@ import type { VoiceProfile } from "../lib/voice-profiles";
 const RAW_SESSION_TOKEN = "raw-session-token";
 const WORKSPACE_ID = "workspace_1";
 const CREATED_AT = "2026-06-27T00:00:00.000Z";
+const ENCRYPTION_KEY = "team-backup-encryption-key";
 
 function queryResult<T extends QueryResultRow>(rows: T[]): QueryResult<T> {
   return {
@@ -87,7 +93,10 @@ test("exportTeamWorkspaceBackup writes a redacted portable workspace zip and aud
     const boards = JSON.parse(await readZipText(zip, "boards/index.json")) as Array<Record<string, unknown>>;
     assert.equal(JSON.stringify(boards).includes("board-secret"), false);
     assert.deepEqual(JSON.parse(await readZipText(zip, "generation-tasks/index.json")), [GENERATION_TASK]);
-    assert.deepEqual(JSON.parse(await readZipText(zip, "settings/local-storage.json")), { localStorage: {} });
+    assert.deepEqual(JSON.parse(await readZipText(zip, "settings/local-storage.json")), {
+      localStorage: {},
+      teamSettings: [],
+    });
     assert.deepEqual(
       queries.find(query => query.text.startsWith("insert into audit_events"))?.values?.slice(0, 3),
       [WORKSPACE_ID, "user_1", "team_backup.export"],
@@ -95,17 +104,41 @@ test("exportTeamWorkspaceBackup writes a redacted portable workspace zip and aud
   });
 });
 
-test("exportTeamWorkspaceBackup rejects credential-inclusive exports explicitly", async () => {
+test("exportTeamWorkspaceBackup includes team settings and opt-in secrets", async () => {
   await withTempMediaDir(async mediaDir => {
-    await assert.rejects(
-      exportTeamWorkspaceBackup(
-        createTeamBackupQueryable(),
+    await writeMediaFile(mediaDir, "originals/image/asset.png", "image-bytes");
+    await withTeamEncryptionKey(async () => {
+      const result = await exportTeamWorkspaceBackup(
+        createTeamBackupQueryable([], {
+          settingsRows: [
+            settingRow("provider:runninghub:baseUrl", "provider", "https://runninghub.example.test", false),
+            settingRow("provider:runninghub:apiKey", "provider", encryptedSecret("runninghub-secret"), true),
+          ],
+        }),
         { databaseUrl: "postgres://localhost/imagine", mediaDir },
         requestWithSession(),
         true,
-      ),
-      /credential-inclusive backup export is not available yet/,
-    );
+      );
+
+      assert.equal(result.settingsKeyCount, 2);
+      const zip = await JSZip.loadAsync(result.body);
+      const settings = JSON.parse(await readZipText(zip, SETTINGS_FILE)) as {
+        localStorage: Record<string, string>;
+        teamSecrets: Array<{ group: string; key: string; value: string }>;
+        teamSettings: Array<{ group: string; key: string; value: string }>;
+      };
+      assert.deepEqual(settings.localStorage, {});
+      assert.deepEqual(settings.teamSettings, [{
+        group: "provider",
+        key: "provider:runninghub:baseUrl",
+        value: "https://runninghub.example.test",
+      }]);
+      assert.deepEqual(settings.teamSecrets, [{
+        group: "provider",
+        key: "provider:runninghub:apiKey",
+        value: "runninghub-secret",
+      }]);
+    });
   });
 });
 
@@ -142,9 +175,68 @@ test("restoreTeamWorkspaceBackup replaces team workspace records and stores a sa
   });
 });
 
-test("restoreTeamWorkspaceBackup rejects credential-inclusive restores explicitly", async () => {
+test("restoreTeamWorkspaceBackup restores team settings and opt-in secrets", async () => {
   await withTempMediaDir(async mediaDir => {
-    const backup = await createPortableTeamBackup();
+    await withTeamEncryptionKey(async () => {
+      const queries: Array<{ text: string; values?: readonly unknown[] }> = [];
+      const backup = await createPortableTeamBackup({
+        teamSecrets: [{ group: "provider", key: "provider:runninghub:apiKey", value: "restored-secret" }],
+        teamSettings: [{ group: "provider", key: "provider:runninghub:baseUrl", value: "https://restored.example.test" }],
+      });
+      const result = await restoreTeamWorkspaceBackup(
+        createTeamBackupQueryable(queries, {
+          existingRecords: false,
+          settingsRows: [
+            settingRow("provider:oldBaseUrl", "provider", "https://old.example.test", false),
+            settingRow("provider:oldApiKey", "provider", encryptedSecret("old-secret"), true),
+          ],
+        }),
+        { databaseUrl: "postgres://localhost/imagine", mediaDir },
+        requestWithSession(),
+        new Blob([backup], { type: "application/zip" }),
+        true,
+      );
+
+      assert.equal(result.settingsKeyCount, 2);
+      assert.ok(queries.some(query => query.text === "delete from settings where workspace_id = $1 and key = $2" && query.values?.[1] === "provider:oldBaseUrl"));
+      assert.ok(queries.some(query => query.text === "delete from settings where workspace_id = $1 and key = $2" && query.values?.[1] === "provider:oldApiKey"));
+      const settingWrites = queries.filter(query => query.text.startsWith("insert into settings"));
+      const baseUrlWrite = settingWrites.find(query => query.values?.[1] === "provider:runninghub:baseUrl");
+      const secretWrite = settingWrites.find(query => query.values?.[1] === "provider:runninghub:apiKey");
+      assert.equal(baseUrlWrite?.values?.[3], "https://restored.example.test");
+      assert.equal(baseUrlWrite?.values?.[4], false);
+      const secretValue = String(secretWrite?.values?.[3] ?? "");
+      assert.equal(secretWrite?.values?.[4], true);
+      assert.equal(isEncryptedWorkspaceSecret(secretValue), true);
+      assert.equal(decryptWorkspaceSecret(secretValue, ENCRYPTION_KEY), "restored-secret");
+    });
+  });
+});
+
+test("restoreTeamWorkspaceBackup rejects credential settings without opt-in", async () => {
+  await withTempMediaDir(async mediaDir => {
+    const backup = await createPortableTeamBackup({
+      teamSecrets: [{ group: "provider", key: "provider:runninghub:apiKey", value: "restored-secret" }],
+    });
+    await assert.rejects(
+      restoreTeamWorkspaceBackup(
+        createTeamBackupQueryable([], { existingRecords: false }),
+        { databaseUrl: "postgres://localhost/imagine", mediaDir },
+        requestWithSession(),
+        new Blob([backup], { type: "application/zip" }),
+        false,
+      ),
+      /credential restore requires the credentials option/,
+    );
+  });
+});
+
+test("restoreTeamWorkspaceBackup rejects duplicate team setting keys", async () => {
+  await withTempMediaDir(async mediaDir => {
+    const backup = await createPortableTeamBackup({
+      teamSecrets: [{ group: "provider", key: "provider:runninghub:apiKey", value: "restored-secret" }],
+      teamSettings: [{ group: "provider", key: "provider:runninghub:apiKey", value: "plain-value" }],
+    });
     await assert.rejects(
       restoreTeamWorkspaceBackup(
         createTeamBackupQueryable([], { existingRecords: false }),
@@ -153,7 +245,7 @@ test("restoreTeamWorkspaceBackup rejects credential-inclusive restores explicitl
         new Blob([backup], { type: "application/zip" }),
         true,
       ),
-      /credential-inclusive backup restore is not available yet/,
+      /Duplicate team setting provider:runninghub:apiKey/,
     );
   });
 });
@@ -187,7 +279,7 @@ function requestWithSession(): Request {
 
 function createTeamBackupQueryable(
   queries: Array<{ text: string; values?: readonly unknown[] }> = [],
-  options: { existingRecords?: boolean } = {},
+  options: { existingRecords?: boolean; settingsRows?: QueryResultRow[] } = {},
 ): PostgresQueryable {
   const existingRecords = options.existingRecords ?? true;
   return {
@@ -209,12 +301,20 @@ function createTeamBackupQueryable(
       if (text.includes("select boards.board")) return typedQueryResult<T>(existingRecords ? [{ board: BOARD, summary: null }] : []);
       if (text.includes("select task from generation_tasks")) return typedQueryResult<T>(existingRecords ? [{ task: GENERATION_TASK }] : []);
       if (text.includes("select profile from voice_profiles")) return typedQueryResult<T>(existingRecords ? [{ profile: VOICE_PROFILE }] : []);
+      if (text.startsWith("select key") && text.includes("from settings")) {
+        const rows = options.settingsRows ?? [];
+        return typedQueryResult<T>(text.includes("is_secret = false") ? rows.filter(row => row.is_secret === false) : rows);
+      }
       return typedQueryResult<T>([]);
     },
   };
 }
 
-async function createPortableTeamBackup(): Promise<ArrayBuffer> {
+async function createPortableTeamBackup(settings: {
+  teamSecrets?: Array<{ group: string; key: string; value: string }>;
+  teamSettings?: Array<{ group: string; key: string; value: string }>;
+} = {}): Promise<ArrayBuffer> {
+  const settingsKeyCount = (settings.teamSecrets?.length ?? 0) + (settings.teamSettings?.length ?? 0);
   const zip = new JSZip();
   zip.file(MANIFEST_FILE, JSON.stringify({
     app: BACKUP_APP_NAME,
@@ -225,7 +325,7 @@ async function createPortableTeamBackup(): Promise<ArrayBuffer> {
       boards: 1,
       generationTasks: 1,
       libraryAssets: 1,
-      settingsKeys: 0,
+      settingsKeys: settingsKeyCount,
       voiceProfiles: 1,
     },
     exportedAt: CREATED_AT,
@@ -245,8 +345,36 @@ async function createPortableTeamBackup(): Promise<ArrayBuffer> {
   zip.file(BOARD_INDEX_FILE, JSON.stringify([BOARD]));
   zip.file(GENERATION_TASK_INDEX_FILE, JSON.stringify([GENERATION_TASK]));
   zip.file(VOICE_PROFILE_INDEX_FILE, JSON.stringify([VOICE_PROFILE]));
-  zip.file(SETTINGS_FILE, JSON.stringify({ localStorage: {} }));
+  zip.file(SETTINGS_FILE, JSON.stringify({ localStorage: {}, ...settings }));
   return zip.generateAsync({ type: "arraybuffer" });
+}
+
+async function withTeamEncryptionKey<T>(run: () => Promise<T>): Promise<T> {
+  const previous = process.env.IMAGINE_TEAM_SECRET_ENCRYPTION_KEY;
+  process.env.IMAGINE_TEAM_SECRET_ENCRYPTION_KEY = ENCRYPTION_KEY;
+  try {
+    return await run();
+  } finally {
+    if (previous === undefined) {
+      delete process.env.IMAGINE_TEAM_SECRET_ENCRYPTION_KEY;
+    } else {
+      process.env.IMAGINE_TEAM_SECRET_ENCRYPTION_KEY = previous;
+    }
+  }
+}
+
+function encryptedSecret(value: string): string {
+  return encryptWorkspaceSecret(value, ENCRYPTION_KEY);
+}
+
+function settingRow(key: string, group: string, value: string, isSecret: boolean): QueryResultRow {
+  return {
+    group_name: group,
+    is_secret: isSecret,
+    key,
+    updated_at: CREATED_AT,
+    value_text: value,
+  };
 }
 
 const SESSION_ROW = {

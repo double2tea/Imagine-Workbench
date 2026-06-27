@@ -6,16 +6,23 @@ import type { LibraryAssetRecord, StorageItemMeta, StorageItemType } from "@/lib
 import type { GenerationTask } from "@/lib/generation-tasks";
 import { dataUriToBlob, parseDataUri } from "@/lib/providers/utils";
 import { LocalFilePayloadStore } from "@/lib/storage/local-file-payload-store";
-import type { PostgresStorageConfig } from "@/lib/storage/postgres/config";
+import { requireTeamSecretEncryptionKey, type PostgresStorageConfig } from "@/lib/storage/postgres/config";
 import type { PostgresQueryable } from "@/lib/storage/postgres/connection";
 import type { WorkspaceStorageRepository } from "@/lib/storage/repository";
 import type {
   WorkspaceAssetRecord,
   WorkspaceAssetPayloadRef,
   WorkspaceSafetySnapshotRecord,
+  WorkspaceSettingGroup,
+  WorkspaceSettingRecord,
 } from "@/lib/storage/schema";
 import { recordTeamAuditEvent } from "@/lib/storage/team-audit";
 import { createTeamWorkspaceStorageContext } from "@/lib/storage/team-context";
+import {
+  decryptWorkspaceSecret,
+  encryptWorkspaceSecret,
+  isEncryptedWorkspaceSecret,
+} from "@/lib/storage/team-secret-crypto";
 import { redactTeamBoardDocument } from "@/lib/storage/team-boards";
 import type {
   TeamWorkspaceBackupExport,
@@ -36,6 +43,7 @@ import {
   type WorkspaceBackupAssetRecord,
   type WorkspaceBackupManifest,
   type WorkspaceBackupSettings,
+  type WorkspaceBackupTeamSetting,
 } from "@/lib/workspace-backup-format";
 import type { VoiceProfile } from "@/lib/voice-profiles";
 
@@ -47,12 +55,6 @@ export async function exportTeamWorkspaceBackup(
   request: Request,
   includeCredentials: boolean,
 ): Promise<TeamWorkspaceBackupExport> {
-  if (includeCredentials) {
-    throw badRequest(
-      "PostgreSQL credential-inclusive backup export is not available yet",
-      "team_backup_credentials_unsupported",
-    );
-  }
   const context = await createTeamWorkspaceStorageContext(queryable, config, request, { minimumRole: "admin" });
   const zip = new JSZip();
   const assets = await listAll(offset => context.repository.assets.list({ limit: BACKUP_PAGE_SIZE, offset }));
@@ -60,12 +62,12 @@ export async function exportTeamWorkspaceBackup(
   const libraryRecords = await listAll(offset => context.repository.assetLibrary.list({ limit: BACKUP_PAGE_SIZE, offset }));
   const generationTasks = await listAll(offset => context.repository.generationTasks.list({ limit: BACKUP_PAGE_SIZE, offset }));
   const voiceProfiles = await listAll(offset => context.repository.voiceProfiles.list({ limit: BACKUP_PAGE_SIZE, offset }));
+  const settings = await exportTeamBackupSettings(context.repository, includeCredentials);
   const assetRecords: WorkspaceBackupAssetRecord[] = [];
   for (const asset of assets) {
     assetRecords.push(await addTeamAssetToZip(zip, context.repository.payloads.read.bind(context.repository.payloads), asset));
   }
   const exportedAt = new Date().toISOString();
-  const settings = { localStorage: {} };
   const manifest: WorkspaceBackupManifest = {
     app: BACKUP_APP_NAME,
     assetsFile: ASSET_INDEX_FILE,
@@ -75,7 +77,7 @@ export async function exportTeamWorkspaceBackup(
       boards: boards.length,
       generationTasks: generationTasks.length,
       libraryAssets: libraryRecords.length,
-      settingsKeys: Object.keys(settings.localStorage).length,
+      settingsKeys: countBackupSettings(settings),
       voiceProfiles: voiceProfiles.length,
     },
     exportedAt,
@@ -102,7 +104,7 @@ export async function exportTeamWorkspaceBackup(
       generationTaskCount: generationTasks.length,
       includeCredentials,
       libraryAssetCount: libraryRecords.length,
-      settingsKeyCount: Object.keys(settings.localStorage).length,
+      settingsKeyCount: countBackupSettings(settings),
       voiceProfileCount: voiceProfiles.length,
     },
     userId: context.session.userId,
@@ -115,7 +117,7 @@ export async function exportTeamWorkspaceBackup(
     fileName,
     generationTaskCount: generationTasks.length,
     libraryAssetCount: libraryRecords.length,
-    settingsKeyCount: Object.keys(settings.localStorage).length,
+    settingsKeyCount: countBackupSettings(settings),
     targetKind: "postgres",
     voiceProfileCount: voiceProfiles.length,
     workspaceId: context.session.workspaceId,
@@ -129,14 +131,15 @@ export async function restoreTeamWorkspaceBackup(
   backupFile: Blob,
   includeCredentials: boolean,
 ): Promise<TeamWorkspaceBackupRestoreResult> {
-  if (includeCredentials) {
+  const parsed = await parseTeamWorkspaceBackup(backupFile);
+  if (parsed.settings.teamSecrets?.length && !includeCredentials) {
     throw badRequest(
-      "PostgreSQL credential-inclusive backup restore is not available yet",
-      "team_restore_credentials_unsupported",
+      "PostgreSQL credential restore requires the credentials option",
+      "team_restore_credentials_required",
     );
   }
+  const encryptionKey = includeCredentials ? requireTeamSecretEncryptionKey(process.env) : undefined;
   const context = await createTeamWorkspaceStorageContext(queryable, config, request, { minimumRole: "admin" });
-  const parsed = await parseTeamWorkspaceBackup(backupFile);
   if (Object.keys(parsed.settings.localStorage).length > 0) {
     throw badRequest(
       "PostgreSQL backup settings restore is not available yet",
@@ -164,6 +167,7 @@ export async function restoreTeamWorkspaceBackup(
     for (const profile of parsed.voiceProfiles) {
       await context.repository.voiceProfiles.put({ profile });
     }
+    await restoreTeamBackupSettings(context.repository, parsed.settings, includeCredentials, encryptionKey);
     await recordTeamAuditEvent(context.queryable, {
       eventType: "team_backup.restore",
       metadata: {
@@ -172,7 +176,7 @@ export async function restoreTeamWorkspaceBackup(
         generationTaskCount: parsed.generationTasks.length,
         libraryAssetCount: parsed.libraryAssets.length,
         safetySnapshotId: safetySnapshot.id,
-        settingsKeyCount: 0,
+        settingsKeyCount: countBackupSettings(parsed.settings),
         voiceProfileCount: parsed.voiceProfiles.length,
       },
       userId: context.session.userId,
@@ -191,11 +195,84 @@ export async function restoreTeamWorkspaceBackup(
     generationTaskCount: parsed.generationTasks.length,
     libraryAssetCount: parsed.libraryAssets.length,
     safetySnapshotId: safetySnapshot.id,
-    settingsKeyCount: 0,
+    settingsKeyCount: countBackupSettings(parsed.settings),
     targetKind: "postgres",
     voiceProfileCount: parsed.voiceProfiles.length,
     workspaceId: context.session.workspaceId,
   };
+}
+
+async function exportTeamBackupSettings(
+  repository: WorkspaceStorageRepository,
+  includeCredentials: boolean,
+): Promise<WorkspaceBackupSettings> {
+  const records = await repository.settings.list({ includeSecrets: includeCredentials });
+  const encryptionKey = includeCredentials ? requireTeamSecretEncryptionKey(process.env) : undefined;
+  const teamSettings: WorkspaceBackupTeamSetting[] = [];
+  const teamSecrets: WorkspaceBackupTeamSetting[] = [];
+  for (const record of records) {
+    if (record.isSecret) {
+      if (!includeCredentials) continue;
+      if (!encryptionKey || !isEncryptedWorkspaceSecret(record.value)) {
+        throw new Error(`Team setting ${record.key} must be stored as an encrypted secret`);
+      }
+      teamSecrets.push(toBackupTeamSetting(record, decryptWorkspaceSecret(record.value, encryptionKey)));
+    } else {
+      teamSettings.push(toBackupTeamSetting(record, record.value));
+    }
+  }
+  return {
+    localStorage: {},
+    teamSecrets: includeCredentials ? teamSecrets : undefined,
+    teamSettings,
+  };
+}
+
+async function restoreTeamBackupSettings(
+  repository: WorkspaceStorageRepository,
+  settings: WorkspaceBackupSettings,
+  includeCredentials: boolean,
+  encryptionKey: string | undefined,
+): Promise<void> {
+  const existing = await repository.settings.list({ includeSecrets: includeCredentials });
+  for (const record of existing) {
+    if (!record.isSecret || includeCredentials) await repository.settings.delete(record.key);
+  }
+  for (const setting of settings.teamSettings ?? []) {
+    await repository.settings.put({
+      group: setting.group,
+      isSecret: false,
+      key: setting.key,
+      updatedAt: new Date().toISOString(),
+      value: setting.value,
+    });
+  }
+  for (const secret of settings.teamSecrets ?? []) {
+    if (!includeCredentials || !encryptionKey) {
+      throw badRequest("PostgreSQL credential restore requires the credentials option", "team_restore_credentials_required");
+    }
+    await repository.settings.put({
+      group: secret.group,
+      isSecret: true,
+      key: secret.key,
+      updatedAt: new Date().toISOString(),
+      value: encryptWorkspaceSecret(secret.value, encryptionKey),
+    });
+  }
+}
+
+function toBackupTeamSetting(record: WorkspaceSettingRecord, value: string): WorkspaceBackupTeamSetting {
+  return {
+    group: record.group,
+    key: record.key,
+    value,
+  };
+}
+
+function countBackupSettings(settings: WorkspaceBackupSettings): number {
+  return Object.keys(settings.localStorage).length +
+    (settings.teamSettings?.length ?? 0) +
+    (settings.teamSecrets?.length ?? 0);
 }
 
 async function listAll<T>(load: (offset: number) => Promise<T[]>): Promise<T[]> {
@@ -388,7 +465,7 @@ async function parseTeamWorkspaceBackup(file: Blob): Promise<ParsedTeamWorkspace
   if ((manifest.counts.voiceProfiles ?? 0) !== voiceProfiles.length) {
     throw badRequest("Backup voice profile count does not match manifest", "invalid_team_backup");
   }
-  if (manifest.counts.settingsKeys !== Object.keys(settings.localStorage).length) {
+  if (manifest.counts.settingsKeys !== countBackupSettings(settings)) {
     throw badRequest("Backup settings count does not match manifest", "invalid_team_backup");
   }
   validateImportedReferences({
@@ -507,7 +584,45 @@ function parseTeamBackupSettings(text: string): WorkspaceBackupSettings {
     if (typeof item !== "string") throw badRequest(`Setting ${key} is invalid`, "invalid_team_backup");
     entries[key] = item;
   }
-  return { localStorage: entries };
+  const teamSecrets = parseTeamBackupSettingRecords(value, "teamSecrets");
+  const teamSettings = parseTeamBackupSettingRecords(value, "teamSettings");
+  validateUniqueTeamBackupSettingKeys(teamSettings, teamSecrets);
+  return {
+    localStorage: entries,
+    teamSecrets,
+    teamSettings,
+  };
+}
+
+function parseTeamBackupSettingRecords(
+  record: Record<string, unknown>,
+  key: "teamSecrets" | "teamSettings",
+): WorkspaceBackupTeamSetting[] | undefined {
+  const value = record[key];
+  if (value === undefined) return undefined;
+  if (!Array.isArray(value)) throw badRequest(`${key} must be an array`, "invalid_team_backup");
+  const seen = new Set<string>();
+  return value.map((item, index) => {
+    if (!isRecord(item)) throw badRequest(`${key} item ${index + 1} is invalid`, "invalid_team_backup");
+    const group = readSettingGroup(item, "group");
+    const settingKey = readString(item, "key");
+    const valueText = readString(item, "value");
+    const dedupeKey = `${group}:${settingKey}`;
+    if (seen.has(dedupeKey)) throw badRequest(`Duplicate ${key} setting ${settingKey}`, "invalid_team_backup");
+    seen.add(dedupeKey);
+    return { group, key: settingKey, value: valueText };
+  });
+}
+
+function validateUniqueTeamBackupSettingKeys(
+  teamSettings: WorkspaceBackupTeamSetting[] | undefined,
+  teamSecrets: WorkspaceBackupTeamSetting[] | undefined,
+): void {
+  const seen = new Set<string>();
+  for (const setting of [...(teamSettings ?? []), ...(teamSecrets ?? [])]) {
+    if (seen.has(setting.key)) throw badRequest(`Duplicate team setting ${setting.key}`, "invalid_team_backup");
+    seen.add(setting.key);
+  }
 }
 
 function parseRecordArray<T>(text: string, label: string): T[] {
@@ -620,6 +735,12 @@ function readAssetType(record: Record<string, unknown>, key: string): StorageIte
 function readAssetStatus(record: Record<string, unknown>, key: string): StorageItemMeta["status"] {
   const value = record[key];
   if (value === "complete" || value === "processing" || value === "failed") return value;
+  throw badRequest(`${key} is invalid`, "invalid_team_backup");
+}
+
+function readSettingGroup(record: Record<string, unknown>, key: string): WorkspaceSettingGroup {
+  const value = record[key];
+  if (value === "agent" || value === "model-cache" || value === "provider" || value === "ui" || value === "other") return value;
   throw badRequest(`${key} is invalid`, "invalid_team_backup");
 }
 
