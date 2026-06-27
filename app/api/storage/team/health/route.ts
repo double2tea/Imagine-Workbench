@@ -1,6 +1,10 @@
 import { APP_VERSION } from "@/lib/app-version";
 import { checkPostgresConnection, withPostgresClient } from "@/lib/storage/postgres/connection";
-import { PostgresStorageConfigError, resolvePostgresStorageConfig } from "@/lib/storage/postgres/config";
+import {
+  assertPostgresMediaDirectoryAccess,
+  PostgresStorageConfigError,
+  resolvePostgresStorageConfig,
+} from "@/lib/storage/postgres/config";
 import { getPostgresMigrationStatus } from "@/lib/storage/postgres/migrations";
 
 export const runtime = "nodejs";
@@ -9,6 +13,7 @@ export const dynamic = "force-dynamic";
 export async function GET(): Promise<Response> {
   try {
     const config = resolvePostgresStorageConfig(process.env);
+    await assertPostgresMediaDirectoryAccess(config.mediaDir);
     const migrationStatus = await withPostgresClient(config, async client => {
       await checkPostgresConnection(client);
       return getPostgresMigrationStatus(client);

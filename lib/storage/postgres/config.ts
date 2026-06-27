@@ -1,3 +1,5 @@
+import { constants as fsConstants } from "node:fs";
+import { access, stat } from "node:fs/promises";
 import {
   DATABASE_URL_ENV,
   IMAGINE_MAX_MEDIA_PAYLOAD_BYTES_ENV,
@@ -133,4 +135,19 @@ export function requireTeamSecretEncryptionKey(env: LocalStorageEnvironment): st
   const key = env[IMAGINE_TEAM_SECRET_ENCRYPTION_KEY_ENV]?.trim();
   if (!key) throw new PostgresStorageConfigError(`${IMAGINE_TEAM_SECRET_ENCRYPTION_KEY_ENV} is required for team workspace secrets`);
   return key;
+}
+
+export async function assertPostgresMediaDirectoryAccess(mediaDir: string): Promise<void> {
+  const stats = await stat(mediaDir).catch(() => null);
+  if (!stats) {
+    throw new PostgresStorageConfigError(`${IMAGINE_MEDIA_DIR_ENV} is not accessible`);
+  }
+  if (!stats.isDirectory()) {
+    throw new PostgresStorageConfigError(`${IMAGINE_MEDIA_DIR_ENV} must be a directory`);
+  }
+  try {
+    await access(mediaDir, fsConstants.R_OK | fsConstants.W_OK | fsConstants.X_OK);
+  } catch {
+    throw new PostgresStorageConfigError(`${IMAGINE_MEDIA_DIR_ENV} must be readable and writable`);
+  }
 }

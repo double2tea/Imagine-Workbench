@@ -111,6 +111,7 @@ Completed in the latest continuation:
 * Hardened team safety snapshot audit consistency. Safety snapshot saves now wrap the trusted snapshot record write plus non-secret audit metadata in one transaction without exposing payload refs publicly.
 * Added optimistic concurrency for PostgreSQL non-secret team settings. Provider Settings now stores each loaded setting `updatedAt` token, sends it on saves/deletes, and team setting services reject missing or stale tokens with `409` instead of silently overwriting another admin's changes.
 * Added explicit PostgreSQL pool and timeout configuration. Team mode now parses `IMAGINE_POSTGRES_POOL_MAX`, `IMAGINE_POSTGRES_CONNECTION_TIMEOUT_MS`, `IMAGINE_POSTGRES_IDLE_TIMEOUT_MS`, and `IMAGINE_POSTGRES_QUERY_TIMEOUT_MS`, uses a shared bounded `pg` pool instead of per-request pools, documents the defaults, and tests the resulting Pool config.
+* Hardened PostgreSQL health checks for media-volume access. `/api/storage/team/health` now verifies `IMAGINE_MEDIA_DIR` exists, is a directory, and is readable/writable before reporting `reachable: true`, while keeping absolute media paths out of error responses.
 
 Still remaining before the full PRD can be considered complete:
 

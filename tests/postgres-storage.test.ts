@@ -1,11 +1,12 @@
 import assert from "node:assert/strict";
-import { mkdtemp, readFile, rm } from "node:fs/promises";
+import { chmod, mkdir, mkdtemp, readFile, rm, writeFile } from "node:fs/promises";
 import os from "node:os";
 import path from "node:path";
 import test from "node:test";
 import type { QueryResult, QueryResultRow } from "pg";
 
 import {
+  assertPostgresMediaDirectoryAccess,
   DEFAULT_POSTGRES_CONNECTION_TIMEOUT_MS,
   DEFAULT_POSTGRES_IDLE_TIMEOUT_MS,
   DEFAULT_POSTGRES_POOL_MAX,
@@ -166,6 +167,52 @@ test("createPostgresPoolConfig applies bounded pool and timeout config", () => {
       query_timeout: 45000,
     },
   );
+});
+
+test("assertPostgresMediaDirectoryAccess validates media directory without leaking paths", async () => {
+  const mediaDir = await mkdtemp(path.join(os.tmpdir(), "imagine-postgres-media-health-"));
+  try {
+    await assertPostgresMediaDirectoryAccess(mediaDir);
+
+    const missingDir = path.join(mediaDir, "missing");
+    await assert.rejects(
+      () => assertPostgresMediaDirectoryAccess(missingDir),
+      (error: unknown) => (
+        error instanceof Error &&
+        error.message === "IMAGINE_MEDIA_DIR is not accessible" &&
+        !error.message.includes(missingDir)
+      ),
+    );
+
+    const filePath = path.join(mediaDir, "file.txt");
+    await writeFile(filePath, "not a directory");
+    await assert.rejects(
+      () => assertPostgresMediaDirectoryAccess(filePath),
+      (error: unknown) => (
+        error instanceof Error &&
+        error.message === "IMAGINE_MEDIA_DIR must be a directory" &&
+        !error.message.includes(filePath)
+      ),
+    );
+
+    const blockedDir = path.join(mediaDir, "blocked");
+    await mkdir(blockedDir);
+    await chmod(blockedDir, 0o500);
+    try {
+      await assert.rejects(
+        () => assertPostgresMediaDirectoryAccess(blockedDir),
+        (error: unknown) => (
+          error instanceof Error &&
+          error.message === "IMAGINE_MEDIA_DIR must be readable and writable" &&
+          !error.message.includes(blockedDir)
+        ),
+      );
+    } finally {
+      await chmod(blockedDir, 0o700);
+    }
+  } finally {
+    await rm(mediaDir, { force: true, recursive: true });
+  }
 });
 
 test("requireTeamSetupToken fails closed for migration routes", () => {
