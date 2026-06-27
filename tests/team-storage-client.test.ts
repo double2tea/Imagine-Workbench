@@ -20,6 +20,7 @@ import {
   logoutTeamSession,
   readTeamCsrfToken,
   saveTeamBoardDocument,
+  saveTeamAsset,
   teamAssetRecordToStorageItem,
   teamAssetMediaUrl,
   updateTeamMemberRole,
@@ -32,6 +33,23 @@ function jsonResponse(body: unknown, init?: ResponseInit): Response {
     headers: { "content-type": "application/json" },
     ...init,
   });
+}
+
+function createStorageItem() {
+  return {
+    aspectRatio: "1:1",
+    boardId: "",
+    createdAt: "2026-06-27T00:00:00.000Z",
+    hasBlob: true,
+    id: "asset_1",
+    model: "model",
+    progress: 100,
+    prompt: "prompt",
+    scope: "workspace" as const,
+    status: "complete" as const,
+    type: "image" as const,
+    url: "data:image/png;base64,aW1hZ2U=",
+  };
 }
 
 test("fetchWorkspaceStorageRuntimeStatus parses browser storage status", async () => {
@@ -200,6 +218,42 @@ test("deleteTeamAsset sends CSRF header to encoded asset route", async () => {
   assert.equal(deleteCsrfHeader, "csrf-token");
   await assert.rejects(
     deleteTeamAsset("asset_1", " "),
+    /CSRF token is required/,
+  );
+});
+
+test("saveTeamAsset posts asset data with CSRF and maps media URL", async () => {
+  let requestedUrl = "";
+  let saveCsrfHeader: string | null = null;
+  let contentTypeHeader: string | null = null;
+  let requestBody: unknown = null;
+  const result = await saveTeamAsset(createStorageItem(), "csrf-token", async (input, init) => {
+    requestedUrl = String(input);
+    assert.equal(init?.method, "POST");
+    const headers = new Headers(init?.headers);
+    saveCsrfHeader = headers.get("x-imagine-csrf-token");
+    contentTypeHeader = headers.get("content-type");
+    requestBody = JSON.parse(String(init?.body ?? ""));
+    return jsonResponse({
+      asset: {
+        mediaUrl: "/api/storage/team/assets/asset_1/media",
+        meta: {
+          ...createStorageItem(),
+          url: undefined,
+        },
+      },
+      targetKind: "postgres",
+      workspaceId: "workspace_1",
+    });
+  });
+
+  assert.equal(requestedUrl, "/api/storage/team/assets");
+  assert.equal(saveCsrfHeader, "csrf-token");
+  assert.equal(contentTypeHeader, "application/json");
+  assert.deepEqual(requestBody, { asset: createStorageItem() });
+  assert.equal(result.url, "/api/storage/team/assets/asset_1/media");
+  await assert.rejects(
+    saveTeamAsset(createStorageItem(), " "),
     /CSRF token is required/,
   );
 });

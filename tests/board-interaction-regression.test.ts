@@ -100,7 +100,7 @@ test("deleting or detaching result nodes clears source result metadata", () => {
   assert.match(deletePlan, /clearSourceResultForDetachedResult/);
   assert.match(deleteEdge, /clearSourceResultForDetachedResult/);
   assert.match(page, /function detachedSourceResultMetadata/);
-  assert.match(pageDeleteEdge, /await saveToDB\(\{/);
+  assert.match(pageDeleteEdge, /await saveBoardAssetDirect\(\{/);
   assert.match(pageDeleteEdge, /sourceBoardNodeId: undefined/);
   assert.match(pageDeleteEdge, /sourceBoardResultStackKey: undefined/);
   assert.match(pageDeleteEdge, /boardController\.deleteEdge\(edgeId\)/);

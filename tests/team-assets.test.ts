@@ -1,12 +1,15 @@
 import assert from "node:assert/strict";
+import { mkdtemp, rm } from "node:fs/promises";
+import { tmpdir } from "node:os";
+import path from "node:path";
 import test from "node:test";
 import type { QueryResult, QueryResultRow } from "pg";
 
-import type { StorageItemMeta } from "../lib/db";
+import type { StorageItem, StorageItemMeta } from "../lib/db";
 import type { PostgresQueryable } from "../lib/storage/postgres/connection";
 import { hashTeamSessionToken } from "../lib/storage/team-auth";
-import { deleteTeamAsset, listTeamAssets } from "../lib/storage/team-assets";
-import { GET as getTeamAssets } from "../app/api/storage/team/assets/route";
+import { deleteTeamAsset, listTeamAssets, saveTeamAsset } from "../lib/storage/team-assets";
+import { GET as getTeamAssets, POST as postTeamAsset } from "../app/api/storage/team/assets/route";
 import { DELETE as deleteTeamAssetRoute } from "../app/api/storage/team/assets/[assetId]/route";
 
 const RAW_SESSION_TOKEN = "raw-session-token";
@@ -100,6 +103,52 @@ test("deleteTeamAsset removes an editor-scoped asset record", async () => {
   );
 });
 
+test("saveTeamAsset writes an editor-scoped asset payload and metadata", async () => {
+  const mediaDir = await mkdtemp(path.join(tmpdir(), "imagine-team-assets-"));
+  const queries: Array<{ text: string; values?: readonly unknown[] }> = [];
+  try {
+    const result = await saveTeamAsset(
+      createTeamAssetsQueryable(queries, { role: "editor" }),
+      { databaseUrl: "postgres://localhost/imagine", mediaDir },
+      requestWithSession(),
+      { item: createStorageItem({ url: "data:image/png;base64,aW1hZ2U=" }) },
+    );
+
+    const assetInsert = queries.find(query => query.text.includes("insert into assets"));
+    const payloadInsert = queries.find(query => query.text.includes("insert into asset_payloads"));
+    const savedMeta = assetInsert?.values?.[2] as StorageItemMeta | undefined;
+
+    assert.equal(result.targetKind, "postgres");
+    assert.equal(result.workspaceId, WORKSPACE_ID);
+    assert.equal(result.asset.mediaUrl, "/api/storage/team/assets/asset_1/media");
+    assert.equal(result.asset.payload?.mimeType, "image/png");
+    assert.equal(savedMeta?.id, ASSET_ID);
+    assert.equal(savedMeta?.url, undefined);
+    assert.equal(savedMeta?.hasBlob, true);
+    assert.equal(savedMeta?.contentHash?.startsWith("sha256:"), true);
+    assert.equal(payloadInsert?.values?.[0], ASSET_ID);
+    assert.equal(payloadInsert?.values?.[2], "image/png");
+  } finally {
+    await rm(mediaDir, { force: true, recursive: true });
+  }
+});
+
+test("saveTeamAsset preserves an existing payload for metadata-only updates", async () => {
+  const queries: Array<{ text: string; values?: readonly unknown[] }> = [];
+  const result = await saveTeamAsset(
+    createTeamAssetsQueryable(queries, { role: "editor" }),
+    { databaseUrl: "postgres://localhost/imagine", mediaDir: "/srv/imagine/media" },
+    requestWithSession(),
+    { item: createStorageItem({ status: "failed", url: "/api/storage/team/assets/asset_1/media" }) },
+  );
+
+  const assetInsert = queries.find(query => query.text.includes("insert into assets"));
+  const savedMeta = assetInsert?.values?.[2] as StorageItemMeta | undefined;
+  assert.equal(result.asset.payload?.contentHash, "sha256:abc");
+  assert.equal(savedMeta?.status, "failed");
+  assert.equal(savedMeta?.contentHash, "sha256:abc");
+});
+
 test("team assets route rejects invalid query params before opening a database client", async () => {
   const originalEnv = {
     DATABASE_URL: process.env.DATABASE_URL,
@@ -118,6 +167,40 @@ test("team assets route rejects invalid query params before opening a database c
       error: "Invalid status",
     });
   } finally {
+    restoreEnv("DATABASE_URL", originalEnv.DATABASE_URL);
+    restoreEnv("IMAGINE_MEDIA_DIR", originalEnv.IMAGINE_MEDIA_DIR);
+    restoreEnv("IMAGINE_STORAGE_TARGET", originalEnv.IMAGINE_STORAGE_TARGET);
+  }
+});
+
+test("team asset save route rejects missing CSRF before opening a database client", async () => {
+  const originalEnv = {
+    APP_URL: process.env.APP_URL,
+    DATABASE_URL: process.env.DATABASE_URL,
+    IMAGINE_MEDIA_DIR: process.env.IMAGINE_MEDIA_DIR,
+    IMAGINE_STORAGE_TARGET: process.env.IMAGINE_STORAGE_TARGET,
+  };
+  try {
+    process.env.APP_URL = "http://localhost:3000";
+    process.env.DATABASE_URL = "postgres://localhost/imagine";
+    process.env.IMAGINE_MEDIA_DIR = "/srv/imagine/media";
+    process.env.IMAGINE_STORAGE_TARGET = "postgres";
+
+    const response = await postTeamAsset(new Request("http://localhost:3000/api/storage/team/assets", {
+      body: JSON.stringify({ asset: createStorageItem({ url: "data:image/png;base64,aW1hZ2U=" }) }),
+      headers: {
+        "content-type": "application/json",
+        origin: "http://localhost:3000",
+      },
+      method: "POST",
+    }));
+    assert.equal(response.status, 403);
+    assert.deepEqual(await response.json(), {
+      code: "invalid_csrf",
+      error: "Valid CSRF token is required",
+    });
+  } finally {
+    restoreEnv("APP_URL", originalEnv.APP_URL);
     restoreEnv("DATABASE_URL", originalEnv.DATABASE_URL);
     restoreEnv("IMAGINE_MEDIA_DIR", originalEnv.IMAGINE_MEDIA_DIR);
     restoreEnv("IMAGINE_STORAGE_TARGET", originalEnv.IMAGINE_STORAGE_TARGET);
@@ -212,6 +295,14 @@ function createAssetMeta(): StorageItemMeta {
     scope: "workspace",
     status: "complete",
     type: "image",
+  };
+}
+
+function createStorageItem(overrides: Partial<StorageItem> = {}): StorageItem {
+  return {
+    ...createAssetMeta(),
+    url: "data:image/png;base64,aW1hZ2U=",
+    ...overrides,
   };
 }
 

@@ -1,9 +1,8 @@
 import { t } from "@/lib/i18n";
 import { useEffect, useRef, type Dispatch, type MutableRefObject, type SetStateAction } from "react";
 import { API_ROUTES } from "@/lib/api/routes";
-import { saveItemWithPreview } from "@/lib/assets/previews";
 import { readFetchError, toErrorMessage } from "@/lib/client-fetch-error";
-import { buildStorageItem, deleteFromDB, type GenerationRequestSnapshot, type StorageItem } from "@/lib/db";
+import { buildStorageItem, type GenerationRequestSnapshot, type StorageItem } from "@/lib/db";
 import { updateGenerationTask, type GenerationTask, type GenerationTaskUpdate } from "@/lib/generation-tasks";
 
 type NoticeType = "error" | "info" | "success";
@@ -15,6 +14,8 @@ interface UseMediaPollingParams {
   locallyCanceledItemIdsRef: MutableRefObject<Set<string>>;
   pollingFailuresRef: MutableRefObject<Record<string, number>>;
   pushWorkspaceNotice: (type: NoticeType, message: string) => void;
+  deleteAssetById: (id: string) => Promise<void>;
+  saveAssetWithPreview: (item: StorageItem) => Promise<StorageItem>;
   setGenerationTasks: Dispatch<SetStateAction<GenerationTask[]>>;
   setItems: Dispatch<SetStateAction<StorageItem[]>>;
 }
@@ -45,13 +46,14 @@ function isProcessingTimedOut(task: GenerationTask): boolean {
 
 async function saveItemOrWarn(
   item: StorageItem,
+  saveAssetWithPreview: (item: StorageItem) => Promise<StorageItem>,
   pushWorkspaceNotice: (type: NoticeType, message: string) => void,
 ): Promise<StorageItem | null> {
   try {
-    return await saveItemWithPreview(item);
+    return await saveAssetWithPreview(item);
   } catch (error) {
     const message = toErrorMessage(error, t("common.notices.fileReadFailed"));
-    console.error("IndexedDB Save Failed:", error);
+    console.error("Asset Save Failed:", error);
     pushWorkspaceNotice("error", t("common.notices.localSaveFailed", { error: message }));
     return null;
   }
@@ -59,13 +61,14 @@ async function saveItemOrWarn(
 
 async function deleteItemOrWarn(
   itemId: string,
+  deleteAssetById: (id: string) => Promise<void>,
   pushWorkspaceNotice: (type: NoticeType, message: string) => void,
 ): Promise<void> {
   try {
-    await deleteFromDB(itemId);
+    await deleteAssetById(itemId);
   } catch (error) {
     const message = toErrorMessage(error, t("common.notices.originalMediaReadFailed"));
-    console.error("IndexedDB Delete Failed:", error);
+    console.error("Asset Delete Failed:", error);
     pushWorkspaceNotice("error", t("common.notices.localResultClearFailed", { error: message }));
   }
 }
@@ -151,6 +154,8 @@ export function useMediaPolling({
   locallyCanceledItemIdsRef,
   pollingFailuresRef,
   pushWorkspaceNotice,
+  deleteAssetById,
+  saveAssetWithPreview,
   setGenerationTasks,
   setItems,
 }: UseMediaPollingParams) {
@@ -312,15 +317,15 @@ export function useMediaPolling({
                 if (wasCanceled) continue;
                 const savedCompletedItems: StorageItem[] = [];
                 for (const completedItem of completedItemsToSave) {
-                  const savedCompletedItem = await saveItemOrWarn(completedItem, pushWorkspaceNotice);
+                  const savedCompletedItem = await saveItemOrWarn(completedItem, saveAssetWithPreview, pushWorkspaceNotice);
                   if (savedCompletedItem) savedCompletedItems.push(savedCompletedItem);
                 }
                 if (await stopIfTaskLocallyCanceled(task, locallyCanceledItemIdsRef, pushWorkspaceNotice, setGenerationTasks)) {
-                  for (const savedItem of savedCompletedItems) await deleteItemOrWarn(savedItem.id, pushWorkspaceNotice);
+                  for (const savedItem of savedCompletedItems) await deleteItemOrWarn(savedItem.id, deleteAssetById, pushWorkspaceNotice);
                   continue;
                 }
                   if (savedCompletedItems.length !== completedItemsToSave.length) {
-                    for (const savedItem of savedCompletedItems) await deleteItemOrWarn(savedItem.id, pushWorkspaceNotice);
+                    for (const savedItem of savedCompletedItems) await deleteItemOrWarn(savedItem.id, deleteAssetById, pushWorkspaceNotice);
                     const failedTask = await updateTaskOrWarn(task.id, {
                       status: "failed",
                       progress: 100,
@@ -338,11 +343,11 @@ export function useMediaPolling({
                   progress: 100,
                 }, pushWorkspaceNotice);
                 if (!completedTask) {
-                  for (const savedItem of savedCompletedItems) await deleteItemOrWarn(savedItem.id, pushWorkspaceNotice);
+                  for (const savedItem of savedCompletedItems) await deleteItemOrWarn(savedItem.id, deleteAssetById, pushWorkspaceNotice);
                   continue;
                 }
                 if (await stopIfTaskLocallyCanceled(task, locallyCanceledItemIdsRef, pushWorkspaceNotice, setGenerationTasks)) {
-                  for (const savedItem of savedCompletedItems) await deleteItemOrWarn(savedItem.id, pushWorkspaceNotice);
+                  for (const savedItem of savedCompletedItems) await deleteItemOrWarn(savedItem.id, deleteAssetById, pushWorkspaceNotice);
                   continue;
                 }
                 delete pollingFailuresRef.current[task.id];
@@ -418,5 +423,5 @@ export function useMediaPolling({
     }, 4000);
 
     return () => clearInterval(interval);
-  }, [buildProviderHeaders, generationTasks, locallyCanceledItemIdsRef, pollingFailuresRef, pushWorkspaceNotice, setGenerationTasks, setItems]);
+  }, [buildProviderHeaders, deleteAssetById, generationTasks, locallyCanceledItemIdsRef, pollingFailuresRef, pushWorkspaceNotice, saveAssetWithPreview, setGenerationTasks, setItems]);
 }

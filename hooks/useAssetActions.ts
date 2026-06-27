@@ -10,7 +10,6 @@ import {
   clearAllDB,
   getAssetMeta,
   getGenerationReferenceMedia,
-  saveToDB,
   type GenerationReferenceMediaSnapshot,
   type StorageItem,
 } from "@/lib/db";
@@ -53,6 +52,7 @@ interface UseAssetActionsParams {
   locallyCanceledItemIdsRef: MutableRefObject<Set<string>>;
   pollingFailuresRef: MutableRefObject<Record<string, number>>;
   pushWorkspaceNotice: (type: NoticeType, message: string) => void;
+  saveAsset: (item: StorageItem) => Promise<StorageItem>;
   selectedItemIdSet: Set<string>;
   selectedItemIds: string[];
   selectedProvider: AiProvider;
@@ -157,15 +157,16 @@ async function prepareRetryReferenceImages(body: RetryRequestBody): Promise<void
 
 async function saveItemOrWarn(
   item: StorageItem,
+  saveAsset: (item: StorageItem) => Promise<StorageItem>,
   pushWorkspaceNotice: (type: NoticeType, message: string) => void,
   t: TFunction,
 ): Promise<boolean> {
   try {
-    await saveToDB(item);
+    await saveAsset(item);
     return true;
   } catch (error) {
     const message = toErrorMessage(error, t("common.notices.indexedDbWriteFailed"));
-    console.error("IndexedDB Save Failed:", error);
+    console.error("Asset Save Failed:", error);
     pushWorkspaceNotice("error", t("common.notices.localSaveFailed", { error: message }));
     return false;
   }
@@ -181,6 +182,7 @@ export function useAssetActions({
   locallyCanceledItemIdsRef,
   pollingFailuresRef,
   pushWorkspaceNotice,
+  saveAsset,
   selectedItemIdSet,
   selectedItemIds,
   selectedProvider,
@@ -363,7 +365,7 @@ export function useAssetActions({
       errorMessage: undefined,
       operationName: undefined,
     };
-    if (!await saveItemOrWarn(retryingItem, pushWorkspaceNotice, t)) return;
+    if (!await saveItemOrWarn(retryingItem, saveAsset, pushWorkspaceNotice, t)) return;
     setItems(prev => prev.map(current => current.id === item.id ? retryingItem : current));
 
     try {
@@ -397,7 +399,7 @@ export function useAssetActions({
           progress: 15,
           operationName,
         };
-        if (!await saveItemOrWarn(processingItem, pushWorkspaceNotice, t)) {
+        if (!await saveItemOrWarn(processingItem, saveAsset, pushWorkspaceNotice, t)) {
           setItems(prev => prev.map(current => current.id === item.id ? processingItem : current));
           return;
         }
@@ -412,7 +414,7 @@ export function useAssetActions({
           status: "complete",
           progress: 100,
         };
-        if (!await saveItemOrWarn(completedItem, pushWorkspaceNotice, t)) {
+        if (!await saveItemOrWarn(completedItem, saveAsset, pushWorkspaceNotice, t)) {
           setItems(prev => prev.map(current => current.id === item.id ? completedItem : current));
           return;
         }
@@ -429,7 +431,7 @@ export function useAssetActions({
         progress: 100,
         errorMessage: message,
       };
-      await saveItemOrWarn(failedItem, pushWorkspaceNotice, t);
+      await saveItemOrWarn(failedItem, saveAsset, pushWorkspaceNotice, t);
       setItems(prev => prev.map(current => current.id === item.id ? failedItem : current));
       pushWorkspaceNotice("error", message);
     }
@@ -486,7 +488,7 @@ export function useAssetActions({
     }
 
     const frameItem = createVideoFrameStorageItem(item, frame, makeClientId("frame"));
-    if (!await saveItemOrWarn(frameItem, pushWorkspaceNotice, t)) return null;
+    if (!await saveItemOrWarn(frameItem, saveAsset, pushWorkspaceNotice, t)) return null;
     setItems(prev => [frameItem, ...prev]);
     pushWorkspaceNotice("success", t("common.notices.videoFrameSaved", { label: getVideoFrameCaptureLabel(frame.mode) }));
     return frameItem;
@@ -503,7 +505,7 @@ export function useAssetActions({
     const savedItems: StorageItem[] = [];
     for (const [index, screenshot] of screenshots.entries()) {
       const screenshotItem = createPanoramaScreenshotStorageItem(item, screenshot, makeClientId(`pano_${index}`));
-      if (await saveItemOrWarn(screenshotItem, pushWorkspaceNotice, t)) savedItems.push(screenshotItem);
+      if (await saveItemOrWarn(screenshotItem, saveAsset, pushWorkspaceNotice, t)) savedItems.push(screenshotItem);
     }
     if (savedItems.length === 0) return;
     setItems(prev => [

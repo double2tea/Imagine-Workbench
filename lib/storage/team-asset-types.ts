@@ -23,3 +23,9 @@ export interface TeamAssetListResult {
   targetKind: "postgres";
   workspaceId: string;
 }
+
+export interface TeamAssetMutationResult {
+  asset: PublicTeamAssetRecord;
+  targetKind: "postgres";
+  workspaceId: string;
+}

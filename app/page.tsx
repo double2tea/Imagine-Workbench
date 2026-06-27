@@ -46,6 +46,7 @@ import { useClipboardImageImport } from "@/hooks/useClipboardImageImport";
 import { useGenerationActions } from "@/hooks/useGenerationActions";
 import { useGenerationTaskStore } from "@/hooks/useGenerationTaskStore";
 import { useMediaPolling } from "@/hooks/useMediaPolling";
+import { saveItemWithPreview } from "@/lib/assets/previews";
 import { resolveAssetOriginalUrl } from "@/lib/assets/resolve-url";
 import { audioOperationFormatOptions, audioOperationRequiresStylePrompt, audioOperationRequiresTextInput } from "@/lib/audio-operation-rules";
 import {
@@ -137,6 +138,7 @@ import {
   fetchTeamWorkspaceGalleryItems,
   fetchWorkspaceStorageRuntimeStatus,
   readTeamCsrfToken,
+  saveTeamAsset,
 } from "@/lib/storage/team-client";
 import { useTranslations, t as translate } from "@/lib/i18n";
 import { readFetchError, toErrorMessage } from "@/lib/client-fetch-error";
@@ -451,6 +453,25 @@ export default function Home() {
       return;
     }
     await deleteFromDB(id);
+  }, [workspaceStorageTarget]);
+
+  const saveWorkspaceAssetDirect = useCallback(async (item: StorageItem): Promise<StorageItem> => {
+    if (workspaceStorageTarget === "postgres") {
+      const csrfToken = readTeamCsrfToken();
+      if (!csrfToken) throw new Error("CSRF token is required");
+      return saveTeamAsset(item, csrfToken);
+    }
+    await saveToDB(item);
+    return item;
+  }, [workspaceStorageTarget]);
+
+  const saveWorkspaceAssetWithPreview = useCallback(async (item: StorageItem): Promise<StorageItem> => {
+    if (workspaceStorageTarget === "postgres") {
+      const csrfToken = readTeamCsrfToken();
+      if (!csrfToken) throw new Error("CSRF token is required");
+      return saveTeamAsset(item, csrfToken);
+    }
+    return saveItemWithPreview(item);
   }, [workspaceStorageTarget]);
 
   const openOriginalItem = useCallback((
@@ -789,10 +810,12 @@ export default function Home() {
 
   useMediaPolling({
     buildProviderHeaders,
+    deleteAssetById: deleteWorkspaceAssetById,
     generationTasks,
     locallyCanceledItemIdsRef,
     pollingFailuresRef,
     pushWorkspaceNotice,
+    saveAssetWithPreview: saveWorkspaceAssetWithPreview,
     setGenerationTasks,
     setItems,
   });
@@ -822,6 +845,9 @@ export default function Home() {
     referenceImage,
     referenceImages,
     runningHubYouchuan,
+    deleteAssetById: deleteWorkspaceAssetById,
+    saveAssetDirect: saveWorkspaceAssetDirect,
+    saveAssetWithPreview: saveWorkspaceAssetWithPreview,
     selectedModel,
     selectedVideoModel,
     setGenerationTasks,
@@ -877,6 +903,7 @@ export default function Home() {
     locallyCanceledItemIdsRef,
     pollingFailuresRef,
     pushWorkspaceNotice,
+    saveAsset: saveWorkspaceAssetDirect,
     selectedItemIdSet,
     selectedItemIds,
     selectedProvider,
@@ -1310,14 +1337,14 @@ export default function Home() {
       maskOriginalId: sourceItem.id,
     });
     try {
-      await saveToDB(item);
+      const savedItem = await saveWorkspaceAssetDirect(item);
+      setItems(prev => [savedItem, ...prev]);
+      pushWorkspaceNotice("info", t("common.notices.imageQuickEditStart", { label }));
+      return savedItem;
     } catch (error) {
       pushWorkspaceNotice("error", t("common.notices.imageQuickEditSaveFailed", { label, error: toErrorMessage(error, t("common.notices.indexedDbWriteFailed")) }));
       return null;
     }
-    setItems(prev => [item, ...prev]);
-    pushWorkspaceNotice("info", t("common.notices.imageQuickEditStart", { label }));
-    return item;
   };
 
   const completeImageQuickEditAsset = async (
@@ -1333,8 +1360,8 @@ export default function Home() {
       progress: 100,
       errorMessage: undefined,
     });
-    await saveToDB(nextItem);
-    setItems(prev => prev.map(current => current.id === nextItem.id ? nextItem : current));
+    const savedItem = await saveWorkspaceAssetDirect(nextItem);
+    setItems(prev => prev.map(current => current.id === savedItem.id ? savedItem : current));
     pushWorkspaceNotice("success", t("common.notices.imageQuickEditComplete", { label }));
   };
 
@@ -1348,8 +1375,8 @@ export default function Home() {
       progress: 100,
       errorMessage: message,
     });
-    await saveToDB(nextItem);
-    setItems(prev => prev.map(current => current.id === nextItem.id ? nextItem : current));
+    const savedItem = await saveWorkspaceAssetDirect(nextItem);
+    setItems(prev => prev.map(current => current.id === savedItem.id ? savedItem : current));
   };
 
   const startImageQuickEdit = async (
@@ -1790,8 +1817,7 @@ export default function Home() {
           file,
           makeClientId(file.type.startsWith("video/") ? `local_video_${index}` : `local_image_${index}`),
         );
-        await saveToDB(item);
-        importedItems.push(item);
+        importedItems.push(await saveWorkspaceAssetDirect(item));
       } catch (error) {
         pushWorkspaceNotice("error", toErrorMessage(error, t("common.notices.localMediaImportFailed", { name: file.name || "media" })));
       }
@@ -1802,7 +1828,7 @@ export default function Home() {
       ...prev.filter(item => !importedItems.some(importedItem => importedItem.id === item.id)),
     ]);
     pushWorkspaceNotice("success", t("common.notices.importedLocalMedia", { count: importedItems.length }));
-  }, [pushWorkspaceNotice]);
+  }, [pushWorkspaceNotice, saveWorkspaceAssetDirect]);
 
   const handleDataCleanupAssets = useCallback(async (kind: WorkspaceCleanupKind) => {
     try {

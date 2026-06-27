@@ -189,7 +189,12 @@ import {
 } from "@/lib/data-management";
 import { API_ROUTES } from "@/lib/api/routes";
 import { readFetchError, toErrorMessage } from "@/lib/client-fetch-error";
-import { fetchWorkspaceStorageRuntimeStatus } from "@/lib/storage/team-client";
+import {
+  deleteTeamAsset,
+  fetchWorkspaceStorageRuntimeStatus,
+  readTeamCsrfToken,
+  saveTeamAsset,
+} from "@/lib/storage/team-client";
 
 type NoticeType = "error" | "info" | "success";
 type MaskDestination = "creative" | "agent" | "board-asset";
@@ -1795,6 +1800,35 @@ export default function BoardPage({ boardId = DEFAULT_BOARD_ID }: BoardPageProps
     };
   }, [pushWorkspaceNotice]);
 
+  const deleteBoardAssetById = useCallback(async (id: string): Promise<void> => {
+    if (boardStorageTarget === "postgres") {
+      const csrfToken = readTeamCsrfToken();
+      if (!csrfToken) throw new Error("CSRF token is required");
+      await deleteTeamAsset(id, csrfToken);
+      return;
+    }
+    await deleteFromDB(id);
+  }, [boardStorageTarget]);
+
+  const saveBoardAssetDirect = useCallback(async (item: StorageItem): Promise<StorageItem> => {
+    if (boardStorageTarget === "postgres") {
+      const csrfToken = readTeamCsrfToken();
+      if (!csrfToken) throw new Error("CSRF token is required");
+      return saveTeamAsset(item, csrfToken);
+    }
+    await saveToDB(item);
+    return item;
+  }, [boardStorageTarget]);
+
+  const saveBoardAssetWithPreview = useCallback(async (item: StorageItem): Promise<StorageItem> => {
+    if (boardStorageTarget === "postgres") {
+      const csrfToken = readTeamCsrfToken();
+      if (!csrfToken) throw new Error("CSRF token is required");
+      return saveTeamAsset(item, csrfToken);
+    }
+    return saveItemWithPreview(item);
+  }, [boardStorageTarget]);
+
   const {
     resolveIntegrationAvailable,
     resolveIntegrationEnabled,
@@ -2035,11 +2069,15 @@ export default function BoardPage({ boardId = DEFAULT_BOARD_ID }: BoardPageProps
     return { ...storedItem, url: originalUrl };
   }, [items]);
   const saveBoardDerivedAsset = useCallback(async (item: StorageItem): Promise<StorageItem | null> => {
-    const savedItem = await saveItemOrWarn(item, pushWorkspaceNotice);
-    if (!savedItem) return null;
-    setItems(prev => [savedItem, ...prev.filter(current => current.id !== savedItem.id)]);
-    return savedItem;
-  }, [pushWorkspaceNotice, setItems]);
+    try {
+      const savedItem = await saveBoardAssetWithPreview(item);
+      setItems(prev => [savedItem, ...prev.filter(current => current.id !== savedItem.id)]);
+      return savedItem;
+    } catch (error) {
+      pushWorkspaceNotice("error", `Local storage failed, may be lost after refresh: ${toErrorMessage(error, "Asset save failed")}`);
+      return null;
+    }
+  }, [pushWorkspaceNotice, saveBoardAssetWithPreview, setItems]);
   const deleteBoardEdge = useCallback(async (edgeId: string): Promise<void> => {
     const detachMetadata = detachedSourceResultMetadata(boardController.board, edgeId);
     if (detachMetadata) {
@@ -2047,7 +2085,7 @@ export default function BoardPage({ boardId = DEFAULT_BOARD_ID }: BoardPageProps
       try {
         await Promise.all(itemsToUpdate.map(async item => {
           const originalItem = await resolveOriginalStorageItem(item);
-          await saveToDB({
+          await saveBoardAssetDirect({
             ...originalItem,
             sourceBoardNodeId: undefined,
             sourceBoardResultStackKey: undefined,
@@ -2069,7 +2107,7 @@ export default function BoardPage({ boardId = DEFAULT_BOARD_ID }: BoardPageProps
     if (detachMetadata) {
       pushWorkspaceNotice("info", t("board.workspace.resultDetachedToMedia"));
     }
-  }, [boardController, items, pushWorkspaceNotice, resolveOriginalStorageItem, setItems, t]);
+  }, [boardController, items, pushWorkspaceNotice, resolveOriginalStorageItem, saveBoardAssetDirect, setItems, t]);
   const promoteItemToOriginal = useCallback((item: StorageItem): void => {
     if (item.status !== "complete") return;
     if (originalAssetPromoteIdsRef.current.has(item.id)) return;
@@ -2224,10 +2262,12 @@ export default function BoardPage({ boardId = DEFAULT_BOARD_ID }: BoardPageProps
 
   useMediaPolling({
     buildProviderHeaders,
+    deleteAssetById: deleteBoardAssetById,
     generationTasks,
     locallyCanceledItemIdsRef,
     pollingFailuresRef,
     pushWorkspaceNotice,
+    saveAssetWithPreview: saveBoardAssetWithPreview,
     setGenerationTasks,
     setItems,
   });
@@ -2253,6 +2293,9 @@ export default function BoardPage({ boardId = DEFAULT_BOARD_ID }: BoardPageProps
     referenceImage,
     referenceImages,
     runningHubYouchuan: RUNNINGHUB_YOUCHUAN_ADVANCED_DEFAULTS,
+    deleteAssetById: deleteBoardAssetById,
+    saveAssetDirect: saveBoardAssetDirect,
+    saveAssetWithPreview: saveBoardAssetWithPreview,
     selectedModel,
     selectedVideoModel,
     setGenerationTasks,
@@ -3862,7 +3905,7 @@ export default function BoardPage({ boardId = DEFAULT_BOARD_ID }: BoardPageProps
     try {
       locallyCanceledItemIdsRef.current.add(item.id);
       generationAbortControllersRef.current[item.id]?.abort();
-      await deleteFromDB(item.id);
+      await deleteBoardAssetById(item.id);
       delete generationAbortControllersRef.current[item.id];
       delete pollingFailuresRef.current[item.id];
       setItems(prev => prev.filter(current => current.id !== item.id));
@@ -3882,6 +3925,7 @@ export default function BoardPage({ boardId = DEFAULT_BOARD_ID }: BoardPageProps
     locallyCanceledItemIdsRef,
     pollingFailuresRef,
     pushWorkspaceNotice,
+    deleteBoardAssetById,
     setItems,
   ]);
 

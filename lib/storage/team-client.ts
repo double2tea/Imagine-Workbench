@@ -4,7 +4,12 @@ import { readFetchError } from "@/lib/client-fetch-error";
 import type { StorageItem, StorageItemMeta } from "@/lib/db";
 import type { PublicLocalStorageRuntimeStatus } from "@/lib/storage/local-public-runtime";
 import type { WORKSPACE_STORAGE_SCHEMA_VERSION } from "@/lib/storage/schema";
-import type { PublicTeamAssetPayload, PublicTeamAssetRecord, TeamAssetListResult } from "@/lib/storage/team-asset-types";
+import type {
+  PublicTeamAssetPayload,
+  PublicTeamAssetRecord,
+  TeamAssetListResult,
+  TeamAssetMutationResult,
+} from "@/lib/storage/team-asset-types";
 import type { TeamBoardDocumentResult, TeamBoardSummaryListResult } from "@/lib/storage/team-board-types";
 import type {
   ManageableTeamRole,
@@ -240,6 +245,30 @@ export async function deleteTeamAsset(
   }
 }
 
+export async function saveTeamAsset(
+  item: StorageItem,
+  csrfToken: string,
+  fetcher: Fetcher = fetch,
+): Promise<StorageItem> {
+  const token = csrfToken.trim();
+  if (!token) throw new Error("CSRF token is required");
+  const response = await fetcher(API_ROUTES.storage.teamAssets, {
+    cache: "no-store",
+    body: JSON.stringify({ asset: item }),
+    headers: {
+      "content-type": "application/json",
+      "x-imagine-csrf-token": token,
+    },
+    method: "POST",
+  });
+  const body: unknown = await response.json();
+  if (!response.ok) {
+    const error = readStringField(body, "error") ?? "Team asset save failed";
+    throw new Error(error);
+  }
+  return teamAssetRecordToStorageItem(parseTeamAssetMutationResult(body).asset);
+}
+
 export async function fetchTeamAssets(
   options: TeamAssetListOptions = {},
   fetcher: Fetcher = fetch,
@@ -466,6 +495,11 @@ function parseTeamAssetListResult(value: unknown): TeamAssetListResult {
   return value;
 }
 
+function parseTeamAssetMutationResult(value: unknown): TeamAssetMutationResult {
+  if (!isTeamAssetMutationResult(value)) throw new Error("Team asset response is invalid");
+  return value;
+}
+
 function parseTeamBoardSummaryListResult(value: unknown): TeamBoardSummaryListResult {
   if (!isTeamBoardSummaryListResult(value)) throw new Error("Team board list response is invalid");
   return value;
@@ -534,6 +568,15 @@ function isTeamAssetListResult(value: unknown): value is TeamAssetListResult {
     Number.isInteger(value.offset) &&
     Array.isArray(value.assets) &&
     value.assets.every(isPublicTeamAssetRecord)
+  );
+}
+
+function isTeamAssetMutationResult(value: unknown): value is TeamAssetMutationResult {
+  if (!isRecord(value)) return false;
+  return (
+    value.targetKind === "postgres" &&
+    typeof value.workspaceId === "string" &&
+    isPublicTeamAssetRecord(value.asset)
   );
 }
 

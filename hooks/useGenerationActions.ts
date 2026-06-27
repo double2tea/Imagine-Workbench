@@ -5,17 +5,14 @@ import type { ReferenceImageRef } from "@/components/reference/ReferenceImagePic
 import { isRunningHubWorkflowAudioTarget } from "@/lib/audio-generation-routing";
 import { API_ROUTES } from "@/lib/api/routes";
 import { resolveAssetOriginalUrl } from "@/lib/assets/resolve-url";
-import { saveItemWithPreview } from "@/lib/assets/previews";
 import { readFetchError, toErrorMessage } from "@/lib/client-fetch-error";
 import { readImageGenerationPayload } from "@/lib/client-image-response";
 import {
   buildStorageItem,
-  deleteFromDB,
   getAssetMeta,
   getAssetMetasByIds,
   getGenerationReferenceMedia,
   hydrateAssets,
-  saveToDB,
   type GenerationReferenceMediaSnapshot,
   type GenerationRequestSnapshot,
   type StorageItem,
@@ -80,6 +77,9 @@ interface UseGenerationActionsParams {
   referenceImage: string | null;
   referenceImages: ReferenceImageRef[];
   runningHubYouchuan: RunningHubYouchuanAdvancedSettings;
+  deleteAssetById: (id: string) => Promise<void>;
+  saveAssetDirect: (item: StorageItem) => Promise<StorageItem>;
+  saveAssetWithPreview: (item: StorageItem) => Promise<StorageItem>;
   selectedModel: string;
   selectedVideoModel: string;
   setGenerationTasks: Dispatch<SetStateAction<GenerationTask[]>>;
@@ -214,14 +214,15 @@ function isAbortError(error: unknown): boolean {
 
 async function saveItemOrWarn(
   item: StorageItem,
+  saveAssetWithPreview: (item: StorageItem) => Promise<StorageItem>,
   pushWorkspaceNotice: (type: NoticeType, message: string) => void,
   t: TFunction,
 ): Promise<StorageItem | null> {
   try {
-    return await saveItemWithPreview(item);
+    return await saveAssetWithPreview(item);
   } catch (error) {
     const message = toErrorMessage(error, t("common.notices.indexedDbWriteFailed"));
-    console.error("IndexedDB Save Failed:", error);
+    console.error("Asset Save Failed:", error);
     pushWorkspaceNotice("error", t("common.notices.localSaveFailed", { error: message }));
     return null;
   }
@@ -229,29 +230,30 @@ async function saveItemOrWarn(
 
 async function deleteItemOrWarn(
   itemId: string,
+  deleteAssetById: (id: string) => Promise<void>,
   pushWorkspaceNotice: (type: NoticeType, message: string) => void,
   t: TFunction,
 ): Promise<void> {
   try {
-    await deleteFromDB(itemId);
+    await deleteAssetById(itemId);
   } catch (error) {
     const message = toErrorMessage(error, t("common.notices.indexedDbDeleteFailed"));
-    console.error("IndexedDB Delete Failed:", error);
+    console.error("Asset Delete Failed:", error);
     pushWorkspaceNotice("error", t("common.notices.localResultClearFailed", { error: message }));
   }
 }
 
 async function saveDirectItemOrWarn(
   item: StorageItem,
+  saveAssetDirect: (item: StorageItem) => Promise<StorageItem>,
   pushWorkspaceNotice: (type: NoticeType, message: string) => void,
   t: TFunction,
 ): Promise<StorageItem | null> {
   try {
-    await saveToDB(item);
-    return item;
+    return await saveAssetDirect(item);
   } catch (error) {
     const message = toErrorMessage(error, t("common.notices.indexedDbWriteFailed"));
-    console.error("IndexedDB Direct Asset Save Failed:", error);
+    console.error("Direct Asset Save Failed:", error);
     pushWorkspaceNotice("error", t("common.notices.localResultSaveFailed", { error: message }));
     return null;
   }
@@ -403,6 +405,9 @@ export function useGenerationActions({
   referenceImage,
   referenceImages,
   runningHubYouchuan,
+  deleteAssetById,
+  saveAssetDirect,
+  saveAssetWithPreview,
   selectedModel,
   selectedVideoModel,
   setGenerationTasks,
@@ -599,12 +604,12 @@ export function useGenerationActions({
             },
             { boardId: resolveScopeBoardId(overrides) },
           );
-          const savedCompletedItem = await saveItemOrWarn(completedItem, pushWorkspaceNotice, t);
+          const savedCompletedItem = await saveItemOrWarn(completedItem, saveAssetWithPreview, pushWorkspaceNotice, t);
           if (savedCompletedItem) savedCompletedItems.push(savedCompletedItem);
         }
 
         if (savedCompletedItems.length !== outputUrls.length) {
-          for (const item of savedCompletedItems) await deleteItemOrWarn(item.id, pushWorkspaceNotice, t);
+          for (const item of savedCompletedItems) await deleteItemOrWarn(item.id, deleteAssetById, pushWorkspaceNotice, t);
           const failedTask = await updateTaskOrWarn(taskId, {
             status: "failed",
             progress: 100,
@@ -1006,7 +1011,7 @@ export function useGenerationActions({
               },
               { boardId: resolveScopeBoardId(overrides) },
             );
-            const savedCompletedItem = await saveDirectItemOrWarn(completedItem, pushWorkspaceNotice, t);
+            const savedCompletedItem = await saveDirectItemOrWarn(completedItem, saveAssetDirect, pushWorkspaceNotice, t);
             if (!savedCompletedItem) {
               const failedTask = await updateTaskOrWarn(taskId, {
                 status: "failed",
@@ -1050,7 +1055,7 @@ export function useGenerationActions({
             },
             { boardId: resolveScopeBoardId(overrides) },
           );
-          const savedCompletedItem = await saveDirectItemOrWarn(completedItem, pushWorkspaceNotice, t);
+          const savedCompletedItem = await saveDirectItemOrWarn(completedItem, saveAssetDirect, pushWorkspaceNotice, t);
           if (!savedCompletedItem) {
             const failedTask = await updateTaskOrWarn(taskId, {
               status: "failed",

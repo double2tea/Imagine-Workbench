@@ -1,7 +1,12 @@
 import { apiErrorResponse, badRequest } from "@/lib/api/errors";
+import type { StorageItem, StorageItemMeta, StorageItemType } from "@/lib/db";
 import { PostgresStorageConfigError, resolvePostgresStorageConfig } from "@/lib/storage/postgres/config";
 import { withPostgresClient } from "@/lib/storage/postgres/connection";
-import { listTeamAssets } from "@/lib/storage/team-assets";
+import {
+  assertTeamCsrf,
+  assertTrustedTeamRequestOrigin,
+} from "@/lib/storage/team-auth";
+import { listTeamAssets, saveTeamAsset, type TeamAssetSaveInput } from "@/lib/storage/team-assets";
 import type { WorkspaceAssetListOptions } from "@/lib/storage/repository";
 
 export const runtime = "nodejs";
@@ -17,6 +22,25 @@ export async function GET(request: Request): Promise<Response> {
     return Response.json(result);
   } catch (error) {
     const response = apiErrorResponse(error, "Team asset list failed");
+    return Response.json(response.body, {
+      status: error instanceof PostgresStorageConfigError ? 400 : response.status,
+    });
+  }
+}
+
+export async function POST(request: Request): Promise<Response> {
+  try {
+    assertTrustedTeamRequestOrigin(request, {
+      APP_URL: process.env.APP_URL,
+      IMAGINE_TRUSTED_ORIGINS: process.env.IMAGINE_TRUSTED_ORIGINS,
+    });
+    assertTeamCsrf(request);
+    const input = await readTeamAssetSaveRequestJson(request);
+    const config = resolvePostgresStorageConfig(process.env);
+    const result = await withPostgresClient(config, client => saveTeamAsset(client, config, request, input));
+    return Response.json(result);
+  } catch (error) {
+    const response = apiErrorResponse(error, "Team asset save failed");
     return Response.json(response.body, {
       status: error instanceof PostgresStorageConfigError ? 400 : response.status,
     });
@@ -66,4 +90,53 @@ function statusParams(searchParams: URLSearchParams): WorkspaceAssetListOptions[
 
 function isTeamAssetStatus(value: string): value is TeamAssetStatus {
   return value === "complete" || value === "processing" || value === "pending" || value === "failed";
+}
+
+async function readTeamAssetSaveRequestJson(request: Request): Promise<TeamAssetSaveInput> {
+  let body: unknown;
+  try {
+    body = await request.json();
+  } catch {
+    throw badRequest("Invalid team asset request", "invalid_team_asset_request");
+  }
+  if (!isRecord(body) || !isStorageItem(body.asset)) {
+    throw badRequest("Invalid team asset request", "invalid_team_asset_request");
+  }
+  return { item: body.asset };
+}
+
+function isStorageItem(value: unknown): value is StorageItem {
+  return (
+    isStorageItemMeta(value) &&
+    typeof value.url === "string"
+  );
+}
+
+function isStorageItemMeta(value: unknown): value is StorageItemMeta {
+  if (!isRecord(value)) return false;
+  return (
+    typeof value.id === "string" &&
+    isStorageItemType(value.type) &&
+    typeof value.prompt === "string" &&
+    typeof value.model === "string" &&
+    typeof value.aspectRatio === "string" &&
+    typeof value.createdAt === "string" &&
+    isStorageItemStatus(value.status) &&
+    typeof value.progress === "number" &&
+    (value.scope === "workspace" || value.scope === "board") &&
+    typeof value.boardId === "string" &&
+    typeof value.hasBlob === "boolean"
+  );
+}
+
+function isStorageItemType(value: unknown): value is StorageItemType {
+  return value === "image" || value === "video" || value === "audio" || value === "transcript";
+}
+
+function isStorageItemStatus(value: unknown): value is StorageItemMeta["status"] {
+  return value === "complete" || value === "processing" || value === "pending" || value === "failed";
+}
+
+function isRecord(value: unknown): value is Record<string, unknown> {
+  return typeof value === "object" && value !== null;
 }
