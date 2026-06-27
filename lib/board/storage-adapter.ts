@@ -58,10 +58,17 @@ export function createTeamBoardStorageAdapter(): BoardStorageAdapter {
     },
     async saveBoard(board) {
       const version = versions.get(board.id);
-      const result = version === undefined
-        ? await createTeamBoardDocument(board, requireTeamCsrfToken())
-        : await saveTeamBoardDocument(board, version, requireTeamCsrfToken());
-      versions.set(result.board.id, result.version);
+      try {
+        const result = version === undefined
+          ? await createTeamBoardDocument(board, requireTeamCsrfToken())
+          : await saveTeamBoardDocument(board, version, requireTeamCsrfToken());
+        versions.set(result.board.id, result.version);
+      } catch (error) {
+        if (error instanceof TeamStorageClientError && error.code === "team_board_version_conflict") {
+          throw new Error("board.workspace.versionConflict");
+        }
+        throw error;
+      }
     },
   };
 }

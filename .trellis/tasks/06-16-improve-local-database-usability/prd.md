@@ -210,7 +210,7 @@ Still remaining before the full PRD can be considered complete:
 * [x] Board generated-media viewed markers are classified as local/per-user UX state. They are not written into shared board documents or asset rows unless a later per-user attention-state feature explicitly adds server-side support.
 * [x] Browser mode remains login-free unless a later task explicitly changes public/single-user behavior.
 * [x] No code path dual-writes workspace data to IndexedDB and PostgreSQL.
-* [ ] Board/settings updates use version checks or equivalent optimistic concurrency; conflicting edits produce a visible reload/merge prompt rather than silently overwriting another user.
+* [x] Board/settings updates use version checks or equivalent optimistic concurrency; conflicting edits produce a visible reload/merge prompt rather than silently overwriting another user.
 * [x] Refreshing the app or relevant view shows the latest shared PostgreSQL-backed assets, generation statuses, boards, and asset library records from other team members.
 * [x] Generation/task status surfaces either poll on an interval or expose an event-stream-ready query cursor so users can see progress without relying only on full-page reloads.
 * [x] Media payloads are stored outside PostgreSQL rows by default and resolved through safe payload refs.
@@ -229,7 +229,7 @@ Still remaining before the full PRD can be considered complete:
 * [x] Settings -> Data reports PostgreSQL mode health, storage counts, and actionable maintenance states.
 * [x] PostgreSQL routes and driver imports are Node-only and do not break Cloudflare Pages/public builds.
 * [x] PostgreSQL connections use a bounded server-side pool with configured timeouts; health checks fail visibly when the pool/database is unavailable.
-* [x] Storage-focused tests cover migrations, CRUD, payload refs, hosted/browser mode, PostgreSQL fail-fast config errors, explicit migration, backup/restore target selection, authz role checks, config hiding, CSRF/origin rejection, and ego-browser browser-mode smoke coverage for the main workstation, board route, Settings -> Data, and disabled PostgreSQL health behavior.
+* [x] Storage-focused tests cover migrations, CRUD, payload refs, hosted/browser mode, PostgreSQL fail-fast config errors, explicit migration, backup/restore target selection, authz role checks, config hiding, CSRF/origin rejection, board/settings concurrency conflict prompts, and ego-browser browser-mode smoke coverage for the main workstation, board route, Settings -> Data, and disabled PostgreSQL health behavior.
 * [x] `pnpm run lint` and `pnpm run typecheck` pass.
 
 ## Research References

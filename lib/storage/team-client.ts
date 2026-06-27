@@ -618,8 +618,7 @@ export async function saveTeamSetting(
   });
   const body: unknown = await response.json();
   if (!response.ok) {
-    const error = readStringField(body, "error") ?? "Team setting save failed";
-    throw new Error(error);
+    throw readTeamStorageClientError(body, "Team setting save failed");
   }
   return parseTeamSettingMutationResult(body);
 }
@@ -662,8 +661,7 @@ export async function deleteTeamSetting(
   });
   const body: unknown = await response.json();
   if (!response.ok) {
-    const error = readStringField(body, "error") ?? "Team setting delete failed";
-    throw new Error(error);
+    throw readTeamStorageClientError(body, "Team setting delete failed");
   }
 }
 

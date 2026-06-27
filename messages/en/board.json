@@ -244,6 +244,7 @@
     "multiGridOnlyImage": "Multi-grid only supports image media",
     "loadFailed": "Board load failed",
     "saveFailed": "Board save failed",
+    "versionConflict": "This board changed in another session. Reload the board before saving again, or merge your changes manually.",
     "connectFailed": "Connection failed",
     "reconnectFailed": "Reconnection failed",
     "restoreNodeFailed": "Failed to restore node",

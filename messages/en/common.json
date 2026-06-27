@@ -180,6 +180,7 @@
     "providerCredentialSaveFailed": "Provider credential save failed",
     "providerCredentialClearFailed": "Provider credential clear failed",
     "providerCredentialCsrfMissing": "Team CSRF token is required before saving provider credentials",
+    "providerSettingConflict": "Team provider settings changed in another session. Reload Settings before saving again, or merge your changes manually.",
     "providerSettingsRestoreFailed": "Provider settings restore failed",
     "enterAtLeastOneModelName": "Please enter at least one model name",
     "noAddableModels": "No addable {category} models",

@@ -25,13 +25,14 @@ import { API_ROUTES } from "@/lib/api/routes";
 import { readFetchError, toErrorMessage } from "@/lib/client-fetch-error";
 import {
   deleteTeamSecret,
+  deleteTeamSetting,
   fetchTeamSecrets,
   fetchTeamSettings,
   fetchWorkspaceStorageRuntimeStatus,
   readTeamCsrfToken,
   saveTeamSecret,
   saveTeamSetting,
-  deleteTeamSetting,
+  TeamStorageClientError,
 } from "@/lib/storage/team-client";
 
 type ModelCategory = "chat" | "image" | "video" | "audio";
@@ -48,6 +49,16 @@ function defaultProviderCredentials(providerKeys: readonly AiProvider[]): Record
   const record = {} as Record<AiProvider, ProviderCredentials>;
   for (const provider of providerKeys) record[provider] = { apiKey: "", baseUrl: "" };
   return record;
+}
+
+function providerSettingSaveErrorMessage(error: unknown, fallback: string): string {
+  if (
+    error instanceof TeamStorageClientError &&
+    (error.code === "team_setting_version_conflict" || error.code === "team_setting_version_required")
+  ) {
+    return t("common.notices.providerSettingConflict");
+  }
+  return toErrorMessage(error, fallback);
 }
 
 function isModelOption(value: unknown): value is ModelOption {
@@ -292,8 +303,8 @@ export function useProviderSettings({
         .then(() => {
           teamSettingVersionsRef.current.delete(key);
         })
-    ).catch(error => {
-      pushWorkspaceNotice("error", toErrorMessage(error, t("common.notices.providerCredentialSaveFailed")));
+      ).catch(error => {
+      pushWorkspaceNotice("error", providerSettingSaveErrorMessage(error, t("common.notices.providerCredentialSaveFailed")));
     });
   }, [credentialStorageTarget, pushWorkspaceNotice]);
 
@@ -331,7 +342,7 @@ export function useProviderSettings({
             teamSettingVersionsRef.current.delete(key);
           })
       ).catch(error => {
-        pushWorkspaceNotice("error", toErrorMessage(error, t("common.notices.providerCredentialSaveFailed")));
+        pushWorkspaceNotice("error", providerSettingSaveErrorMessage(error, t("common.notices.providerCredentialSaveFailed")));
       });
       return;
     }
@@ -386,7 +397,7 @@ export function useProviderSettings({
         }));
       })
       .catch(error => {
-        pushWorkspaceNotice("error", toErrorMessage(error, t("common.notices.providerCredentialClearFailed")));
+        pushWorkspaceNotice("error", providerSettingSaveErrorMessage(error, t("common.notices.providerCredentialClearFailed")));
       });
   }, [credentialStorageTarget, customProviderByKey, pushWorkspaceNotice, setProviderCredentials, syncResolveProviderCredentialIfEnabled]);
 

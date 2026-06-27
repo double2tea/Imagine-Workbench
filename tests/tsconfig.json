@@ -63,6 +63,7 @@
     "./team-assets.test.ts",
     "./team-boards.test.ts",
     "./team-bootstrap.test.ts",
+    "./team-concurrency-prompts.test.ts",
     "./team-context.test.ts",
     "./team-data-summary.test.ts",
     "./team-generation-tasks.test.ts",

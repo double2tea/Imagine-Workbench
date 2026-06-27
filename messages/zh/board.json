@@ -244,6 +244,7 @@
     "multiGridOnlyImage": "多宫格只支持图片媒体",
     "loadFailed": "画板加载失败",
     "saveFailed": "画板保存失败",
+    "versionConflict": "这个画板已被其他成员更新。请刷新画板后再保存，或手动合并你的修改。",
     "connectFailed": "连接失败",
     "reconnectFailed": "重连失败",
     "restoreNodeFailed": "恢复节点失败",

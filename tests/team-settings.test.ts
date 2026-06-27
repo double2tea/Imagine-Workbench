@@ -14,6 +14,7 @@ import {
   deleteTeamSetting as deleteTeamSettingClient,
   fetchTeamSettings,
   saveTeamSetting as saveTeamSettingClient,
+  TeamStorageClientError,
 } from "../lib/storage/team-client";
 import { POST as postTeamSetting } from "../app/api/storage/team/settings/route";
 
@@ -283,6 +284,35 @@ test("team setting client sends filters and rejects secret-shaped responses", as
     return Response.json({ ok: true });
   });
   assert.equal(deleteUrl, "/api/storage/team/settings/provider%2Fbase%20url");
+});
+
+test("team setting client preserves version conflict error codes", async () => {
+  await assert.rejects(
+    saveTeamSettingClient({
+      expectedUpdatedAt: "2026-06-26T00:00:00.000Z",
+      group: "provider",
+      key: SETTING_KEY,
+      value: "https://provider.example.test",
+    }, "csrf-token", async () => Response.json({
+      code: "team_setting_version_conflict",
+      error: "Team setting version conflict",
+    }, { status: 409 })),
+    (error: unknown) =>
+      error instanceof TeamStorageClientError &&
+      error.code === "team_setting_version_conflict" &&
+      error.message === "Team setting version conflict",
+  );
+
+  await assert.rejects(
+    deleteTeamSettingClient(SETTING_KEY, "csrf-token", "2026-06-26T00:00:00.000Z", async () => Response.json({
+      code: "team_setting_version_required",
+      error: "Team setting version is required",
+    }, { status: 409 })),
+    (error: unknown) =>
+      error instanceof TeamStorageClientError &&
+      error.code === "team_setting_version_required" &&
+      error.message === "Team setting version is required",
+  );
 });
 
 function requestWithSession(): Request {

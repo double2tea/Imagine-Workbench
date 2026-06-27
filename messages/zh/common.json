@@ -178,6 +178,7 @@
     "providerCredentialSaveFailed": "服务商凭证保存失败",
     "providerCredentialClearFailed": "服务商凭证清除失败",
     "providerCredentialCsrfMissing": "保存服务商凭证前需要团队 CSRF token",
+    "providerSettingConflict": "团队服务商设置已被其他成员更新。请刷新设置后再保存，或重新合并你的修改。",
     "providerSettingsRestoreFailed": "服务商设置恢复失败",
     "enterAtLeastOneModelName": "请输入至少一个模型名称",
     "noAddableModels": "没有可添加的{category}模型",

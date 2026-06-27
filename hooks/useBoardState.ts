@@ -213,6 +213,12 @@ export interface BoardStateController {
   updateRunningHubAppNode: (nodeId: string, input: BoardRunningHubAppNodeUpdate) => void;
 }
 
+function boardStorageErrorMessage(error: unknown, fallbackKey: string): string {
+  if (!(error instanceof Error)) return t(fallbackKey);
+  if (error.message.startsWith("board.workspace.")) return t(error.message);
+  return error.message;
+}
+
 function createBoardId(prefix: string): string {
   const cryptoApi = globalThis.crypto;
   if (!cryptoApi) {
@@ -1852,7 +1858,7 @@ export function useBoardState(
         })
         .catch((error: unknown) => {
           if (!isActive) return;
-          setSaveError(error instanceof Error ? error.message : t("board.workspace.saveFailed"));
+          setSaveError(boardStorageErrorMessage(error, "board.workspace.saveFailed"));
           setSaveStatus("error");
         });
     }, 450);
@@ -1872,7 +1878,7 @@ export function useBoardState(
       setSaveError(null);
       setSaveStatus("saved");
     } catch (error: unknown) {
-      setSaveError(error instanceof Error ? error.message : t("board.workspace.saveFailed"));
+      setSaveError(boardStorageErrorMessage(error, "board.workspace.saveFailed"));
       setSaveStatus("error");
       throw error;
     }
