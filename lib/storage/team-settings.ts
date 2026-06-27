@@ -51,13 +51,20 @@ export async function saveTeamSetting(
     updatedAt: new Date().toISOString(),
     value: input.value,
   };
-  await context.repository.settings.put(record);
-  await recordTeamAuditEvent(context.queryable, {
-    eventType: "team_setting.save",
-    metadata: { group, key },
-    userId: context.session.userId,
-    workspaceId: context.session.workspaceId,
-  });
+  await context.queryable.query("begin");
+  try {
+    await context.repository.settings.put(record);
+    await recordTeamAuditEvent(context.queryable, {
+      eventType: "team_setting.save",
+      metadata: { group, key },
+      userId: context.session.userId,
+      workspaceId: context.session.workspaceId,
+    });
+    await context.queryable.query("commit");
+  } catch (error) {
+    await context.queryable.query("rollback");
+    throw error;
+  }
   return {
     setting: toPublicTeamSetting(record),
     targetKind: "postgres",
@@ -76,13 +83,20 @@ export async function deleteTeamSetting(
   const existing = await context.repository.settings.get(normalizedKey);
   if (existing?.isSecret) throw badRequest("Team setting is secret", "team_setting_secret_unsupported");
   if (!existing) return;
-  await context.repository.settings.delete(normalizedKey);
-  await recordTeamAuditEvent(context.queryable, {
-    eventType: "team_setting.delete",
-    metadata: { key: normalizedKey },
-    userId: context.session.userId,
-    workspaceId: context.session.workspaceId,
-  });
+  await context.queryable.query("begin");
+  try {
+    await context.repository.settings.delete(normalizedKey);
+    await recordTeamAuditEvent(context.queryable, {
+      eventType: "team_setting.delete",
+      metadata: { key: normalizedKey },
+      userId: context.session.userId,
+      workspaceId: context.session.workspaceId,
+    });
+    await context.queryable.query("commit");
+  } catch (error) {
+    await context.queryable.query("rollback");
+    throw error;
+  }
 }
 
 function toPublicTeamSetting(record: WorkspaceSettingRecord): PublicTeamSetting {

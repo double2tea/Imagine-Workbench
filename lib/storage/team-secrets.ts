@@ -54,13 +54,20 @@ export async function saveTeamSecret(
     updatedAt: new Date().toISOString(),
     value: encryptedValue,
   };
-  await context.repository.settings.put(record);
-  await recordTeamAuditEvent(context.queryable, {
-    eventType: "team_secret.save",
-    metadata: { group, key },
-    userId: context.session.userId,
-    workspaceId: context.session.workspaceId,
-  });
+  await context.queryable.query("begin");
+  try {
+    await context.repository.settings.put(record);
+    await recordTeamAuditEvent(context.queryable, {
+      eventType: "team_secret.save",
+      metadata: { group, key },
+      userId: context.session.userId,
+      workspaceId: context.session.workspaceId,
+    });
+    await context.queryable.query("commit");
+  } catch (error) {
+    await context.queryable.query("rollback");
+    throw error;
+  }
   return {
     secret: toPublicTeamSecretStatus(record),
     targetKind: "postgres",
@@ -76,13 +83,20 @@ export async function deleteTeamSecret(
 ): Promise<void> {
   const context = await createTeamWorkspaceStorageContext(queryable, config, request, { minimumRole: "admin" });
   const normalizedKey = normalizeTeamSecretKey(key);
-  await context.repository.settings.delete(normalizedKey);
-  await recordTeamAuditEvent(context.queryable, {
-    eventType: "team_secret.delete",
-    metadata: { key: normalizedKey },
-    userId: context.session.userId,
-    workspaceId: context.session.workspaceId,
-  });
+  await context.queryable.query("begin");
+  try {
+    await context.repository.settings.delete(normalizedKey);
+    await recordTeamAuditEvent(context.queryable, {
+      eventType: "team_secret.delete",
+      metadata: { key: normalizedKey },
+      userId: context.session.userId,
+      workspaceId: context.session.workspaceId,
+    });
+    await context.queryable.query("commit");
+  } catch (error) {
+    await context.queryable.query("rollback");
+    throw error;
+  }
 }
 
 function toPublicTeamSecretStatus(record: WorkspaceSettingRecord): PublicTeamSecretStatus {

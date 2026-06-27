@@ -68,6 +68,9 @@ test("saveTeamSecret encrypts the value before writing settings", async () => {
   assert.equal(decryptWorkspaceSecret(encryptedValue, ENCRYPTION_KEY), "provider-api-key");
   assert.deepEqual(write?.values?.slice(0, 3), [WORKSPACE_ID, "provider:demo:apiKey", "provider"]);
   assert.equal(write?.values?.[4], true);
+  assert.ok(queries.some(query => query.text === "begin"));
+  assert.ok(queries.some(query => query.text === "commit"));
+  assert.equal(queries.some(query => query.text === "rollback"), false);
   const audit = queries.find(query => query.text.includes("insert into audit_events"));
   assert.deepEqual(audit?.values?.slice(0, 3), [WORKSPACE_ID, "user_1", "team_secret.save"]);
   assert.deepEqual(JSON.parse(String(audit?.values?.[3])) as unknown, {
@@ -89,6 +92,9 @@ test("deleteTeamSecret removes an admin-scoped setting key", async () => {
     queries.find(query => query.text.startsWith("delete from settings"))?.values,
     [WORKSPACE_ID, "provider:demo:apiKey"],
   );
+  assert.ok(queries.some(query => query.text === "begin"));
+  assert.ok(queries.some(query => query.text === "commit"));
+  assert.equal(queries.some(query => query.text === "rollback"), false);
   const audit = queries.find(query => query.text.includes("insert into audit_events"));
   assert.deepEqual(audit?.values?.slice(0, 3), [WORKSPACE_ID, "user_1", "team_secret.delete"]);
   assert.deepEqual(JSON.parse(String(audit?.values?.[3])) as unknown, {

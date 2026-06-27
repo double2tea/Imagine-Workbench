@@ -70,12 +70,36 @@ test("saveTeamSetting writes a non-secret setting and audit event", async () => 
   const write = queries.find(query => query.text.includes("insert into settings"));
   assert.equal(result.setting.key, SETTING_KEY);
   assert.deepEqual(write?.values, [WORKSPACE_ID, SETTING_KEY, "provider", "https://provider.example.test", false]);
+  assert.ok(queries.some(query => query.text === "begin"));
+  assert.ok(queries.some(query => query.text === "commit"));
+  assert.equal(queries.some(query => query.text === "rollback"), false);
   const audit = queries.find(query => query.text.includes("insert into audit_events"));
   assert.deepEqual(audit?.values?.slice(0, 3), [WORKSPACE_ID, "user_1", "team_setting.save"]);
   assert.deepEqual(JSON.parse(String(audit?.values?.[3])) as unknown, {
     group: "provider",
     key: SETTING_KEY,
   });
+});
+
+test("deleteTeamSetting removes a non-secret setting with audit", async () => {
+  const queries: Array<{ text: string; values?: readonly unknown[] }> = [];
+  await deleteTeamSetting(
+    createTeamSettingsQueryable(queries),
+    { databaseUrl: "postgres://localhost/imagine", mediaDir: "/srv/imagine/media" },
+    requestWithSession(),
+    ` ${SETTING_KEY} `,
+  );
+
+  assert.deepEqual(
+    queries.find(query => query.text.startsWith("delete from settings"))?.values,
+    [WORKSPACE_ID, SETTING_KEY],
+  );
+  assert.ok(queries.some(query => query.text === "begin"));
+  assert.ok(queries.some(query => query.text === "commit"));
+  assert.equal(queries.some(query => query.text === "rollback"), false);
+  const audit = queries.find(query => query.text.includes("insert into audit_events"));
+  assert.deepEqual(audit?.values?.slice(0, 3), [WORKSPACE_ID, "user_1", "team_setting.delete"]);
+  assert.deepEqual(JSON.parse(String(audit?.values?.[3])) as unknown, { key: SETTING_KEY });
 });
 
 test("deleteTeamSetting refuses to delete secret settings", async () => {
