@@ -284,7 +284,7 @@ test("buildManagedLocalStorageInventory classifies current persisted localStorag
       {
         key: "imagine_resolve_integration_enabled",
         kind: "ui-preferences",
-        migrationPolicy: "required",
+        migrationPolicy: "local-only",
         includeCredentialsRequired: false,
       },
       {

@@ -213,6 +213,118 @@ test("restoreTeamWorkspaceBackup restores team settings and opt-in secrets", asy
   });
 });
 
+test("restoreTeamWorkspaceBackup imports classified browser localStorage into team stores", async () => {
+  await withTempMediaDir(async mediaDir => {
+    await withTeamEncryptionKey(async () => {
+      const queries: Array<{ text: string; values?: readonly unknown[] }> = [];
+      const backup = await createPortableTeamBackup({
+        localStorage: {
+          imagine_ai_provider: "grok2api",
+          imagine_chat_model: "grok2api:grok-4-image",
+          imagine_chat_model_options: JSON.stringify({
+            grok2api: [{ label: "Grok 4 Image", value: "grok2api:grok-4-image" }],
+          }),
+          imagine_custom_prompt_templates: JSON.stringify([CUSTOM_PROMPT_TEMPLATE]),
+          imagine_provider_credentials: JSON.stringify({
+            grok2api: {
+              apiKey: "browser-grok-key",
+              baseUrl: "https://grok.example.test",
+            },
+          }),
+          imagine_runninghub_saved_targets: JSON.stringify([RUNNINGHUB_SAVED_TARGET]),
+          "imagine_board_viewed_generated_asset_ids:board_1": JSON.stringify(["asset_1"]),
+        },
+      });
+      const result = await restoreTeamWorkspaceBackup(
+        createTeamBackupQueryable(queries, { existingRecords: false }),
+        { databaseUrl: "postgres://localhost/imagine", mediaDir },
+        requestWithSession(),
+        new Blob([backup], { type: "application/zip" }),
+        true,
+      );
+
+      assert.equal(result.settingsKeyCount, 7);
+      const settingWrites = queries.filter(query => query.text.startsWith("insert into settings"));
+      assert.equal(settingWrites.find(query => query.values?.[1] === "provider:selected")?.values?.[3], "grok2api");
+      assert.equal(settingWrites.find(query => query.values?.[1] === "provider:chatModel")?.values?.[3], "grok2api:grok-4-image");
+      assert.equal(settingWrites.find(query => query.values?.[1] === "provider:grok2api:baseUrl")?.values?.[3], "https://grok.example.test");
+      const secretValue = String(settingWrites.find(query => query.values?.[1] === "provider:grok2api:apiKey")?.values?.[3] ?? "");
+      assert.equal(isEncryptedWorkspaceSecret(secretValue), true);
+      assert.equal(decryptWorkspaceSecret(secretValue, ENCRYPTION_KEY), "browser-grok-key");
+
+      const promptWrite = queries.find(query => query.text.includes("insert into prompt_templates"));
+      assert.equal(promptWrite?.values?.[0], CUSTOM_PROMPT_TEMPLATE.id);
+
+      const targetWrite = queries.find(query => query.text.includes("insert into saved_provider_targets"));
+      assert.equal(targetWrite?.values?.[0], `${WORKSPACE_ID}:runninghub:ai-app:app_1`);
+      const storedTarget = JSON.parse(String(targetWrite?.values?.[3] ?? "")) as { accessPasswordEncrypted?: string; targetId?: string };
+      assert.equal(storedTarget.targetId, "app_1");
+      assert.equal(isEncryptedWorkspaceSecret(storedTarget.accessPasswordEncrypted ?? ""), true);
+      assert.equal(decryptWorkspaceSecret(storedTarget.accessPasswordEncrypted ?? "", ENCRYPTION_KEY), "target-password");
+      const restoreAudit = queries.find(query => query.values?.[2] === "team_backup.restore");
+      assert.match(String(restoreAudit?.values?.[3] ?? ""), /"skippedLocalOnlySettingCount":1/);
+    });
+  });
+});
+
+test("restoreTeamWorkspaceBackup rejects unknown browser localStorage keys", async () => {
+  await withTempMediaDir(async mediaDir => {
+    const backup = await createPortableTeamBackup({
+      localStorage: { imagine_unknown_future_key: "value" },
+    });
+    await assert.rejects(
+      restoreTeamWorkspaceBackup(
+        createTeamBackupQueryable([], { existingRecords: false }),
+        { databaseUrl: "postgres://localhost/imagine", mediaDir },
+        requestWithSession(),
+        new Blob([backup], { type: "application/zip" }),
+        false,
+      ),
+      /Unsupported browser setting imagine_unknown_future_key/,
+    );
+  });
+});
+
+test("restoreTeamWorkspaceBackup rejects malformed browser localStorage JSON", async () => {
+  await withTempMediaDir(async mediaDir => {
+    await withTeamEncryptionKey(async () => {
+      const backup = await createPortableTeamBackup({
+        localStorage: { imagine_provider_credentials: "{" },
+      });
+      await assert.rejects(
+        restoreTeamWorkspaceBackup(
+          createTeamBackupQueryable([], { existingRecords: false }),
+          { databaseUrl: "postgres://localhost/imagine", mediaDir },
+          requestWithSession(),
+          new Blob([backup], { type: "application/zip" }),
+          true,
+        ),
+        /Browser provider credentials are invalid/,
+      );
+    });
+  });
+});
+
+test("restoreTeamWorkspaceBackup rejects browser credential localStorage without opt-in", async () => {
+  await withTempMediaDir(async mediaDir => {
+    const backup = await createPortableTeamBackup({
+      localStorage: {
+        imagine_provider_credentials: JSON.stringify({ grok2api: { apiKey: "browser-grok-key" } }),
+      },
+    });
+    await assert.rejects(
+      restoreTeamWorkspaceBackup(
+        createTeamBackupQueryable([], { existingRecords: false }),
+        { databaseUrl: "postgres://localhost/imagine", mediaDir },
+        requestWithSession(),
+        new Blob([backup], { type: "application/zip" }),
+        false,
+      ),
+      /credential restore requires the credentials option/,
+    );
+  });
+});
+
 test("restoreTeamWorkspaceBackup rejects credential settings without opt-in", async () => {
   await withTempMediaDir(async mediaDir => {
     const backup = await createPortableTeamBackup({
@@ -311,10 +423,13 @@ function createTeamBackupQueryable(
 }
 
 async function createPortableTeamBackup(settings: {
+  localStorage?: Record<string, string>;
   teamSecrets?: Array<{ group: string; key: string; value: string }>;
   teamSettings?: Array<{ group: string; key: string; value: string }>;
 } = {}): Promise<ArrayBuffer> {
-  const settingsKeyCount = (settings.teamSecrets?.length ?? 0) + (settings.teamSettings?.length ?? 0);
+  const settingsKeyCount = Object.keys(settings.localStorage ?? {}).length +
+    (settings.teamSecrets?.length ?? 0) +
+    (settings.teamSettings?.length ?? 0);
   const zip = new JSZip();
   zip.file(MANIFEST_FILE, JSON.stringify({
     app: BACKUP_APP_NAME,
@@ -475,5 +590,33 @@ const VOICE_PROFILE: VoiceProfile = {
   referenceAudioAssetIds: [],
   source: "designed",
   tags: [],
+  updatedAt: CREATED_AT,
+};
+
+const CUSTOM_PROMPT_TEMPLATE = {
+  category: "custom",
+  createdAt: CREATED_AT,
+  id: "user-prompt-template-1",
+  positivePrompt: "cinematic product shot",
+  scene: "Product",
+  title: "Product Shot",
+  updatedAt: CREATED_AT,
+};
+
+const RUNNINGHUB_SAVED_TARGET = {
+  accessPassword: "target-password",
+  bindings: [{
+    deliveryMode: "raw",
+    fieldName: "prompt",
+    id: "binding_1",
+    nodeId: "node_1",
+    source: "prompt",
+    value: "",
+  }],
+  id: "ai-app:app_1",
+  label: "App 1",
+  outputType: "image",
+  targetId: "app_1",
+  targetType: "ai-app",
   updatedAt: CREATED_AT,
 };
