@@ -1,6 +1,7 @@
 import { API_ROUTES } from "@/lib/api/routes";
 import type { BoardDocument, BoardSummary } from "@/lib/board/types";
 import { readFetchError } from "@/lib/client-fetch-error";
+import { readCustomPromptTemplate, type CustomPromptTemplate } from "@/lib/custom-prompt-templates";
 import type { StorageItem, StorageItemMeta } from "@/lib/db";
 import type {
   GenerationTask,
@@ -33,6 +34,10 @@ import type {
   TeamProviderTargetMutationResult,
   TeamProviderTargetSaveInput,
 } from "@/lib/storage/team-provider-target-types";
+import type {
+  TeamPromptTemplateListResult,
+  TeamPromptTemplateMutationResult,
+} from "@/lib/storage/team-prompt-template-types";
 import type {
   PublicTeamSecretStatus,
   TeamSecretListResult,
@@ -277,6 +282,59 @@ export async function fetchTeamProviderTargets(fetcher: Fetcher = fetch): Promis
     throw new Error(error);
   }
   return parseTeamProviderTargetListResult(body);
+}
+
+export async function fetchTeamPromptTemplates(fetcher: Fetcher = fetch): Promise<TeamPromptTemplateListResult> {
+  const response = await fetcher(API_ROUTES.storage.teamPromptTemplates, { cache: "no-store" });
+  const body: unknown = await response.json();
+  if (!response.ok) {
+    const error = readStringField(body, "error") ?? "Team prompt template list failed";
+    throw new Error(error);
+  }
+  return parseTeamPromptTemplateListResult(body);
+}
+
+export async function saveTeamPromptTemplate(
+  template: CustomPromptTemplate,
+  csrfToken: string,
+  fetcher: Fetcher = fetch,
+): Promise<TeamPromptTemplateMutationResult> {
+  const token = csrfToken.trim();
+  if (!token) throw new Error("CSRF token is required");
+  const response = await fetcher(API_ROUTES.storage.teamPromptTemplates, {
+    cache: "no-store",
+    body: JSON.stringify({ template }),
+    headers: {
+      "content-type": "application/json",
+      "x-imagine-csrf-token": token,
+    },
+    method: "POST",
+  });
+  const body: unknown = await response.json();
+  if (!response.ok) {
+    const error = readStringField(body, "error") ?? "Team prompt template save failed";
+    throw new Error(error);
+  }
+  return parseTeamPromptTemplateMutationResult(body);
+}
+
+export async function deleteTeamPromptTemplate(
+  templateId: string,
+  csrfToken: string,
+  fetcher: Fetcher = fetch,
+): Promise<void> {
+  const token = csrfToken.trim();
+  if (!token) throw new Error("CSRF token is required");
+  const response = await fetcher(API_ROUTES.storage.teamPromptTemplate(templateId), {
+    cache: "no-store",
+    headers: { "x-imagine-csrf-token": token },
+    method: "DELETE",
+  });
+  const body: unknown = await response.json();
+  if (!response.ok) {
+    const error = readStringField(body, "error") ?? "Team prompt template delete failed";
+    throw new Error(error);
+  }
 }
 
 export async function saveTeamProviderTarget(
@@ -736,6 +794,28 @@ function parseTeamProviderTargetListResult(value: unknown): TeamProviderTargetLi
 function parseTeamProviderTargetMutationResult(value: unknown): TeamProviderTargetMutationResult {
   if (!isTeamProviderTargetMutationResult(value)) throw new Error("Team provider target response is invalid");
   return value;
+}
+
+function parseTeamPromptTemplateListResult(value: unknown): TeamPromptTemplateListResult {
+  if (!isRecord(value) || value.targetKind !== "postgres" || typeof value.workspaceId !== "string" || !Array.isArray(value.templates)) {
+    throw new Error("Team prompt template list response is invalid");
+  }
+  return {
+    targetKind: "postgres",
+    templates: value.templates.map(readCustomPromptTemplate),
+    workspaceId: value.workspaceId,
+  };
+}
+
+function parseTeamPromptTemplateMutationResult(value: unknown): TeamPromptTemplateMutationResult {
+  if (!isRecord(value) || value.targetKind !== "postgres" || typeof value.workspaceId !== "string") {
+    throw new Error("Team prompt template response is invalid");
+  }
+  return {
+    targetKind: "postgres",
+    template: readCustomPromptTemplate(value.template),
+    workspaceId: value.workspaceId,
+  };
 }
 
 function parseTeamAssetListResult(value: unknown): TeamAssetListResult {

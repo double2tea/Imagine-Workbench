@@ -23,6 +23,13 @@ import {
   type PromptTemplateCategoryId,
 } from "@/lib/prompt-templates";
 import { markPromptTemplatePickerPointerDown } from "@/lib/prompt-template-picker-dom";
+import {
+  deleteTeamPromptTemplate,
+  fetchTeamPromptTemplates,
+  fetchWorkspaceStorageRuntimeStatus,
+  readTeamCsrfToken,
+  saveTeamPromptTemplate,
+} from "@/lib/storage/team-client";
 
 export type PromptTemplatePickerAccent = "amber" | "blue" | "teal" | "violet";
 
@@ -63,6 +70,7 @@ function translatedCategoryLabel(categoryId: PromptTemplateCategoryId, t: TFunct
 const panelMaxHeight = 440;
 
 type TemplateEditorMode = "create" | "edit";
+type CustomTemplateStorageTarget = "indexeddb" | "postgres";
 
 const emptyDraft: CustomPromptTemplateDraft = {
   title: "",
@@ -96,6 +104,11 @@ function getPanelPosition(anchor: HTMLButtonElement): { left: number; top: numbe
   };
 }
 
+async function readCustomTemplateStorageTarget(): Promise<CustomTemplateStorageTarget> {
+  const status = await fetchWorkspaceStorageRuntimeStatus();
+  return status.targetKind === "postgres" ? "postgres" : "indexeddb";
+}
+
 const PromptTemplatePicker = forwardRef<PromptTemplatePickerHandle, PromptTemplatePickerProps>(function PromptTemplatePicker(
   { accent = "blue", compact = false, triggerVariant = "accent", onApply },
   forwardedRef,
@@ -107,6 +120,7 @@ const PromptTemplatePicker = forwardRef<PromptTemplatePickerHandle, PromptTempla
   const [selectedId, setSelectedId] = useState(PROMPT_TEMPLATES[0]?.id ?? "");
   const [position, setPosition] = useState<{ left: number; top: number } | null>(null);
   const [customTemplates, setCustomTemplates] = useState<CustomPromptTemplate[]>([]);
+  const [customTemplateStorageTarget, setCustomTemplateStorageTarget] = useState<CustomTemplateStorageTarget | null>(null);
   const [editorMode, setEditorMode] = useState<TemplateEditorMode | null>(null);
   const [editingTemplateId, setEditingTemplateId] = useState<string | null>(null);
   const [draft, setDraft] = useState<CustomPromptTemplateDraft>(emptyDraft);
@@ -115,17 +129,31 @@ const PromptTemplatePicker = forwardRef<PromptTemplatePickerHandle, PromptTempla
   const showAlert = useAlert();
 
   useEffect(() => {
-    const readTemplates = (): void => {
+    let isActive = true;
+    const readTemplates = async (): Promise<void> => {
       try {
-        setCustomTemplates(readCustomPromptTemplates());
+        const storageTarget = await readCustomTemplateStorageTarget();
+        const templates = storageTarget === "postgres"
+          ? (await fetchTeamPromptTemplates()).templates
+          : readCustomPromptTemplates();
+        if (!isActive) return;
+        setCustomTemplateStorageTarget(storageTarget);
+        setCustomTemplates(templates);
       } catch (error) {
         console.error("Custom prompt template read failed:", error);
+        if (!isActive) return;
         setCustomTemplates([]);
       }
     };
-    readTemplates();
-    window.addEventListener(CUSTOM_PROMPT_TEMPLATES_CHANGE_EVENT, readTemplates);
-    return () => window.removeEventListener(CUSTOM_PROMPT_TEMPLATES_CHANGE_EVENT, readTemplates);
+    const handleTemplatesChange = (): void => {
+      void readTemplates();
+    };
+    void readTemplates();
+    window.addEventListener(CUSTOM_PROMPT_TEMPLATES_CHANGE_EVENT, handleTemplatesChange);
+    return () => {
+      isActive = false;
+      window.removeEventListener(CUSTOM_PROMPT_TEMPLATES_CHANGE_EVENT, handleTemplatesChange);
+    };
   }, []);
 
   const openPicker = (search?: string): void => {
@@ -204,20 +232,56 @@ const PromptTemplatePicker = forwardRef<PromptTemplatePickerHandle, PromptTempla
     setDraft(emptyDraft);
   };
 
-  const saveCustomTemplate = (): void => {
+  const saveBrowserCustomPromptTemplate = (
+    savedTemplate: CustomPromptTemplate,
+    editingTemplate: CustomPromptTemplate | null,
+  ): CustomPromptTemplate[] => {
+    const nextTemplates = editorMode === "edit" && editingTemplate
+      ? customTemplates.map(template => template.id === editingTemplate.id ? savedTemplate : template)
+      : [...customTemplates, savedTemplate];
+    writeCustomPromptTemplates(nextTemplates);
+    return nextTemplates;
+  };
+
+  const saveTeamCustomPromptTemplate = async (savedTemplate: CustomPromptTemplate): Promise<CustomPromptTemplate[]> => {
+    const csrfToken = readTeamCsrfToken();
+    if (!csrfToken) throw new Error("CSRF token is required");
+    await saveTeamPromptTemplate(savedTemplate, csrfToken);
+    const result = await fetchTeamPromptTemplates();
+    window.dispatchEvent(new CustomEvent(CUSTOM_PROMPT_TEMPLATES_CHANGE_EVENT));
+    return result.templates;
+  };
+
+  const deleteBrowserCustomPromptTemplate = (templateId: string): CustomPromptTemplate[] => {
+    const nextTemplates = customTemplates.filter(template => template.id !== templateId);
+    writeCustomPromptTemplates(nextTemplates);
+    return nextTemplates;
+  };
+
+  const deleteTeamCustomPromptTemplate = async (templateId: string): Promise<CustomPromptTemplate[]> => {
+    const csrfToken = readTeamCsrfToken();
+    if (!csrfToken) throw new Error("CSRF token is required");
+    await deleteTeamPromptTemplate(templateId, csrfToken);
+    const result = await fetchTeamPromptTemplates();
+    window.dispatchEvent(new CustomEvent(CUSTOM_PROMPT_TEMPLATES_CHANGE_EVENT));
+    return result.templates;
+  };
+
+  const saveCustomTemplate = async (): Promise<void> => {
     if (!isDraftValid) return;
     try {
+      const storageTarget = customTemplateStorageTarget ?? await readCustomTemplateStorageTarget();
       const editingTemplate = editingTemplateId
-        ? customTemplates.find(template => template.id === editingTemplateId)
+        ? customTemplates.find(template => template.id === editingTemplateId) ?? null
         : null;
       if (editorMode === "edit" && !editingTemplate) throw new Error("Custom prompt template not found");
       const savedTemplate = editorMode === "edit" && editingTemplate
         ? updateCustomPromptTemplate(editingTemplate, draft)
         : createCustomPromptTemplate(draft);
-      const nextTemplates = editorMode === "edit" && editingTemplate
-        ? customTemplates.map(template => template.id === editingTemplate.id ? savedTemplate : template)
-        : [...customTemplates, savedTemplate];
-      writeCustomPromptTemplates(nextTemplates);
+      const nextTemplates = storageTarget === "postgres"
+        ? await saveTeamCustomPromptTemplate(savedTemplate)
+        : saveBrowserCustomPromptTemplate(savedTemplate, editingTemplate);
+      setCustomTemplateStorageTarget(storageTarget);
       setCustomTemplates(nextTemplates);
       setSelectedId(savedTemplate.id);
       setCategoryId("custom");
@@ -237,8 +301,11 @@ const PromptTemplatePicker = forwardRef<PromptTemplatePickerHandle, PromptTempla
     });
     if (!confirmed) return;
     try {
-      const nextTemplates = customTemplates.filter(template => template.id !== selectedUserTemplate.id);
-      writeCustomPromptTemplates(nextTemplates);
+      const storageTarget = customTemplateStorageTarget ?? await readCustomTemplateStorageTarget();
+      const nextTemplates = storageTarget === "postgres"
+        ? await deleteTeamCustomPromptTemplate(selectedUserTemplate.id)
+        : deleteBrowserCustomPromptTemplate(selectedUserTemplate.id);
+      setCustomTemplateStorageTarget(storageTarget);
       setCustomTemplates(nextTemplates);
       setSelectedId(PROMPT_TEMPLATES[0]?.id ?? nextTemplates[0]?.id ?? "");
       closeEditor();

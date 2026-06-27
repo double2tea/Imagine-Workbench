@@ -77,7 +77,7 @@ function normalizeCustomPromptTemplateDraft(draft: CustomPromptTemplateDraft): O
   };
 }
 
-function readCustomPromptTemplate(value: unknown): CustomPromptTemplate {
+export function readCustomPromptTemplate(value: unknown): CustomPromptTemplate {
   if (typeof value !== "object" || value === null) throw new Error("Invalid custom prompt template");
   const record = value as Record<string, unknown>;
   const id = readString(record.id, "id");
