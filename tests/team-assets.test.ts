@@ -96,7 +96,7 @@ test("listTeamAssets preserves empty board id for workspace gallery queries", as
   );
 });
 
-test("deleteTeamAsset removes an editor-scoped asset record", async () => {
+test("deleteTeamAsset removes an editor-scoped asset record with audit", async () => {
   const queries: Array<{ text: string; values?: readonly unknown[] }> = [];
   await deleteTeamAsset(
     createTeamAssetsQueryable(queries, { role: "editor" }),
@@ -113,6 +113,12 @@ test("deleteTeamAsset removes an editor-scoped asset record", async () => {
     queries.find(query => query.text.startsWith("delete from assets"))?.values,
     [WORKSPACE_ID, ASSET_ID],
   );
+  assert.ok(queries.some(query => query.text === "begin"));
+  assert.ok(queries.some(query => query.text === "commit"));
+  assert.equal(queries.some(query => query.text === "rollback"), false);
+  const audit = queries.find(query => query.text.startsWith("insert into audit_events"));
+  assert.deepEqual(audit?.values?.slice(0, 3), [WORKSPACE_ID, "user_1", "team_asset.delete"]);
+  assert.deepEqual(JSON.parse(String(audit?.values?.[3])) as unknown, { assetId: ASSET_ID });
 });
 
 test("clearTeamAssets removes workspace assets and generation tasks with audit", async () => {

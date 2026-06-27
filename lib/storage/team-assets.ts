@@ -49,7 +49,20 @@ export async function deleteTeamAsset(
   const context = await createTeamWorkspaceStorageContext(queryable, config, request, { minimumRole: "editor" });
   const record = await context.repository.assets.get(assetId);
   if (!record) throw new ApiError(404, "team_asset_not_found", "Team asset was not found");
-  await context.repository.assets.delete(assetId);
+  await context.queryable.query("begin");
+  try {
+    await context.repository.assets.delete(assetId);
+    await recordTeamAuditEvent(context.queryable, {
+      eventType: "team_asset.delete",
+      metadata: { assetId },
+      userId: context.session.userId,
+      workspaceId: context.session.workspaceId,
+    });
+    await context.queryable.query("commit");
+  } catch (error) {
+    await context.queryable.query("rollback");
+    throw error;
+  }
 }
 
 export async function clearTeamAssets(

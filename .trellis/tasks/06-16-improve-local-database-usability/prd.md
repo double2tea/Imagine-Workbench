@@ -95,6 +95,7 @@ Completed in the latest continuation:
 * Added config/runtime/payload-store tests covering missing/invalid byte limits, public redaction, and over-limit payload rejection.
 * Added non-secret system audit events for applied PostgreSQL schema migrations: `applyPostgresMigrations()` now records `team_migrations.apply` with app version, applied count, and migration ids after pending migrations run, without storing setup tokens, database URLs, or media paths.
 * Added optional `IMAGINE_MEDIA_USAGE_WARNING_BYTES` for PostgreSQL team mode. Team data summary now returns aggregate media directory bytes plus `mediaUsageWarning`, and Settings -> Data shows an attention issue when total media usage reaches the configured threshold without exposing paths.
+* Added `team_asset.delete` audit coverage for single team asset deletes. The service now wraps the workspace-scoped delete plus non-secret asset-id audit metadata in one transaction.
 
 Still remaining before the full PRD can be considered complete:
 
