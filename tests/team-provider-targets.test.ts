@@ -8,10 +8,11 @@ import type { PostgresQueryable } from "../lib/storage/postgres/connection";
 import {
   deleteTeamProviderTarget,
   listTeamProviderTargets,
+  readTeamProviderTargetAccessPassword,
   saveTeamProviderTarget,
 } from "../lib/storage/team-provider-targets";
 import { hashTeamSessionToken } from "../lib/storage/team-auth";
-import { decryptWorkspaceSecret, isEncryptedWorkspaceSecret } from "../lib/storage/team-secret-crypto";
+import { decryptWorkspaceSecret, encryptWorkspaceSecret, isEncryptedWorkspaceSecret } from "../lib/storage/team-secret-crypto";
 import { fetchTeamProviderTargets } from "../lib/storage/team-client";
 import { POST as postTeamProviderTarget } from "../app/api/storage/team/provider-targets/route";
 
@@ -122,6 +123,39 @@ test("saveTeamProviderTarget preserves existing encrypted passwords when omitted
   const write = queries.find(query => query.text.includes("insert into saved_provider_targets"));
   const storedTarget = JSON.parse(String(write?.values?.[3])) as { accessPasswordEncrypted?: string };
   assert.equal(storedTarget.accessPasswordEncrypted, existingCiphertext);
+});
+
+test("readTeamProviderTargetAccessPassword decrypts saved target passwords", async () => {
+  const result = await readTeamProviderTargetAccessPassword(
+    createTeamProviderTargetsQueryable([], {
+      existingCiphertext: encryptTargetPassword("app-password"),
+      role: "editor",
+    }),
+    { databaseUrl: "postgres://localhost/imagine", mediaDir: "/srv/imagine/media" },
+    requestWithSession(),
+    "ai-app:1937084622758465538",
+    ENCRYPTION_KEY,
+    "editor",
+  );
+
+  assert.equal(result, "app-password");
+});
+
+test("readTeamProviderTargetAccessPassword rejects malformed saved target passwords", async () => {
+  await assert.rejects(
+    () => readTeamProviderTargetAccessPassword(
+      createTeamProviderTargetsQueryable([], {
+        existingCiphertext: "plain-password",
+        role: "editor",
+      }),
+      { databaseUrl: "postgres://localhost/imagine", mediaDir: "/srv/imagine/media" },
+      requestWithSession(),
+      "ai-app:1937084622758465538",
+      ENCRYPTION_KEY,
+      "editor",
+    ),
+    /Team provider target access password must be stored as an encrypted secret/,
+  );
 });
 
 test("deleteTeamProviderTarget removes an admin-scoped saved target", async () => {
@@ -283,6 +317,10 @@ function savedTargetRow(existingCiphertext = "encrypted-password"): QueryResultR
     },
     updated_at: "2026-06-27T00:00:00.000Z",
   };
+}
+
+function encryptTargetPassword(value: string): string {
+  return encryptWorkspaceSecret(value, ENCRYPTION_KEY);
 }
 
 function runningHubBinding(overrides: Partial<BoardRunningHubNodeInfoBinding> = {}): BoardRunningHubNodeInfoBinding {

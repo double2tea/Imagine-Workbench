@@ -13,7 +13,12 @@ import type { PostgresStorageConfig } from "@/lib/storage/postgres/config";
 import type { PostgresQueryable } from "@/lib/storage/postgres/connection";
 import { recordTeamAuditEvent } from "@/lib/storage/team-audit";
 import { createTeamWorkspaceStorageContext } from "@/lib/storage/team-context";
-import { encryptWorkspaceSecret } from "@/lib/storage/team-secret-crypto";
+import {
+  decryptWorkspaceSecret,
+  encryptWorkspaceSecret,
+  isEncryptedWorkspaceSecret,
+} from "@/lib/storage/team-secret-crypto";
+import type { TeamRole } from "@/lib/storage/team-auth";
 import type {
   PublicTeamProviderTarget,
   TeamProviderTargetListResult,
@@ -108,6 +113,25 @@ export async function saveTeamProviderTarget(
     targetKind: "postgres",
     workspaceId: context.session.workspaceId,
   };
+}
+
+export async function readTeamProviderTargetAccessPassword(
+  queryable: PostgresQueryable,
+  config: PostgresStorageConfig,
+  request: Request,
+  targetId: string,
+  encryptionKey: string,
+  minimumRole: TeamRole,
+): Promise<string | null> {
+  const context = await createTeamWorkspaceStorageContext(queryable, config, request, { minimumRole });
+  const publicId = normalizeText(targetId, "Team provider target id is required", "invalid_team_provider_target_id");
+  const storageId = storageProviderTargetId(context.session.workspaceId, publicId);
+  const target = await readExistingTarget(context.queryable, context.session.workspaceId, storageId);
+  if (!target?.accessPasswordEncrypted) return null;
+  if (!isEncryptedWorkspaceSecret(target.accessPasswordEncrypted)) {
+    throw new Error("Team provider target access password must be stored as an encrypted secret");
+  }
+  return decryptWorkspaceSecret(target.accessPasswordEncrypted, encryptionKey);
 }
 
 export async function deleteTeamProviderTarget(

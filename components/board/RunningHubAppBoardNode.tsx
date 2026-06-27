@@ -227,12 +227,8 @@ function savedTargetId(targetType: BoardRunningHubTargetType, targetId: string):
   return `${targetType}:${targetId.trim()}`;
 }
 
-function teamProviderTargetToSavedTarget(
-  target: PublicTeamProviderTarget,
-  accessPassword?: string,
-): RunningHubSavedTarget {
+function teamProviderTargetToSavedTarget(target: PublicTeamProviderTarget): RunningHubSavedTarget {
   return {
-    accessPassword,
     accessPasswordConfigured: target.accessPasswordConfigured,
     bindings: target.bindings,
     id: target.id,
@@ -296,6 +292,7 @@ const RunningHubAppBoardNode = memo(function RunningHubAppBoardNode({
   const [isFetchingSchema, setIsFetchingSchema] = useState(false);
   const [savedTargets, setSavedTargets] = useState<RunningHubSavedTarget[]>([]);
   const [savedTargetStorageTarget, setSavedTargetStorageTarget] = useState<RunningHubSavedTargetStorageTarget>("indexeddb");
+  const [accessPasswordDraft, setAccessPasswordDraft] = useState("");
   const promptPreview = inputSummary?.promptPreview ?? null;
   const referenceCount = inputSummary?.referenceCount ?? 0;
   const readiness = analyzeRunningHubBindings(node.bindings, promptPreview ?? node.prompt, referenceCount);
@@ -343,6 +340,15 @@ const RunningHubAppBoardNode = memo(function RunningHubAppBoardNode({
     };
   }, [t]);
 
+  useEffect(() => {
+    if (savedTargetStorageTarget === "postgres") {
+      setAccessPasswordDraft("");
+      if (node.accessPassword?.trim()) onUpdate({ accessPassword: undefined });
+      return;
+    }
+    setAccessPasswordDraft(node.accessPassword ?? "");
+  }, [node.accessPassword, onUpdate, savedTargetStorageTarget]);
+
   const updateBinding = (bindingId: string, patch: Partial<BoardRunningHubNodeInfoBinding>): void => {
     onUpdate({
       bindings: node.bindings.map(binding => binding.id === bindingId ? { ...binding, ...patch } : binding),
@@ -371,8 +377,9 @@ const RunningHubAppBoardNode = memo(function RunningHubAppBoardNode({
     }
     const id = savedTargetId(node.targetType, targetId);
     const label = name?.trim() || currentSavedTarget?.label || `${node.targetType === "workflow" ? t("runninghub.targetWorkflow") : t("runninghub.targetAiApp")} ${targetId}`;
+    const accessPassword = (savedTargetStorageTarget === "postgres" ? accessPasswordDraft : node.accessPassword)?.trim() || undefined;
     const target: RunningHubSavedTarget = {
-      accessPassword: node.accessPassword?.trim() || undefined,
+      accessPassword,
       bindings,
       id,
       label,
@@ -387,10 +394,9 @@ const RunningHubAppBoardNode = memo(function RunningHubAppBoardNode({
         setImportError("CSRF token is required");
         return;
       }
-      const password = node.accessPassword?.trim();
       try {
         const result = await saveTeamProviderTarget({
-          ...(password ? { accessPassword: password } : {}),
+          ...(accessPassword ? { accessPassword } : {}),
           bindings,
           label,
           outputType: node.outputType,
@@ -398,8 +404,10 @@ const RunningHubAppBoardNode = memo(function RunningHubAppBoardNode({
           targetId,
           targetType: node.targetType,
         }, csrfToken);
-        const savedTarget = teamProviderTargetToSavedTarget(result.target, password || undefined);
+        const savedTarget = teamProviderTargetToSavedTarget(result.target);
         setSavedTargets([savedTarget, ...savedTargets.filter(item => item.id !== savedTarget.id)].slice(0, 50));
+        setAccessPasswordDraft("");
+        if (node.accessPassword !== undefined) onUpdate({ accessPassword: undefined });
         setImportError(null);
       } catch (error) {
         setImportError(errorMessage(error, t("runninghub.importFailed")));
@@ -417,8 +425,9 @@ const RunningHubAppBoardNode = memo(function RunningHubAppBoardNode({
   const applySavedTarget = (targetId: string): void => {
     const target = savedTargets.find(item => item.id === targetId);
     if (!target) return;
+    if (savedTargetStorageTarget === "postgres") setAccessPasswordDraft("");
     onUpdate({
-      accessPassword: target.accessPassword ?? (savedTargetStorageTarget === "postgres" ? node.accessPassword : ""),
+      accessPassword: savedTargetStorageTarget === "postgres" ? undefined : target.accessPassword ?? "",
       bindings: target.bindings,
       outputType: target.outputType,
       targetId: target.targetId,
@@ -600,8 +609,14 @@ const RunningHubAppBoardNode = memo(function RunningHubAppBoardNode({
               <option value="audio">{t("runninghub.outputAudio")}</option>
             </select>
             <input
-              value={node.accessPassword ?? ""}
-              onChange={event => onUpdate({ accessPassword: event.target.value })}
+              value={savedTargetStorageTarget === "postgres" ? accessPasswordDraft : node.accessPassword ?? ""}
+              onChange={event => {
+                if (savedTargetStorageTarget === "postgres") {
+                  setAccessPasswordDraft(event.target.value);
+                  return;
+                }
+                onUpdate({ accessPassword: event.target.value });
+              }}
               className={`${inputClass} font-mono`}
               placeholder={t("runninghub.accessPasswordPlaceholder")}
             />

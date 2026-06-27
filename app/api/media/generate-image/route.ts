@@ -10,7 +10,7 @@ import {
   resolveRunningHubNodeInfoListForModel,
   runningHubResolvedNodeInfoAllowsEmptyPrompt,
 } from "@/lib/providers/runninghub-node-info";
-import { resolveProviderConfigForRequest } from "@/lib/providers/team-config";
+import { resolveProviderConfigForRequest, resolveRunningHubAccessPasswordForRequest } from "@/lib/providers/team-config";
 import { dataUriToBlob, optionalText } from "@/lib/providers/utils";
 import { getRunningHubYouchuanCatalog } from "@/lib/providers/runninghub";
 import { mediaReferenceTypeFromBase64DataUri } from "@/lib/media-references";
@@ -68,6 +68,11 @@ export async function POST(req: NextRequest) {
     if (modelCapability) validateInputModalityReferences(modelCapability.inputModalities, referenceMedia);
 
     const allowsEmptyPrompt = runningHubResolvedNodeInfoAllowsEmptyPrompt(parsed.model, "image", runningHubNodeInfo);
+    const runningHubAccessPassword = await resolveRunningHubAccessPasswordForRequest(
+      req,
+      parsed.model,
+      optionalText(body.runningHubAccessPassword),
+    );
     const result = await generateImage(config, {
       prompt: allowsEmptyPrompt ? optionalText(body.prompt) ?? "" : requireApiText(body.prompt, "Prompt"),
       model: parsed.model,
@@ -78,7 +83,7 @@ export async function POST(req: NextRequest) {
       referenceImages: referenceImages.map(dataUri => ({ dataUri })),
       referenceMedia,
       async: parsed.async,
-      runningHubAccessPassword: optionalText(body.runningHubAccessPassword),
+      runningHubAccessPassword,
       runningHubNodeInfoList: runningHubNodeInfo.nodeInfoList,
       runningHubYouchuan,
     });

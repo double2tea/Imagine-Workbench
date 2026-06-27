@@ -7,7 +7,7 @@ import { generateAudio } from "@/lib/providers/audio";
 import { parseProviderModel, ProviderModelParseError } from "@/lib/providers/model-catalog";
 import { readRunningHubNodeInfoList } from "@/lib/providers/runninghub-node-info";
 import type { ReferenceMedia } from "@/lib/providers/types";
-import { resolveProviderConfigForRequest } from "@/lib/providers/team-config";
+import { resolveProviderConfigForRequest, resolveRunningHubAccessPasswordForRequest } from "@/lib/providers/team-config";
 import { optionalText } from "@/lib/providers/utils";
 
 export const runtime = "nodejs";
@@ -49,11 +49,16 @@ export async function POST(req: NextRequest) {
     }
 
     const config = await resolveProviderConfigForRequest(req, parsed.provider);
+    const runningHubAccessPassword = await resolveRunningHubAccessPasswordForRequest(
+      req,
+      parsed.model,
+      optionalText(body.runningHubAccessPassword),
+    );
     const result = await generateAudio(config, {
       prompt: runningHubNodeInfoList.length > 0 ? optionalText(body.prompt) ?? "" : requireApiText(body.prompt, "Prompt"),
       model: parsed.model,
       referenceMedia,
-      runningHubAccessPassword: optionalText(body.runningHubAccessPassword),
+      runningHubAccessPassword,
       runningHubNodeInfoList,
     });
 

@@ -11,6 +11,7 @@ import { IMAGINE_STORAGE_TARGET_ENV, parseWorkspaceStorageMode } from "@/lib/sto
 import { resolvePostgresStorageConfig, requireTeamSecretEncryptionKey, type PostgresStorageConfig } from "@/lib/storage/postgres/config";
 import { type PostgresQueryable, withPostgresClient } from "@/lib/storage/postgres/connection";
 import { createTeamWorkspaceStorageContext } from "@/lib/storage/team-context";
+import { readTeamProviderTargetAccessPassword } from "@/lib/storage/team-provider-targets";
 import { decryptWorkspaceSecret, isEncryptedWorkspaceSecret } from "@/lib/storage/team-secret-crypto";
 import { readTeamSessionToken, type TeamRole } from "@/lib/storage/team-auth";
 
@@ -53,6 +54,34 @@ export async function resolveProviderConfigForRequest(
     baseUrlOverride: overrides.baseUrl ?? undefined,
     providerLabelOverride: overrides.providerLabel,
   });
+}
+
+export async function resolveRunningHubAccessPasswordForRequest(
+  req: Request,
+  model: string,
+  explicitPassword: string | undefined,
+  minimumTeamRole: TeamRole = "editor",
+): Promise<string | undefined> {
+  if (explicitPassword) return explicitPassword;
+  const targetId = runningHubProviderTargetIdFromModel(model);
+  if (
+    !targetId ||
+    parseWorkspaceStorageMode(process.env[IMAGINE_STORAGE_TARGET_ENV]) !== "postgres" ||
+    !readTeamSessionToken(req)
+  ) {
+    return undefined;
+  }
+  const config = resolvePostgresStorageConfig(process.env);
+  const encryptionKey = requireTeamSecretEncryptionKey(process.env);
+  const password = await withPostgresClient(config, queryable => readTeamProviderTargetAccessPassword(
+    queryable,
+    config,
+    req,
+    targetId,
+    encryptionKey,
+    minimumTeamRole,
+  ));
+  return password ?? undefined;
 }
 
 export async function readTeamProviderApiKey(
@@ -114,6 +143,14 @@ export async function readTeamProviderConfigOverrides(
     baseUrl,
     providerLabel: customProvider?.label,
   };
+}
+
+function runningHubProviderTargetIdFromModel(model: string): string | null {
+  const match = /^(ai-app|workflow)-(?:image|video|audio):(.+)$/.exec(model);
+  if (!match) return null;
+  const [, targetType, targetId] = match;
+  const normalizedTargetId = targetId?.trim();
+  return targetType && normalizedTargetId ? `${targetType}:${normalizedTargetId}` : null;
 }
 
 function readCustomProviderDefinition(value: string, provider: AiProvider): CustomProviderDefinition | undefined {

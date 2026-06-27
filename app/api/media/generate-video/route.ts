@@ -9,7 +9,7 @@ import {
   resolveRunningHubNodeInfoListForModel,
   runningHubResolvedNodeInfoAllowsEmptyPrompt,
 } from "@/lib/providers/runninghub-node-info";
-import { resolveProviderConfigForRequest } from "@/lib/providers/team-config";
+import { resolveProviderConfigForRequest, resolveRunningHubAccessPasswordForRequest } from "@/lib/providers/team-config";
 import { optionalText } from "@/lib/providers/utils";
 import { mediaReferenceTypeFromBase64DataUri } from "@/lib/media-references";
 import { REFERENCE_IMAGE_REQUEST_BODY_MAX_BYTES, getReferenceMediaPayloadError } from "@/lib/reference-images";
@@ -54,6 +54,11 @@ export async function POST(req: NextRequest) {
     if (modelCapability) validateInputModalityReferences(modelCapability.inputModalities, referenceMedia);
 
     const allowsEmptyPrompt = runningHubResolvedNodeInfoAllowsEmptyPrompt(parsed.model, "video", runningHubNodeInfo);
+    const runningHubAccessPassword = await resolveRunningHubAccessPasswordForRequest(
+      req,
+      parsed.model,
+      optionalText(body.runningHubAccessPassword),
+    );
     const result = await generateVideo(config, {
       prompt: allowsEmptyPrompt ? optionalText(body.prompt) ?? "" : requireApiText(body.prompt, "Prompt"),
       model: parsed.model,
@@ -63,7 +68,7 @@ export async function POST(req: NextRequest) {
       referenceMode: readReferenceMode(body.referenceMode),
       resolutionName: optionalText(body.resolutionName),
       referenceMedia,
-      runningHubAccessPassword: optionalText(body.runningHubAccessPassword),
+      runningHubAccessPassword,
       runningHubNodeInfoList: runningHubNodeInfo.nodeInfoList,
     });
 
