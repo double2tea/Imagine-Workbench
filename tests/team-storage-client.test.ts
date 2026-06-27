@@ -10,6 +10,7 @@ import {
   deleteTeamAsset,
   deleteTeamGenerationTask,
   deleteTeamMember,
+  deleteTeamSecret,
   createTeamBoardDocument,
   deleteTeamBoardDocument,
   fetchTeamBoardDocument,
@@ -17,6 +18,7 @@ import {
   fetchTeamAssets,
   fetchTeamBoardSummaries,
   fetchTeamGenerationTasks,
+  fetchTeamSecrets,
   fetchTeamStorageHealth,
   fetchTeamSession,
   fetchTeamWorkspaceGalleryItems,
@@ -26,6 +28,7 @@ import {
   saveTeamBoardDocument,
   saveTeamAsset,
   saveTeamGenerationTask,
+  saveTeamSecret,
   teamAssetRecordToStorageItem,
   teamAssetMediaUrl,
   updateTeamGenerationTask,
@@ -247,6 +250,88 @@ test("deleteTeamAsset sends CSRF header to encoded asset route", async () => {
     deleteTeamAsset("asset_1", " "),
     /CSRF token is required/,
   );
+});
+
+test("team secret client methods send filters and never accept secret values", async () => {
+  let listUrl = "";
+  const listResult = await fetchTeamSecrets({
+    groups: ["provider"],
+    keys: ["provider:demo:apiKey", "provider with spaces"],
+  }, async input => {
+    listUrl = String(input);
+    return jsonResponse({
+      secrets: [{
+        configured: true,
+        group: "provider",
+        key: "provider:demo:apiKey",
+        updatedAt: "2026-06-27T00:00:00.000Z",
+      }],
+      targetKind: "postgres",
+      workspaceId: "workspace_1",
+    });
+  });
+
+  assert.equal(
+    listUrl,
+    "/api/storage/team/secrets?group=provider&key=provider%3Ademo%3AapiKey&key=provider+with+spaces",
+  );
+  assert.equal(listResult.secrets[0]?.configured, true);
+
+  await assert.rejects(
+    fetchTeamSecrets(undefined, async () => jsonResponse({
+      secrets: [{
+        configured: true,
+        group: "provider",
+        key: "provider:demo:apiKey",
+        updatedAt: "2026-06-27T00:00:00.000Z",
+        value: "leaked-secret",
+      }],
+      targetKind: "postgres",
+      workspaceId: "workspace_1",
+    })),
+    /Team secret list response is invalid/,
+  );
+
+  let saveCsrfHeader: string | null = null;
+  let saveBody: string | null = null;
+  const saveResult = await saveTeamSecret({
+    group: "provider",
+    key: "provider:demo:apiKey",
+    value: "provider-api-key",
+  }, "csrf-token", async (input, init) => {
+    assert.equal(String(input), "/api/storage/team/secrets");
+    assert.equal(init?.method, "POST");
+    saveCsrfHeader = new Headers(init?.headers).get("x-imagine-csrf-token");
+    saveBody = String(init?.body);
+    return jsonResponse({
+      secret: {
+        configured: true,
+        group: "provider",
+        key: "provider:demo:apiKey",
+        updatedAt: "2026-06-27T00:00:00.000Z",
+      },
+      targetKind: "postgres",
+      workspaceId: "workspace_1",
+    });
+  });
+  assert.equal(saveCsrfHeader, "csrf-token");
+  assert.equal(saveBody, JSON.stringify({
+    group: "provider",
+    key: "provider:demo:apiKey",
+    value: "provider-api-key",
+  }));
+  assert.equal(saveResult.secret.key, "provider:demo:apiKey");
+
+  let deleteUrl = "";
+  let deleteCsrfHeader: string | null = null;
+  await deleteTeamSecret("provider/demo key", "csrf-token", async (input, init) => {
+    deleteUrl = String(input);
+    deleteCsrfHeader = new Headers(init?.headers).get("x-imagine-csrf-token");
+    assert.equal(init?.method, "DELETE");
+    return jsonResponse({ ok: true });
+  });
+  assert.equal(deleteUrl, "/api/storage/team/secrets/provider%2Fdemo%20key");
+  assert.equal(deleteCsrfHeader, "csrf-token");
 });
 
 test("saveTeamAsset posts asset data with CSRF and maps media URL", async () => {

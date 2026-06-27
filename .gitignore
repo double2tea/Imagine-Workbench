@@ -10,3 +10,4 @@ coverage/
 tsconfig.tsbuildinfo
 .env*
 !.env.example
+!.env.team.example

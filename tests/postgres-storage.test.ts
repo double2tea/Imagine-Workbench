@@ -5,13 +5,22 @@ import path from "node:path";
 import test from "node:test";
 import type { QueryResult, QueryResultRow } from "pg";
 
-import { resolvePostgresStorageConfig, requireTeamSetupToken } from "../lib/storage/postgres/config";
+import {
+  resolvePostgresStorageConfig,
+  requireTeamSecretEncryptionKey,
+  requireTeamSetupToken,
+} from "../lib/storage/postgres/config";
 import { createPostgresWorkspaceStorageRepository } from "../lib/storage/postgres/repository";
 import {
   POSTGRES_SCHEMA_MIGRATIONS,
   getPostgresMigrationStatus,
 } from "../lib/storage/postgres/migrations";
 import type { PostgresQueryable } from "../lib/storage/postgres/connection";
+import {
+  decryptWorkspaceSecret,
+  encryptWorkspaceSecret,
+  isEncryptedWorkspaceSecret,
+} from "../lib/storage/team-secret-crypto";
 
 function queryResult<T extends QueryResultRow>(rows: T[]): QueryResult<T> {
   return {
@@ -68,6 +77,29 @@ test("requireTeamSetupToken fails closed for migration routes", () => {
   );
 
   assert.doesNotThrow(() => requireTeamSetupToken({ IMAGINE_TEAM_SETUP_TOKEN: "expected" }, "expected"));
+});
+
+test("requireTeamSecretEncryptionKey fails closed for team workspace secrets", () => {
+  assert.throws(
+    () => requireTeamSecretEncryptionKey({}),
+    /IMAGINE_TEAM_SECRET_ENCRYPTION_KEY is required/,
+  );
+  assert.equal(
+    requireTeamSecretEncryptionKey({ IMAGINE_TEAM_SECRET_ENCRYPTION_KEY: " encryption-key " }),
+    "encryption-key",
+  );
+});
+
+test("workspace secret encryption round-trips without exposing plaintext format", () => {
+  const ciphertext = encryptWorkspaceSecret("provider-api-key", "workspace-encryption-key");
+
+  assert.equal(isEncryptedWorkspaceSecret(ciphertext), true);
+  assert.notEqual(ciphertext.includes("provider-api-key"), true);
+  assert.equal(decryptWorkspaceSecret(ciphertext, "workspace-encryption-key"), "provider-api-key");
+  assert.throws(
+    () => decryptWorkspaceSecret(ciphertext, "wrong-key"),
+    /Unsupported state|unable to authenticate data/,
+  );
 });
 
 test("getPostgresMigrationStatus reports pending migrations when schema table is absent", async () => {
@@ -161,4 +193,41 @@ test("PostgreSQL payload repository stores local files and records asset payload
   } finally {
     await rm(mediaDir, { force: true, recursive: true });
   }
+});
+
+test("PostgreSQL settings repository rejects plaintext secret records", async () => {
+  const writes: unknown[][] = [];
+  const queryable: PostgresQueryable = {
+    query: async <T extends QueryResultRow = QueryResultRow>(text: string, values?: unknown[]) => {
+      if (text.includes("insert into settings")) writes.push(values ?? []);
+      return typedQueryResult<T>([]);
+    },
+  };
+  const repository = createPostgresWorkspaceStorageRepository(
+    queryable,
+    { databaseUrl: "postgres://localhost/imagine", mediaDir: "/srv/imagine/media" },
+    "workspace_1",
+  );
+
+  await assert.rejects(
+    () => repository.settings.put({
+      group: "provider",
+      isSecret: true,
+      key: "provider:demo:apiKey",
+      updatedAt: "2026-06-27T00:00:00.000Z",
+      value: "plaintext-api-key",
+    }),
+    /must be encrypted/,
+  );
+
+  const encryptedValue = encryptWorkspaceSecret("provider-api-key", "workspace-encryption-key");
+  await repository.settings.put({
+    group: "provider",
+    isSecret: true,
+    key: "provider:demo:apiKey",
+    updatedAt: "2026-06-27T00:00:00.000Z",
+    value: encryptedValue,
+  });
+
+  assert.deepEqual(writes[0], ["workspace_1", "provider:demo:apiKey", "provider", encryptedValue, true]);
 });

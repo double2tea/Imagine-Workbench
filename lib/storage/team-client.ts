@@ -27,6 +27,13 @@ import type {
   TeamMemberListResult,
   TeamMemberMutationResult,
 } from "@/lib/storage/team-member-types";
+import type {
+  PublicTeamSecretStatus,
+  TeamSecretListResult,
+  TeamSecretMutationResult,
+  TeamSecretSaveInput,
+} from "@/lib/storage/team-secret-types";
+import type { WorkspaceSettingGroup } from "@/lib/storage/schema";
 
 export interface TeamStorageMigrationStatus {
   appliedMigrationIds: string[];
@@ -92,6 +99,11 @@ export interface TeamBoardSummaryListOptions {
 }
 
 export type TeamGenerationTaskListOptions = ListGenerationTasksOptions;
+
+export interface TeamSecretListOptions {
+  groups?: WorkspaceSettingGroup[];
+  keys?: string[];
+}
 
 type Fetcher = typeof fetch;
 
@@ -234,6 +246,62 @@ export async function deleteTeamMember(
   const body: unknown = await response.json();
   if (!response.ok) {
     const error = readStringField(body, "error") ?? "Team member delete failed";
+    throw new Error(error);
+  }
+}
+
+export async function fetchTeamSecrets(
+  options: TeamSecretListOptions = {},
+  fetcher: Fetcher = fetch,
+): Promise<TeamSecretListResult> {
+  const response = await fetcher(teamSecretsUrl(options), { cache: "no-store" });
+  const body: unknown = await response.json();
+  if (!response.ok) {
+    const error = readStringField(body, "error") ?? "Team secret list failed";
+    throw new Error(error);
+  }
+  return parseTeamSecretListResult(body);
+}
+
+export async function saveTeamSecret(
+  input: TeamSecretSaveInput,
+  csrfToken: string,
+  fetcher: Fetcher = fetch,
+): Promise<TeamSecretMutationResult> {
+  const token = csrfToken.trim();
+  if (!token) throw new Error("CSRF token is required");
+  const response = await fetcher(API_ROUTES.storage.teamSecrets, {
+    cache: "no-store",
+    body: JSON.stringify(input),
+    headers: {
+      "content-type": "application/json",
+      "x-imagine-csrf-token": token,
+    },
+    method: "POST",
+  });
+  const body: unknown = await response.json();
+  if (!response.ok) {
+    const error = readStringField(body, "error") ?? "Team secret save failed";
+    throw new Error(error);
+  }
+  return parseTeamSecretMutationResult(body);
+}
+
+export async function deleteTeamSecret(
+  key: string,
+  csrfToken: string,
+  fetcher: Fetcher = fetch,
+): Promise<void> {
+  const token = csrfToken.trim();
+  if (!token) throw new Error("CSRF token is required");
+  const response = await fetcher(API_ROUTES.storage.teamSecret(key), {
+    cache: "no-store",
+    headers: { "x-imagine-csrf-token": token },
+    method: "DELETE",
+  });
+  const body: unknown = await response.json();
+  if (!response.ok) {
+    const error = readStringField(body, "error") ?? "Team secret delete failed";
     throw new Error(error);
   }
 }
@@ -591,6 +659,16 @@ function parseTeamMemberMutationResult(value: unknown): TeamMemberMutationResult
   return value;
 }
 
+function parseTeamSecretListResult(value: unknown): TeamSecretListResult {
+  if (!isTeamSecretListResult(value)) throw new Error("Team secret list response is invalid");
+  return value;
+}
+
+function parseTeamSecretMutationResult(value: unknown): TeamSecretMutationResult {
+  if (!isTeamSecretMutationResult(value)) throw new Error("Team secret response is invalid");
+  return value;
+}
+
 function parseTeamAssetListResult(value: unknown): TeamAssetListResult {
   if (!isTeamAssetListResult(value)) throw new Error("Team asset list response is invalid");
   return value;
@@ -654,6 +732,14 @@ function teamBoardsUrl(options: TeamBoardSummaryListOptions): string {
   if (options.offset !== undefined) searchParams.set("offset", String(options.offset));
   const query = searchParams.toString();
   return query ? `${API_ROUTES.storage.teamBoards}?${query}` : API_ROUTES.storage.teamBoards;
+}
+
+function teamSecretsUrl(options: TeamSecretListOptions): string {
+  const searchParams = new URLSearchParams();
+  for (const group of options.groups ?? []) searchParams.append("group", group);
+  for (const key of options.keys ?? []) searchParams.append("key", key);
+  const query = searchParams.toString();
+  return query ? `${API_ROUTES.storage.teamSecrets}?${query}` : API_ROUTES.storage.teamSecrets;
 }
 
 function readStringField(value: unknown, field: string): string | null {
@@ -765,6 +851,25 @@ function isTeamMemberMutationResult(value: unknown): value is TeamMemberMutation
   );
 }
 
+function isTeamSecretListResult(value: unknown): value is TeamSecretListResult {
+  if (!isRecord(value)) return false;
+  return (
+    value.targetKind === "postgres" &&
+    typeof value.workspaceId === "string" &&
+    Array.isArray(value.secrets) &&
+    value.secrets.every(isPublicTeamSecretStatus)
+  );
+}
+
+function isTeamSecretMutationResult(value: unknown): value is TeamSecretMutationResult {
+  if (!isRecord(value)) return false;
+  return (
+    value.targetKind === "postgres" &&
+    typeof value.workspaceId === "string" &&
+    isPublicTeamSecretStatus(value.secret)
+  );
+}
+
 function isPublicTeamMember(value: unknown): value is PublicTeamMember {
   if (!isRecord(value)) return false;
   return (
@@ -772,6 +877,17 @@ function isPublicTeamMember(value: unknown): value is PublicTeamMember {
     typeof value.email === "string" &&
     isTeamRole(value.role) &&
     typeof value.userId === "string"
+  );
+}
+
+function isPublicTeamSecretStatus(value: unknown): value is PublicTeamSecretStatus {
+  if (!isRecord(value)) return false;
+  return (
+    value.configured === true &&
+    isWorkspaceSettingGroup(value.group) &&
+    typeof value.key === "string" &&
+    typeof value.updatedAt === "string" &&
+    !("value" in value)
   );
 }
 
@@ -842,6 +958,10 @@ function isPublicTeamBoardNode(value: unknown): boolean {
 
 function isTeamRole(value: unknown): value is TeamSessionContext["role"] {
   return value === "owner" || value === "admin" || value === "editor" || value === "viewer";
+}
+
+function isWorkspaceSettingGroup(value: unknown): value is WorkspaceSettingGroup {
+  return value === "agent" || value === "model-cache" || value === "provider" || value === "ui" || value === "other";
 }
 
 function isStorageItemStatus(value: unknown): value is StorageItemMeta["status"] {

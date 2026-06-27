@@ -8,6 +8,7 @@ import {
 } from "@/lib/storage/local-config";
 
 export const IMAGINE_TEAM_SETUP_TOKEN_ENV = "IMAGINE_TEAM_SETUP_TOKEN";
+export const IMAGINE_TEAM_SECRET_ENCRYPTION_KEY_ENV = "IMAGINE_TEAM_SECRET_ENCRYPTION_KEY";
 
 export class PostgresStorageConfigError extends Error {
   constructor(message: string) {
@@ -43,4 +44,10 @@ export function requireTeamSetupToken(env: LocalStorageEnvironment, requestToken
   const setupToken = env[IMAGINE_TEAM_SETUP_TOKEN_ENV]?.trim();
   if (!setupToken) throw new PostgresStorageConfigError(`${IMAGINE_TEAM_SETUP_TOKEN_ENV} is required for team storage migrations`);
   if (requestToken !== setupToken) throw new PostgresStorageConfigError("Invalid team setup token");
+}
+
+export function requireTeamSecretEncryptionKey(env: LocalStorageEnvironment): string {
+  const key = env[IMAGINE_TEAM_SECRET_ENCRYPTION_KEY_ENV]?.trim();
+  if (!key) throw new PostgresStorageConfigError(`${IMAGINE_TEAM_SECRET_ENCRYPTION_KEY_ENV} is required for team workspace secrets`);
+  return key;
 }

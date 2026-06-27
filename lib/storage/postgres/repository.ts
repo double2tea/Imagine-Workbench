@@ -26,6 +26,7 @@ import {
 } from "@/lib/storage/schema";
 import type { PostgresStorageConfig } from "@/lib/storage/postgres/config";
 import type { PostgresQueryable } from "@/lib/storage/postgres/connection";
+import { isEncryptedWorkspaceSecret } from "@/lib/storage/team-secret-crypto";
 
 interface AssetRow extends QueryResultRow {
   meta: WorkspaceAssetRecord["meta"];
@@ -331,6 +332,9 @@ class PostgresSettingsRepository implements WorkspaceSettingsRepository {
   }
 
   async put(record: WorkspaceSettingRecord): Promise<void> {
+    if (record.isSecret && !isEncryptedWorkspaceSecret(record.value)) {
+      throw new Error("PostgreSQL workspace secrets must be encrypted before storage");
+    }
     await this.queryable.query(
       `insert into settings (workspace_id, key, group_name, value, is_secret, updated_at)
        values ($1, $2, $3, to_jsonb($4::text), $5, now())

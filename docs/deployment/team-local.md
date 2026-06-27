@@ -16,6 +16,7 @@ Edit `.env.team` before starting the stack:
 - Replace `POSTGRES_PASSWORD`.
 - Replace `DATABASE_URL` with the same PostgreSQL password.
 - Replace `IMAGINE_TEAM_SETUP_TOKEN`.
+- Replace `IMAGINE_TEAM_SECRET_ENCRYPTION_KEY` with a long random server-side key. Keep it stable across restarts and backups, because team workspace secrets encrypted with it cannot be read with a different key.
 - Set `APP_URL` to the URL users will open on the LAN.
 - Set `IMAGINE_TRUSTED_ORIGINS` to `APP_URL` plus any reverse-proxy origins that may send browser requests.
 
@@ -47,7 +48,7 @@ curl -i "$APP_URL/api/storage/team/bootstrap" \
   --data '{"email":"owner@example.com","password":"replace-with-a-long-password"}'
 ```
 
-The route creates the first workspace, team, owner user, server session, and CSRF token only when no owner exists yet. It returns non-secret ids and sets the session/CSRF cookies. Member-management screens are still a later implementation slice.
+The route creates the first workspace, team, owner user, server session, and CSRF token only when no owner exists yet. It returns non-secret ids and sets the session/CSRF cookies. Owner/admin member management is available from Settings -> Data in PostgreSQL mode.
 
 ## Backup
 
@@ -68,6 +69,6 @@ Restore the database dump and media volume from the same backup point. Do not mi
 
 ## Current Scope
 
-The current team-storage foundation includes PostgreSQL configuration, health/migration APIs, schema migrations, repository foundations, local media payload storage, and the Settings -> Data status/migration surface.
+The current team-storage foundation includes PostgreSQL configuration, health/migration APIs, schema migrations, repository foundations, local media payload storage, team auth/session/member APIs, shared asset/board/generation-task APIs, encrypted workspace-secret storage APIs, and the Settings -> Data status/migration/session/member surfaces.
 
-Full shared workspace routing, local accounts, member roles, CSRF/origin enforcement, encrypted team secrets, and IndexedDB -> PostgreSQL import are later implementation slices. Do not expose a team deployment to untrusted networks until those slices are complete.
+Provider/RunningHub settings migration to encrypted team secrets, team-mode settings/backup/restore/clear/cleanup routing, explicit IndexedDB -> PostgreSQL import, and deeper backup/restore automation are later implementation slices. Do not expose a team deployment to untrusted networks until the remaining operational slices are complete.
