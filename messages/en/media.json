@@ -33,6 +33,9 @@
   "customSizeLabel": "Custom Size",
   "workspaceHeader": {
     "brandSubtitle": "AI Image, Video & Audio Creative Studio",
+    "storageModeIndexedDb": "IndexedDB",
+    "storageModePostgres": "PostgreSQL",
+    "storageModeTitle": "Current storage mode: {mode}",
     "boardLink": "Board", "assetLibraryLink": "Library",
     "resolveCheckTitle": "Run connection check via Resolve plugin",
     "resolveRunning": "Waiting for Resolve", "resolveIdle": "DaVinci Resolve",

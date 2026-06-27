@@ -159,6 +159,7 @@ interface BoardWorkspaceProps {
   onSelectedNodeIdsChange?: (nodeIds: string[]) => void;
   externalSelectedNodeIds?: string[];
   selectedDownloadableCount?: number;
+  storageTarget?: "indexeddb" | "postgres";
   viewedGeneratedAssetIds?: ReadonlySet<string>;
 }
 
@@ -1340,6 +1341,7 @@ export default function BoardWorkspace({
   onSelectedNodeIdsChange,
   externalSelectedNodeIds,
   selectedDownloadableCount = 0,
+  storageTarget = "indexeddb",
   viewedGeneratedAssetIds = EMPTY_STRING_SET,
 }: BoardWorkspaceProps) {
   const themeMode = useThemeModeSnapshot();
@@ -3498,6 +3500,7 @@ export default function BoardWorkspace({
         canUndo={canUndo}
         saveError={saveError}
         saveStatus={saveStatus}
+        storageTarget={storageTarget}
         trashedCount={trashedNodes.length}
         onRedo={redo}
         onRestoreTrash={trashedNodes.length > 0 ? () => restoreTrashedNode(0) : undefined}

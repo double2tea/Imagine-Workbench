@@ -33,6 +33,9 @@
   "customSizeLabel": "自定义尺寸",
   "workspaceHeader": {
     "brandSubtitle": "智能图像、视频与音频创作工作台",
+    "storageModeIndexedDb": "IndexedDB",
+    "storageModePostgres": "PostgreSQL",
+    "storageModeTitle": "当前存储模式：{mode}",
     "boardLink": "画板", "assetLibraryLink": "素材库",
     "resolveCheckTitle": "通过 Resolve 插件执行连接检查",
     "resolveRunning": "等待达芬奇", "resolveIdle": "达芬奇",

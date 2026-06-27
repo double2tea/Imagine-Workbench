@@ -30,6 +30,7 @@ import WorkspaceTopBar, {
   workspaceTopBarButtonClass,
   workspaceTopBarIconButtonClass,
 } from "@/components/workbench/WorkspaceTopBar";
+import WorkspaceStorageModeBadge, { type WorkspaceStorageModeBadgeTarget } from "@/components/workbench/WorkspaceStorageModeBadge";
 import { useLocale, useTranslations } from "@/lib/i18n";
 
 interface BoardToolbarProps {
@@ -41,6 +42,7 @@ interface BoardToolbarProps {
   nodeCount: number;
   saveError: string | null;
   saveStatus: BoardSaveStatus;
+  storageTarget: WorkspaceStorageModeBadgeTarget;
   trashedCount: number;
   onBack: () => void;
   onClear: () => void;
@@ -113,6 +115,7 @@ export default function BoardToolbar({
   nodeCount,
   saveError,
   saveStatus,
+  storageTarget,
   trashedCount,
   onBack,
   onClear,
@@ -127,6 +130,7 @@ export default function BoardToolbar({
   onUndo,
 }: BoardToolbarProps) {
   const { t } = useTranslations("board");
+  const mediaT = useTranslations("media");
   const commonT = useTranslations("common");
   const { themeMode, toggleThemeMode } = useThemeMode();
   const { locale, setLocale } = useLocale();
@@ -145,6 +149,9 @@ export default function BoardToolbar({
   const nextLocale = locale === "zh" ? "en" : "zh";
   const languageToggleLabel = t(`workspace.language.${nextLocale}`);
   const languageToggleShort = t(`workspace.language.${locale}Short`);
+  const storageModeLabel = storageTarget === "postgres"
+    ? mediaT.t("workspaceHeader.storageModePostgres")
+    : mediaT.t("workspaceHeader.storageModeIndexedDb");
 
   const visibleBoardSummaries = boardSummaries.some(board => board.id === boardId)
     ? boardSummaries
@@ -228,6 +235,12 @@ export default function BoardToolbar({
       start={
         <div className="contents">
           <WorkspaceTopBarBrand compact showBadge={false} />
+
+          <WorkspaceStorageModeBadge
+            label={storageModeLabel}
+            target={storageTarget}
+            title={mediaT.t("workspaceHeader.storageModeTitle", { mode: storageModeLabel })}
+          />
 
           <span className="hidden h-7 w-px shrink-0 bg-[var(--iw-border)] md:block" aria-hidden="true" />
 

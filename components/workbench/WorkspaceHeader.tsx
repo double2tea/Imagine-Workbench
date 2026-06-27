@@ -7,6 +7,7 @@ import WorkspaceTopBar, {
   workspaceTopBarButtonClass,
   workspaceTopBarIconButtonClass,
 } from "@/components/workbench/WorkspaceTopBar";
+import WorkspaceStorageModeBadge, { type WorkspaceStorageModeBadgeTarget } from "@/components/workbench/WorkspaceStorageModeBadge";
 import { useThemeMode, type ThemeMode } from "@/lib/theme-mode";
 import { useTranslations } from "@/lib/i18n";
 import { useLocale } from "@/lib/i18n";
@@ -20,6 +21,7 @@ interface WorkspaceHeaderProps {
   onRunResolveCheck: () => void;
   resolveCheckStatus: "idle" | "running";
   showResolveCheck: boolean;
+  storageTarget: WorkspaceStorageModeBadgeTarget;
 }
 
 export default function WorkspaceHeader({
@@ -29,6 +31,7 @@ export default function WorkspaceHeader({
   onRunResolveCheck,
   resolveCheckStatus,
   showResolveCheck,
+  storageTarget,
   }: WorkspaceHeaderProps) {
   const { themeMode, toggleThemeMode } = useThemeMode();
   const { t } = useTranslations("media");
@@ -36,6 +39,9 @@ export default function WorkspaceHeader({
   const nextLocale = locale === "zh" ? "en" : "zh";
   const languageToggleLabel = t(`workspaceHeader.language.${nextLocale}`);
   const languageToggleShort = t(`workspaceHeader.language.${locale}Short`);
+  const storageModeLabel = storageTarget === "postgres"
+    ? t("workspaceHeader.storageModePostgres")
+    : t("workspaceHeader.storageModeIndexedDb");
 
   return (
     <WorkspaceTopBar
@@ -45,6 +51,12 @@ export default function WorkspaceHeader({
       }
       end={
         <div className="z-10 flex shrink-0 items-center gap-1.5 sm:gap-2">
+          <WorkspaceStorageModeBadge
+            label={storageModeLabel}
+            target={storageTarget}
+            title={t("workspaceHeader.storageModeTitle", { mode: storageModeLabel })}
+          />
+
           <Link href="/board" className={workspaceTopBarButtonClass} title={t('workspaceHeader.boardLink')} aria-label={t('workspaceHeader.boardLink')}>
             <Grid2X2 className="h-3.5 w-3.5" />
             <span className="hidden sm:inline">{t('workspaceHeader.boardLink')}</span>

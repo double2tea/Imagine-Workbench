@@ -84,6 +84,7 @@
     "./team-storage-client.test.ts",
     "./team-workspace-backup.test.ts",
     "./team-auth.test.ts",
+    "./workspace-storage-mode-badge.test.ts",
     "./provider-utils.test.ts",
     "./reference-images.test.ts",
     "../lib/canvas-editor.ts",
@@ -217,6 +218,7 @@
     "../lib/providers/utils.ts",
     "../lib/reference-images.ts",
     "../lib/transcripts.ts",
-    "../lib/workspace-backup-format.ts"
+    "../lib/workspace-backup-format.ts",
+    "../components/workbench/WorkspaceStorageModeBadge.tsx"
   ]
 }

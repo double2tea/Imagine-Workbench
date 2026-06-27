@@ -2153,6 +2153,7 @@ export default function Home() {
         onRunResolveCheck={() => void runResolveCheck()}
         resolveCheckStatus={resolveCheckStatus}
         showResolveCheck={resolveIntegrationEnabled}
+        storageTarget={workspaceStorageTarget}
       />
 
       {/* Main Multi-panel Layout grid */}

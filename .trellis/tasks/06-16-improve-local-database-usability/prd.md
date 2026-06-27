@@ -118,6 +118,7 @@ Completed in the latest continuation:
 * Added a scripted PostgreSQL migration entrypoint. `pnpm db:migrate` calls the existing setup-token-protected migration API with `Origin: APP_URL`, prints non-secret schema/migration counts, and is documented for Docker Compose upgrade flows.
 * Promoted the PostgreSQL storage adapter from planned to active now that the team storage vertical slices are implemented, and tightened the adapter test so only IndexedDB and PostgreSQL are exposed with no planned SQLite/local-folder/remote-api targets.
 * Migrated pnpm build-script approvals from ignored `package.json.pnpm.onlyBuiltDependencies` to `pnpm-workspace.yaml` `allowBuilds`, restoring clean pnpm 11 installs/checks after dependency rebuilds.
+* Added a compact active storage-mode badge to the main workspace and board top bars so users can see whether the current workspace is using IndexedDB or PostgreSQL without opening Settings -> Data.
 
 Still remaining before the full PRD can be considered complete:
 
@@ -175,7 +176,7 @@ Still remaining before the full PRD can be considered complete:
 
 ## Acceptance Criteria
 
-* [ ] Users can clearly see whether the active storage mode is IndexedDB or PostgreSQL.
+* [x] Users can clearly see whether the active storage mode is IndexedDB or PostgreSQL.
 * [ ] Browser/deployed mode continues to work with IndexedDB and does not require PostgreSQL.
 * [ ] With no PostgreSQL/team environment variables configured, the app behaves like the current project: no login prompt, no team setup prompt, no required migration, and no visible disruption to existing creation/board/gallery/settings workflows.
 * [ ] Team/PostgreSQL UI, auth bootstrap, and PostgreSQL routes are shown or enabled only when team mode is explicitly configured.

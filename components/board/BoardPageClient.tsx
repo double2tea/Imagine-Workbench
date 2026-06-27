@@ -5436,6 +5436,7 @@ export default function BoardPage({ boardId = DEFAULT_BOARD_ID }: BoardPageProps
         onSendAssetToAgent={useBoardAssetForAgent}
         onSendAgentNode={handleSendAgentNode}
         selectedDownloadableCount={selectedDownloadableBoardItems.length}
+        storageTarget={boardStorageTarget}
         viewedGeneratedAssetIds={viewedGeneratedAssetIds}
       >
         <BoardSidePanel
