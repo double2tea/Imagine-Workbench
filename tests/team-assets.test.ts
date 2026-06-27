@@ -1,5 +1,5 @@
 import assert from "node:assert/strict";
-import { mkdtemp, rm } from "node:fs/promises";
+import { mkdtemp, readdir, rm } from "node:fs/promises";
 import { tmpdir } from "node:os";
 import path from "node:path";
 import test from "node:test";
@@ -243,6 +243,29 @@ test("saveTeamAsset writes an editor-scoped asset payload and metadata", async (
   }
 });
 
+test("saveTeamAsset cleans staged payload files when metadata commit fails", async () => {
+  const mediaDir = await mkdtemp(path.join(tmpdir(), "imagine-team-assets-fail-"));
+  const queries: Array<{ text: string; values?: readonly unknown[] }> = [];
+  try {
+    await assert.rejects(
+      saveTeamAsset(
+        createTeamAssetsQueryable(queries, { failAssetPut: true, role: "editor" }),
+        { databaseUrl: "postgres://localhost/imagine", mediaDir },
+        requestWithSession(),
+        { item: createStorageItem({ url: "data:image/png;base64,aW1hZ2U=" }) },
+      ),
+      /metadata write failed/,
+    );
+
+    assert.equal(queries.some(query => query.text === "begin"), true);
+    assert.equal(queries.some(query => query.text === "rollback"), true);
+    assert.equal(queries.some(query => query.text === "commit"), false);
+    assert.deepEqual(await listFiles(mediaDir), []);
+  } finally {
+    await rm(mediaDir, { force: true, recursive: true });
+  }
+});
+
 test("saveTeamAsset preserves an existing payload for metadata-only updates", async () => {
   const queries: Array<{ text: string; values?: readonly unknown[] }> = [];
   const result = await saveTeamAsset(
@@ -437,6 +460,7 @@ function createTeamAssetsQueryable(
   options: {
     assetMetas?: StorageItemMeta[];
     boards?: BoardDocument[];
+    failAssetPut?: boolean;
     role?: "owner" | "admin" | "editor" | "viewer";
   } = {},
 ): PostgresQueryable {
@@ -467,6 +491,12 @@ function createTeamAssetsQueryable(
       if (text.startsWith("select boards.board")) {
         return typedQueryResult<T>((options.boards ?? []).map(board => ({ board, summary: null })));
       }
+      if (text.includes("insert into assets") && options.failAssetPut === true) {
+        throw new Error("metadata write failed");
+      }
+      if (text.startsWith("select 1 as referenced from asset_payloads")) {
+        return typedQueryResult<T>([]);
+      }
       if (text.includes("from asset_payloads")) {
         return typedQueryResult<T>([{
           content_hash: "sha256:abc",
@@ -479,6 +509,25 @@ function createTeamAssetsQueryable(
       return typedQueryResult<T>([]);
     },
   };
+}
+
+async function listFiles(dir: string): Promise<string[]> {
+  const result: string[] = [];
+  await collectFiles(dir, "", result);
+  return result.sort();
+}
+
+async function collectFiles(root: string, relativeDir: string, result: string[]): Promise<void> {
+  const absoluteDir = relativeDir ? path.join(root, relativeDir) : root;
+  const entries = await readdir(absoluteDir, { withFileTypes: true });
+  for (const entry of entries) {
+    const relativePath = relativeDir ? path.join(relativeDir, entry.name) : entry.name;
+    if (entry.isDirectory()) {
+      await collectFiles(root, relativePath, result);
+    } else if (entry.isFile()) {
+      result.push(relativePath);
+    }
+  }
 }
 
 function assetRouteContext(assetId = ASSET_ID): { params: Promise<{ assetId: string }> } {

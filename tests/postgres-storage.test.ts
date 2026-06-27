@@ -387,7 +387,7 @@ test("initial PostgreSQL migration contains the team storage foundation tables",
   assert.match(sql, /asset_previews[\s\S]*storage_kind text[\s\S]*storage_key text/);
 });
 
-test("PostgreSQL payload repository stores local files and records asset payload refs", async () => {
+test("PostgreSQL payload repository stages local files without committing asset payload refs", async () => {
   const mediaDir = await mkdtemp(path.join(os.tmpdir(), "imagine-postgres-payload-"));
   const writes: unknown[][] = [];
   const queryable: PostgresQueryable = {
@@ -414,8 +414,7 @@ test("PostgreSQL payload repository stores local files and records asset payload
 
     assert.match(ref.uri, /^originals\/image\/[a-f0-9]{2}\/[a-f0-9]{2}\/[a-f0-9]{64}\.png$/);
     assert.equal(await readFile(path.join(mediaDir, ref.uri), "utf8"), "image bytes");
-    assert.deepEqual(writes[0], ["asset_1"]);
-    assert.deepEqual(writes[1], ["asset_1", ref.contentHash, "image/png", 11, "local-file", ref.uri]);
+    assert.deepEqual(writes, []);
   } finally {
     await rm(mediaDir, { force: true, recursive: true });
   }

@@ -1,5 +1,5 @@
 import assert from "node:assert/strict";
-import { mkdir, mkdtemp, readFile, rm, writeFile } from "node:fs/promises";
+import { mkdir, mkdtemp, readdir, readFile, rm, writeFile } from "node:fs/promises";
 import os from "node:os";
 import path from "node:path";
 import test from "node:test";
@@ -179,6 +179,29 @@ test("restoreTeamWorkspaceBackup replaces team workspace records and stores a sa
     assert.ok(payloadInsert);
     assert.equal(payloadInsert.values?.[2], "image/png");
     assert.equal(await readFile(path.join(mediaDir, ...String(payloadInsert.values?.[5]).split("/")), "utf8"), "image-bytes");
+  });
+});
+
+test("restoreTeamWorkspaceBackup cleans staged safety snapshot payload when snapshot commit fails", async () => {
+  await withTempMediaDir(async mediaDir => {
+    const queries: Array<{ text: string; values?: readonly unknown[] }> = [];
+    const backup = await createPortableTeamBackup();
+
+    await assert.rejects(
+      restoreTeamWorkspaceBackup(
+        createTeamBackupQueryable(queries, { existingRecords: false, failSafetySnapshotPut: true }),
+        { databaseUrl: "postgres://localhost/imagine", mediaDir },
+        requestWithSession(),
+        new Blob([backup], { type: "application/zip" }),
+        false,
+      ),
+      /safety snapshot write failed/,
+    );
+
+    assert.ok(queries.some(query => query.text === "begin"));
+    assert.ok(queries.some(query => query.text === "rollback"));
+    assert.equal(queries.some(query => query.values?.[2] === "team_backup.restore"), false);
+    assert.deepEqual(await listFiles(mediaDir), []);
   });
 });
 
@@ -390,6 +413,25 @@ async function readZipText(zip: JSZip, filePath: string): Promise<string> {
   return file.async("text");
 }
 
+async function listFiles(dir: string): Promise<string[]> {
+  const result: string[] = [];
+  await collectFiles(dir, "", result);
+  return result.sort();
+}
+
+async function collectFiles(root: string, relativeDir: string, result: string[]): Promise<void> {
+  const absoluteDir = relativeDir ? path.join(root, relativeDir) : root;
+  const entries = await readdir(absoluteDir, { withFileTypes: true });
+  for (const entry of entries) {
+    const relativePath = relativeDir ? path.join(relativeDir, entry.name) : entry.name;
+    if (entry.isDirectory()) {
+      await collectFiles(root, relativePath, result);
+    } else if (entry.isFile()) {
+      result.push(relativePath);
+    }
+  }
+}
+
 function requestWithSession(): Request {
   return new Request("http://localhost:3000/api/storage/team/backup", {
     headers: { cookie: `imagine_team_session=${RAW_SESSION_TOKEN}` },
@@ -398,7 +440,7 @@ function requestWithSession(): Request {
 
 function createTeamBackupQueryable(
   queries: Array<{ text: string; values?: readonly unknown[] }> = [],
-  options: { existingRecords?: boolean; settingsRows?: QueryResultRow[] } = {},
+  options: { existingRecords?: boolean; failSafetySnapshotPut?: boolean; settingsRows?: QueryResultRow[] } = {},
 ): PostgresQueryable {
   const existingRecords = options.existingRecords ?? true;
   return {
@@ -406,6 +448,9 @@ function createTeamBackupQueryable(
       queries.push({ text, values });
       if (text === "begin" || text === "commit" || text === "rollback") return typedQueryResult<T>([]);
       if (text.includes("from sessions")) return typedQueryResult<T>([SESSION_ROW]);
+      if (text.startsWith("insert into safety_snapshots") && options.failSafetySnapshotPut === true) {
+        throw new Error("safety snapshot write failed");
+      }
       if (text.includes("select meta from assets")) return typedQueryResult<T>(existingRecords ? [{ meta: ASSET_META }] : []);
       if (text.includes("from asset_payloads where asset_id")) {
         return typedQueryResult<T>(existingRecords ? [{

@@ -216,7 +216,7 @@ Still remaining before the full PRD can be considered complete:
 * [x] Media payloads are stored outside PostgreSQL rows by default and resolved through safe payload refs.
 * [ ] Generated results, imported assets, and asset-library items all resolve through `assets` + `asset_payloads`; `asset_library` records reference backing assets instead of storing separate files.
 * [x] Browser clients can view/download media through app routes without seeing `IMAGINE_MEDIA_DIR`, database credentials, or raw filesystem paths.
-* [ ] Server-side media writes are staged before metadata commit; failed writes/commits clean staged files or mark them for explicit cleanup.
+* [x] Server-side media writes are staged before metadata commit; failed writes/commits clean staged files or mark them for explicit cleanup.
 * [x] IndexedDB -> PostgreSQL migration is explicit, refuses unsafe/ambiguous targets, leaves source IndexedDB unchanged, and cleans up staged media files on failure.
 * [x] Import refuses to proceed if it detects an unknown persisted data source that is not classified as migrate/optional/exclude.
 * [x] Backup/export/restore uses the active storage target and preserves provider credential opt-in semantics.
@@ -229,7 +229,7 @@ Still remaining before the full PRD can be considered complete:
 * [x] Settings -> Data reports PostgreSQL mode health, storage counts, and actionable maintenance states.
 * [x] PostgreSQL routes and driver imports are Node-only and do not break Cloudflare Pages/public builds.
 * [x] PostgreSQL connections use a bounded server-side pool with configured timeouts; health checks fail visibly when the pool/database is unavailable.
-* [x] Storage-focused tests cover migrations, CRUD, payload refs, hosted/browser mode, PostgreSQL fail-fast config errors, explicit migration, backup/restore target selection, authz role checks, config hiding, CSRF/origin rejection, board/settings concurrency conflict prompts, and ego-browser browser-mode smoke coverage for the main workstation, board route, Settings -> Data, and disabled PostgreSQL health behavior.
+* [x] Storage-focused tests cover migrations, CRUD, staged media writes and failed-commit cleanup, payload refs, hosted/browser mode, PostgreSQL fail-fast config errors, explicit migration, backup/restore target selection, authz role checks, config hiding, CSRF/origin rejection, board/settings concurrency conflict prompts, and ego-browser browser-mode smoke coverage for the main workstation, board route, Settings -> Data, and disabled PostgreSQL health behavior.
 * [x] `pnpm run lint` and `pnpm run typecheck` pass.
 
 ## Research References

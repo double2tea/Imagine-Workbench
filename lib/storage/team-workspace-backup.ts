@@ -675,19 +675,27 @@ async function createTeamRestoreSafetySnapshot(
     sizeBytes: snapshotExport.body.byteLength,
     voiceProfileCount: snapshotExport.voiceProfileCount,
   };
-  await context.repository.safetySnapshots.put(snapshot);
-  await recordTeamAuditEvent(context.queryable, {
-    eventType: "safety_snapshot.save",
-    metadata: {
-      assetCount: snapshot.assetCount,
-      boardCount: snapshot.boardCount,
-      id: snapshot.id,
-      reason: snapshot.reason,
-      sizeBytes: snapshot.sizeBytes,
-    },
-    userId: context.session.userId,
-    workspaceId: context.session.workspaceId,
-  });
+  await context.queryable.query("begin");
+  try {
+    await context.repository.safetySnapshots.put(snapshot);
+    await recordTeamAuditEvent(context.queryable, {
+      eventType: "safety_snapshot.save",
+      metadata: {
+        assetCount: snapshot.assetCount,
+        boardCount: snapshot.boardCount,
+        id: snapshot.id,
+        reason: snapshot.reason,
+        sizeBytes: snapshot.sizeBytes,
+      },
+      userId: context.session.userId,
+      workspaceId: context.session.workspaceId,
+    });
+    await context.queryable.query("commit");
+  } catch (error) {
+    await context.queryable.query("rollback");
+    await new LocalFilePayloadStore(config.mediaDir, { maxPayloadBytes: config.maxMediaPayloadBytes }).delete(payload);
+    throw error;
+  }
   return snapshot;
 }
 

@@ -249,9 +249,7 @@ class PostgresAssetPayloadRepository implements WorkspaceAssetPayloadRepository 
     contentHash?: string;
     mimeType: string;
   }): Promise<WorkspaceAssetPayloadRef> {
-    const ref = await this.payloadStore.write(input);
-    await upsertAssetPayloadRef(this.queryable, input.assetId, ref);
-    return ref;
+    return this.payloadStore.write(input);
   }
 }
 

@@ -139,23 +139,48 @@ export async function saveTeamAsset(
   const context = await createTeamWorkspaceStorageContext(queryable, config, request, { minimumRole: "editor" });
   const dataUriPayload = readAssetDataUriPayload(input.item);
   const existing = dataUriPayload ? null : await context.repository.assets.get(input.item.id);
-  const payload = dataUriPayload
+  const stagedPayload: WorkspaceAssetPayloadRef | null = dataUriPayload
     ? await context.repository.payloads.write({
       assetId: input.item.id,
       blob: dataUriPayload.blob,
       mimeType: dataUriPayload.mimeType,
     })
-    : existing?.payload;
+    : null;
+  const payload = stagedPayload ?? existing?.payload;
   if (!payload) {
     throw new ApiError(400, "invalid_team_asset_request", "Team asset payload is required");
   }
   const meta = teamAssetMetaFromItem(input.item, payload);
-  await context.repository.assets.put({ meta, payload });
+  await context.queryable.query("begin");
+  try {
+    await context.repository.assets.put({ meta, payload });
+    await context.queryable.query("commit");
+  } catch (error) {
+    await context.queryable.query("rollback");
+    if (stagedPayload) await deleteStagedPayloadIfUnreferenced(context.queryable, context.repository.payloads, stagedPayload);
+    throw error;
+  }
   return {
     asset: publicTeamAssetRecord({ meta, payload }),
     targetKind: "postgres",
     workspaceId: context.session.workspaceId,
   };
+}
+
+interface PayloadReferenceRow extends QueryResultRow {
+  referenced: number;
+}
+
+async function deleteStagedPayloadIfUnreferenced(
+  queryable: PostgresQueryable,
+  payloads: { delete: (ref: WorkspaceAssetPayloadRef) => Promise<void> },
+  ref: WorkspaceAssetPayloadRef,
+): Promise<void> {
+  const references = await queryable.query<PayloadReferenceRow>(
+    "select 1 as referenced from asset_payloads where storage_kind = $1 and storage_key = $2 limit 1",
+    [ref.kind, ref.uri],
+  );
+  if (!references.rows[0]) await payloads.delete(ref);
 }
 
 export function publicTeamAssetRecord(record: {
