@@ -39,6 +39,10 @@ export async function inspectTeamMediaConsistency(
   return summarizeTeamMediaConsistency(await collectTeamMediaConsistencyDetails(mediaDir, refs));
 }
 
+export async function calculateTeamMediaDirectoryBytes(mediaDir: string): Promise<number> {
+  return calculateDirectoryBytes(path.resolve(mediaDir));
+}
+
 export function countTeamMediaConsistencyIssues(summary: TeamMediaConsistencySummary): number {
   return summary.missingPayloadFiles +
     summary.missingPreviewFiles +
@@ -160,6 +164,27 @@ async function collectStorageKeys(mediaDir: string, absoluteDir: string): Promis
     }
   }
   return storageKeys;
+}
+
+async function calculateDirectoryBytes(absoluteDir: string): Promise<number> {
+  let entries: import("node:fs").Dirent<string>[];
+  try {
+    entries = await readdir(absoluteDir, { encoding: "utf8", withFileTypes: true });
+  } catch (error) {
+    if (isNodeErrorCode(error, "ENOENT")) return 0;
+    throw error;
+  }
+
+  let total = 0;
+  for (const entry of entries) {
+    const absolutePath = path.join(absoluteDir, entry.name);
+    if (entry.isDirectory()) {
+      total += await calculateDirectoryBytes(absolutePath);
+    } else if (entry.isFile()) {
+      total += (await stat(absolutePath)).size;
+    }
+  }
+  return total;
 }
 
 async function deleteStorageKeys(mediaDir: string, storageKeys: string[]): Promise<void> {

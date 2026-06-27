@@ -1531,7 +1531,10 @@ function isWorkspaceDataSummaryTeamStorage(value: unknown): boolean {
   return (
     typeof value.assetLibraryRecords === "number" &&
     typeof value.generationTasks === "number" &&
+    typeof value.mediaBytes === "number" &&
     isWorkspaceDataSummaryTeamMediaConsistency(value.mediaConsistency) &&
+    typeof value.mediaUsageWarning === "boolean" &&
+    (value.mediaUsageWarningBytes === undefined || typeof value.mediaUsageWarningBytes === "number") &&
     typeof value.payloadBytes === "number" &&
     typeof value.payloadRefs === "number" &&
     typeof value.promptTemplates === "number" &&

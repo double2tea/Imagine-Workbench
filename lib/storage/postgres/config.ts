@@ -2,6 +2,7 @@ import {
   DATABASE_URL_ENV,
   IMAGINE_MAX_MEDIA_PAYLOAD_BYTES_ENV,
   IMAGINE_MEDIA_DIR_ENV,
+  IMAGINE_MEDIA_USAGE_WARNING_BYTES_ENV,
   IMAGINE_STORAGE_TARGET_ENV,
   isHostedDeploymentEnvironment,
   parseWorkspaceStorageMode,
@@ -22,6 +23,7 @@ export interface PostgresStorageConfig {
   databaseUrl: string;
   maxMediaPayloadBytes?: number;
   mediaDir: string;
+  mediaUsageWarningBytes?: number;
 }
 
 export function resolvePostgresStorageConfig(env: LocalStorageEnvironment): PostgresStorageConfig {
@@ -43,6 +45,7 @@ export function resolvePostgresStorageConfig(env: LocalStorageEnvironment): Post
     databaseUrl,
     maxMediaPayloadBytes: parseMaxMediaPayloadBytes(env[IMAGINE_MAX_MEDIA_PAYLOAD_BYTES_ENV]),
     mediaDir,
+    mediaUsageWarningBytes: parseOptionalPositiveByteCount(env[IMAGINE_MEDIA_USAGE_WARNING_BYTES_ENV], IMAGINE_MEDIA_USAGE_WARNING_BYTES_ENV),
   };
 }
 
@@ -57,6 +60,19 @@ function parseMaxMediaPayloadBytes(value: string | undefined): number {
   const parsed = Number(trimmed);
   if (!Number.isSafeInteger(parsed) || parsed <= 0) {
     throw new PostgresStorageConfigError(`${IMAGINE_MAX_MEDIA_PAYLOAD_BYTES_ENV} must be a positive integer byte count`);
+  }
+  return parsed;
+}
+
+function parseOptionalPositiveByteCount(value: string | undefined, envName: string): number | undefined {
+  const trimmed = value?.trim();
+  if (!trimmed) return undefined;
+  if (!/^\d+$/.test(trimmed)) {
+    throw new PostgresStorageConfigError(`${envName} must be a positive integer byte count`);
+  }
+  const parsed = Number(trimmed);
+  if (!Number.isSafeInteger(parsed) || parsed <= 0) {
+    throw new PostgresStorageConfigError(`${envName} must be a positive integer byte count`);
   }
   return parsed;
 }

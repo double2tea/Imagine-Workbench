@@ -16,6 +16,7 @@ Edit `.env.team` before starting the stack:
 - Replace `POSTGRES_PASSWORD`.
 - Replace `DATABASE_URL` with the same PostgreSQL password.
 - Set `IMAGINE_MAX_MEDIA_PAYLOAD_BYTES` to the largest single generated/imported media payload the team may store, in bytes.
+- Set `IMAGINE_MEDIA_USAGE_WARNING_BYTES` to the media-volume byte count that should show a Settings -> Data warning.
 - Replace `IMAGINE_TEAM_SETUP_TOKEN`.
 - Replace `IMAGINE_TEAM_SECRET_ENCRYPTION_KEY` with a long random server-side key. Keep it stable across restarts and backups, because team workspace secrets encrypted with it cannot be read with a different key.
 - Set `APP_URL` to the URL users will open on the LAN.
@@ -27,7 +28,7 @@ Edit `.env.team` before starting the stack:
 docker compose --env-file .env.team -f docker-compose.team.yml up --build
 ```
 
-The app listens on `http://localhost:3000` by default. PostgreSQL data is stored in the `postgres-data` volume. Generated media is stored in the `imagine-media` volume under `/data/imagine-media` inside the app container. Any single media payload larger than `IMAGINE_MAX_MEDIA_PAYLOAD_BYTES` is rejected before it is written to the media volume, and the failing request returns a visible error.
+The app listens on `http://localhost:3000` by default. PostgreSQL data is stored in the `postgres-data` volume. Generated media is stored in the `imagine-media` volume under `/data/imagine-media` inside the app container. Any single media payload larger than `IMAGINE_MAX_MEDIA_PAYLOAD_BYTES` is rejected before it is written to the media volume, and the failing request returns a visible error. When total media-volume usage reaches `IMAGINE_MEDIA_USAGE_WARNING_BYTES`, Settings -> Data shows a non-secret aggregate warning with used bytes and threshold bytes.
 
 ## Run Schema Migrations
 
@@ -102,4 +103,4 @@ Do not roll back only the app while keeping a newer migrated database unless tha
 
 The current team-storage foundation includes PostgreSQL configuration, health/migration APIs, schema migrations, repository foundations, local media payload storage with a required per-payload byte limit, team auth/session/member APIs, shared asset/board/generation-task APIs, prompt templates, voice profiles, encrypted workspace-secret storage APIs, provider/RunningHub team settings, Settings -> Data status/migration/session/member surfaces, team backup/restore, explicit browser IndexedDB -> PostgreSQL import, clear-assets/reset-boards, media maintenance cleanup, missing-payload asset deletion, missing-preview repair, and stale source-link repair.
 
-Remaining hardening includes deeper automated backup orchestration, reverse-proxy examples, disk usage threshold warnings, and production-grade monitoring. Keep team mode behind trusted self-hosted access until those operational slices are complete.
+Remaining hardening includes deeper automated backup orchestration, reverse-proxy examples, and production-grade monitoring. Keep team mode behind trusted self-hosted access until those operational slices are complete.

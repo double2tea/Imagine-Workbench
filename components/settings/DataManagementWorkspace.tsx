@@ -466,6 +466,10 @@ export default function DataManagementWorkspace({
   const issueGroups = useMemo<HealthIssueGroup[]>(() => {
     if (!integrity) return [];
     const mediaConsistency = teamStorageSummary?.mediaConsistency;
+    const mediaUsageWarningBytes = teamStorageSummary?.mediaUsageWarningBytes;
+    const showTeamMediaUsageWarning = isTeamStorageMode &&
+      teamStorageSummary?.mediaUsageWarning === true &&
+      mediaUsageWarningBytes !== undefined;
     const missingTeamMediaAction = mediaConsistency?.missingPayloadFiles
       ? {
           label: t("dataManagement.issueGroups.teamDeleteMissingPayloadAssets"),
@@ -545,6 +549,18 @@ export default function DataManagementWorkspace({
         },
         details: integrity.failedAssetIds,
       },
+      ...(showTeamMediaUsageWarning && teamStorageSummary ? [{
+        key: "team-media-usage-warning",
+        title: t("dataManagement.issueGroups.teamMediaUsageWarning"),
+        count: 1,
+        tone: "attention" as const,
+        details: [
+          t("dataManagement.issueGroups.teamMediaUsageWarningDetail", {
+            threshold: formatBytes(mediaUsageWarningBytes),
+            usage: formatBytes(teamStorageSummary.mediaBytes),
+          }),
+        ],
+      }] : []),
       ...(isTeamStorageMode && mediaConsistency ? [
         {
           key: "team-missing-media-files",
@@ -1106,14 +1122,15 @@ export default function DataManagementWorkspace({
         <StatCard
           label={isTeamStorageMode ? t("dataManagement.statCards.teamMedia") : t("dataManagement.statCards.browserStorage")}
           primary={isTeamStorageMode
-            ? teamStorageSummary ? formatBytes(teamStorageSummary.payloadBytes) : "--"
+            ? teamStorageSummary ? formatBytes(teamStorageSummary.mediaBytes) : "--"
             : usage !== undefined ? formatBytes(usage) : "--"}
           secondary={isTeamStorageMode
             ? teamStorageSummary
               ? t("dataManagement.teamMediaDetailTemplate", {
+                  mediaBytes: formatBytes(teamStorageSummary.mediaBytes),
                   missing: teamStorageSummary.mediaConsistency.missingPayloadFiles + teamStorageSummary.mediaConsistency.missingPreviewFiles,
                   library: teamStorageSummary.assetLibraryRecords,
-                  payloads: teamStorageSummary.payloadRefs,
+                  payloadBytes: formatBytes(teamStorageSummary.payloadBytes),
                   stale: teamStorageSummary.mediaConsistency.orphanedPayloadFiles +
                     teamStorageSummary.mediaConsistency.orphanedPreviewFiles +
                     teamStorageSummary.mediaConsistency.tmpFiles +

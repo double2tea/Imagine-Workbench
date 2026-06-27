@@ -13,6 +13,7 @@ import { createTeamWorkspaceStorageContext } from "@/lib/storage/team-context";
 import type { TeamWorkspaceDataSummaryResult } from "@/lib/storage/team-data-summary-types";
 import {
   countTeamMediaConsistencyIssues,
+  calculateTeamMediaDirectoryBytes,
   inspectTeamMediaConsistency,
   type TeamMediaConsistencySummary,
 } from "@/lib/storage/team-media-consistency";
@@ -148,11 +149,15 @@ export async function getTeamWorkspaceDataSummary(
     Date.now(),
     protectedAssetIds,
   );
-  const mediaConsistency = await inspectTeamMediaConsistency(config.mediaDir, {
-    payloadStorageKeys,
-    previewStorageKeys,
-  });
-  const summaryIntegrity = withTeamMediaConsistencyIssues(integrity, mediaConsistency);
+  const [mediaConsistency, mediaBytes] = await Promise.all([
+    inspectTeamMediaConsistency(config.mediaDir, {
+      payloadStorageKeys,
+      previewStorageKeys,
+    }),
+    calculateTeamMediaDirectoryBytes(config.mediaDir),
+  ]);
+  const mediaUsageWarning = config.mediaUsageWarningBytes !== undefined && mediaBytes >= config.mediaUsageWarningBytes;
+  const summaryIntegrity = withTeamMediaConsistencyIssues(integrity, mediaConsistency, mediaUsageWarning);
   const payloadBytes = payloadsResult.rows.reduce((total, row) => total + numberFromDatabase(row.size_bytes), 0);
 
   return {
@@ -200,7 +205,10 @@ export async function getTeamWorkspaceDataSummary(
       teamStorage: {
         assetLibraryRecords: counts.asset_library_records,
         generationTasks: counts.generation_tasks,
+        mediaBytes,
         mediaConsistency,
+        mediaUsageWarning,
+        mediaUsageWarningBytes: config.mediaUsageWarningBytes,
         payloadBytes,
         payloadRefs: payloadAssetIds.size,
         promptTemplates: counts.prompt_templates,
@@ -218,8 +226,9 @@ export async function getTeamWorkspaceDataSummary(
 function withTeamMediaConsistencyIssues(
   integrity: WorkspaceIntegrityDiagnostics,
   mediaConsistency: TeamMediaConsistencySummary,
+  mediaUsageWarning: boolean,
 ): WorkspaceIntegrityDiagnostics {
-  const issueCount = integrity.issueCount + countTeamMediaConsistencyIssues(mediaConsistency);
+  const issueCount = integrity.issueCount + countTeamMediaConsistencyIssues(mediaConsistency) + (mediaUsageWarning ? 1 : 0);
   const status = mediaConsistency.missingPayloadFiles > 0 || integrity.status === "critical"
     ? "critical"
     : issueCount > 0 ? "attention" : "healthy";

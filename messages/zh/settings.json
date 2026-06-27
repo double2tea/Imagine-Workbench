@@ -124,7 +124,7 @@
     "localSettingsDetailTemplate": "{agentKeys} Agent / {modelCacheKeys} 模型 / {providerSettingKeys} 服务商 / {credentialKeys} 密钥",
     "browserStorageDetailTemplate": "配额 {quota} · {percent}",
     "teamSettingsDetailTemplate": "{settings} 设置 / {secretSettings} 密钥 / {promptTemplates} 模板 / {providerTargets} 目标 / {voiceProfiles} 音色",
-    "teamMediaDetailTemplate": "{payloads} 负载引用 / {library} 素材 / {tasks} 任务 / {missing} 缺文件 / {stale} 待维护",
+    "teamMediaDetailTemplate": "{mediaBytes} 媒体 / {payloadBytes} 负载字节 / {library} 素材 / {tasks} 任务 / {missing} 缺文件 / {stale} 待维护",
     "metadataEstimate": "元数据估算",
     "integrityDiagnosis": "完整性诊断",
     "issueGroups": {
@@ -141,6 +141,8 @@
       "teamOrphanedPreviewFiles": "{count} 个孤立预览文件",
       "teamTmpFiles": "{count} 个临时文件",
       "teamTrashFiles": "{count} 个回收站文件",
+      "teamMediaUsageWarning": "团队媒体用量接近阈值",
+      "teamMediaUsageWarningDetail": "已用 {usage} / 预警阈值 {threshold}",
       "teamCleanMaintenanceFiles": "清理文件",
       "teamCleanMaintenanceFilesBusy": "清理文件中",
       "teamDeleteMissingPayloadAssets": "删除缺失资产记录",

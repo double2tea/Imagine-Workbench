@@ -45,7 +45,7 @@ test("getTeamWorkspaceDataSummary returns PostgreSQL workspace data health stats
     const queries: Array<{ text: string; values?: readonly unknown[] }> = [];
     const result = await getTeamWorkspaceDataSummary(
       createTeamDataSummaryQueryable(queries),
-      { databaseUrl: "postgres://localhost/imagine", mediaDir },
+      { databaseUrl: "postgres://localhost/imagine", mediaDir, mediaUsageWarningBytes: 25 },
       requestWithSession(),
     );
 
@@ -59,11 +59,14 @@ test("getTeamWorkspaceDataSummary returns PostgreSQL workspace data health stats
     assert.equal(result.summary.assets.staleProcessing, 1);
     assert.equal(result.summary.assets.orphaned, 2);
     assert.equal(result.summary.integrity.status, "critical");
-    assert.equal(result.summary.integrity.issueCount, 9);
+    assert.equal(result.summary.integrity.issueCount, 10);
     assert.deepEqual(result.summary.integrity.brokenCompleteAssetIds, ["asset_missing_payload"]);
     assert.deepEqual(result.summary.integrity.missingBoardReferences.map(reference => reference.assetId), ["asset_missing"]);
     assert.equal(result.summary.teamStorage?.payloadRefs, 1);
     assert.equal(result.summary.teamStorage?.payloadBytes, 1024);
+    assert.equal(result.summary.teamStorage?.mediaBytes, 30);
+    assert.equal(result.summary.teamStorage?.mediaUsageWarning, true);
+    assert.equal(result.summary.teamStorage?.mediaUsageWarningBytes, 25);
     assert.deepEqual(result.summary.teamStorage?.mediaConsistency, {
       missingPayloadFiles: 0,
       missingPreviewFiles: 1,

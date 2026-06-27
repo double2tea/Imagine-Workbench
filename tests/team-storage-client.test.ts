@@ -200,6 +200,8 @@ test("fetchTeamWorkspaceDataSummary parses PostgreSQL data summary", async () =>
 
   assert.equal(summary.assets.total, 2);
   assert.equal(summary.teamStorage?.payloadBytes, 2048);
+  assert.equal(summary.teamStorage?.mediaBytes, 4096);
+  assert.equal(summary.teamStorage?.mediaUsageWarning, true);
 
   await assert.rejects(
     fetchTeamWorkspaceDataSummary(async () => jsonResponse({
@@ -1200,6 +1202,7 @@ function createWorkspaceDataSummary() {
     teamStorage: {
       assetLibraryRecords: 1,
       generationTasks: 1,
+      mediaBytes: 4096,
       mediaConsistency: {
         missingPayloadFiles: 0,
         missingPreviewFiles: 0,
@@ -1208,6 +1211,8 @@ function createWorkspaceDataSummary() {
         tmpFiles: 0,
         trashFiles: 0,
       },
+      mediaUsageWarning: true,
+      mediaUsageWarningBytes: 4096,
       payloadBytes: 2048,
       payloadRefs: 2,
       promptTemplates: 1,

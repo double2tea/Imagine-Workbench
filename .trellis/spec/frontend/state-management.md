@@ -184,7 +184,7 @@ return Response.json({
 - Service: `getTeamWorkspaceDataSummary(queryable, config, request): Promise<TeamWorkspaceDataSummaryResult>`.
 - Client: `fetchTeamWorkspaceDataSummary(): Promise<WorkspaceDataSummary>`.
 - Runtime branch: `fetchWorkspaceStorageRuntimeStatus()` decides whether Settings -> Data calls `getWorkspaceDataSummary()` or `fetchTeamWorkspaceDataSummary()`.
-- Shared type extension: `WorkspaceDataSummary.teamStorage?: { assetLibraryRecords; generationTasks; mediaConsistency; payloadBytes; payloadRefs; promptTemplates; providerTargets; secretSettings; settings; voiceProfiles }`.
+- Shared type extension: `WorkspaceDataSummary.teamStorage?: { assetLibraryRecords; generationTasks; mediaBytes; mediaConsistency; mediaUsageWarning; mediaUsageWarningBytes?; payloadBytes; payloadRefs; promptTemplates; providerTargets; secretSettings; settings; voiceProfiles }`.
 - Team media consistency shape: `mediaConsistency: { missingPayloadFiles; missingPreviewFiles; orphanedPayloadFiles; orphanedPreviewFiles; tmpFiles; trashFiles }`.
 
 #### 3. Contracts
@@ -1108,6 +1108,7 @@ const diagnostics = buildWorkspaceIntegrityDiagnostics(assetMetas, boards);
 - Environment selector: `IMAGINE_STORAGE_TARGET`; empty/undefined means `"browser"`, and the only non-default accepted value is `"postgres"`.
 - PostgreSQL connection: `DATABASE_URL`, server-only.
 - Media volume: `IMAGINE_MEDIA_DIR`, server-only, used only by PostgreSQL team mode's local payload store.
+- Media usage warning: optional `IMAGINE_MEDIA_USAGE_WARNING_BYTES`, server-only, positive integer bytes. When configured, Settings -> Data shows an aggregate warning after total media-volume bytes reach the threshold.
 - Team setup token: `IMAGINE_TEAM_SETUP_TOKEN`, server-only, required by explicit PostgreSQL migration routes.
 - Team secret encryption key: `IMAGINE_TEAM_SECRET_ENCRYPTION_KEY`, server-only, required before saving encrypted workspace secrets in PostgreSQL.
 - Trusted browser origins: `APP_URL` is required for team mutating request checks, and `IMAGINE_TRUSTED_ORIGINS` may add explicit comma-separated origins for reverse proxies.
@@ -1302,7 +1303,7 @@ if (storageTarget === "postgres") await resetTeamBoards(readTeamCsrfToken());
 - RunningHub board nodes route saved target list/save/delete through the active storage target: browser mode keeps `imagine_runninghub_saved_targets` in localStorage, while PostgreSQL mode uses `/api/storage/team/provider-targets` and never falls back to localStorage after team storage is detected. In PostgreSQL mode, access-password input is a component-local draft used only for saving the provider target; it is cleared after save/apply and must not be written to the team board document.
 - RunningHub image, video, and audio-workflow generation routes resolve saved target access passwords server-side in PostgreSQL mode. Explicit request `runningHubAccessPassword` still wins for browser/current-session flows; otherwise, an authenticated team request may decrypt `saved_provider_targets.target.accessPasswordEncrypted` for the current virtual model id (`ai-app-*:<id>` / `workflow-*:<id>`) and pass it only in memory to the provider adapter.
 - Board generated-media viewed markers (`imagine_board_viewed_generated_asset_ids:<boardId>`) are local/per-user attention state. They must not become shared board document or asset fields in the first team-storage implementation.
-- Settings -> Data must show the active storage target. Browser mode should show IndexedDB as the default and avoid migration prompts. PostgreSQL mode may show database/media configured booleans, the configured max media payload size, migration status, pending migration ids, a setup-token-gated migration action, setup-token-gated first-owner bootstrap controls, and the current team session state with explicit login/logout controls.
+- Settings -> Data must show the active storage target. Browser mode should show IndexedDB as the default and avoid migration prompts. PostgreSQL mode may show database/media configured booleans, the configured max media payload size, aggregate media usage warnings, migration status, pending migration ids, a setup-token-gated migration action, setup-token-gated first-owner bootstrap controls, and the current team session state with explicit login/logout controls.
 - Board result ownership must stay distinct from plain asset derivation. Connected `result` nodes represent generated provenance; ordinary asset nodes and split/crop asset references do not recreate source result ownership.
 - Team mode requires local account/session auth, CSRF/origin checks for mutating routes, role-based authorization, encrypted workspace secrets, and audit events for sensitive actions. `settings.is_secret = true` records must be encrypted before repository storage; repository writes must fail if a secret value is plaintext.
 - Team secret save/delete and RunningHub provider target save/delete mutations must write `audit_events` rows with workspace id, actor user id, event type, and non-secret metadata only.
@@ -1323,7 +1324,9 @@ if (storageTarget === "postgres") await resetTeamBoards(readTeamCsrfToken());
 - `IMAGINE_STORAGE_TARGET=postgres` and `DATABASE_URL` missing -> fail startup or health check visibly.
 - `IMAGINE_STORAGE_TARGET=postgres` and `IMAGINE_MEDIA_DIR` missing/unwritable -> fail startup or health check visibly.
 - `IMAGINE_STORAGE_TARGET=postgres` and missing/invalid `IMAGINE_MAX_MEDIA_PAYLOAD_BYTES` -> fail startup or health check visibly.
+- `IMAGINE_STORAGE_TARGET=postgres` and invalid `IMAGINE_MEDIA_USAGE_WARNING_BYTES` -> fail startup or health check visibly.
 - PostgreSQL media write larger than `IMAGINE_MAX_MEDIA_PAYLOAD_BYTES` -> fail visibly before writing a local-file payload ref.
+- PostgreSQL media directory bytes greater than or equal to configured `IMAGINE_MEDIA_USAGE_WARNING_BYTES` -> `summary.teamStorage.mediaUsageWarning` is true and Settings -> Data shows an attention issue with only aggregate byte counts.
 - `POST /api/storage/team/migrations` with missing `IMAGINE_TEAM_SETUP_TOKEN` -> `400` with explicit setup-token config error.
 - `POST /api/storage/team/migrations` with missing/invalid `x-imagine-setup-token` -> `400` and no migration query execution.
 - Database schema older than app requires -> run documented migrations or fail with migration instructions.
@@ -1397,7 +1400,7 @@ if (storageTarget === "postgres") await resetTeamBoards(readTeamCsrfToken());
 #### 5. Good/Base/Bad Cases
 
 - Good: normal local dev and Cloudflare Pages builds run in browser mode with no login prompt and no database requirement.
-- Good: self-hosted Docker Compose sets `IMAGINE_STORAGE_TARGET=postgres`, `DATABASE_URL`, `IMAGINE_MEDIA_DIR`, `IMAGINE_MAX_MEDIA_PAYLOAD_BYTES`, session/setup/encryption secrets, and app trusted origin, then uses PostgreSQL plus a media volume.
+- Good: self-hosted Docker Compose sets `IMAGINE_STORAGE_TARGET=postgres`, `DATABASE_URL`, `IMAGINE_MEDIA_DIR`, `IMAGINE_MAX_MEDIA_PAYLOAD_BYTES`, optional `IMAGINE_MEDIA_USAGE_WARNING_BYTES`, session/setup/encryption secrets, and app trusted origin, then uses PostgreSQL plus a media volume.
 - Good: `GET /api/storage/team/health` in a configured Node deployment reports `reachable: true`, current schema version, max media payload bytes, and pending migration ids without returning raw config values.
 - Good: `GET /api/storage/team/assets` returns workspace-scoped asset metadata, safe media/download URLs, and payload summaries without returning raw storage keys or media-volume paths.
 - Good: `GET /api/storage/team/assets/[assetId]/media` reads only assets visible in the caller's workspace and returns private, no-store media bytes with the stored MIME type; `?download=1` adds `Content-Disposition: attachment`.
@@ -1443,8 +1446,9 @@ if (storageTarget === "postgres") await resetTeamBoards(readTeamCsrfToken());
 - Unit: storage mode parser accepts only empty/browser/postgres and rejects stale `local-database`, `local-folder`, and `remote-api` values.
 - Unit: hosted/edge environment rejects PostgreSQL mode unless a Node server deployment path is explicitly configured.
 - Unit/integration: missing `DATABASE_URL`, missing/unwritable `IMAGINE_MEDIA_DIR`, older schema, and newer schema produce explicit visible errors.
-- Unit: Postgres config parsing requires explicit `postgres` mode, private database/media config, and setup token for migration routes.
+- Unit: Postgres config parsing requires explicit `postgres` mode, private database/media config, max media payload bytes, optional media usage warning bytes, and setup token for migration routes.
 - Unit: Postgres migration status reports all migrations pending when `schema_migrations` is absent, flags unsupported newer schemas, and records a non-secret `team_migrations.apply` audit event when applying pending migrations.
+- Unit: team data summary reports aggregate media directory bytes and sets `mediaUsageWarning` when the configured media warning threshold is reached.
 - Unit: initial PostgreSQL migration SQL contains the team foundation tables listed in this scenario.
 - Unit: localStorage inventory covers every current managed key, including provider selection/custom providers, default generation models, image-edit feature models, custom prompt templates, price visibility, RunningHub saved targets, Resolve toggle, Agent/board preferences, and board generated-media viewed markers as local/per-user state.
 - Unit: team-storage client parses browser status, surfaces health errors, requires setup token for migrations/bootstrap, and sends the setup token only as a request header.

@@ -94,11 +94,11 @@ Completed in the latest continuation:
 * Media payloads larger than the configured byte limit now fail visibly before a local-file payload is written, and config/status APIs expose only the non-secret byte limit without returning `DATABASE_URL` or `IMAGINE_MEDIA_DIR`.
 * Added config/runtime/payload-store tests covering missing/invalid byte limits, public redaction, and over-limit payload rejection.
 * Added non-secret system audit events for applied PostgreSQL schema migrations: `applyPostgresMigrations()` now records `team_migrations.apply` with app version, applied count, and migration ids after pending migrations run, without storing setup tokens, database URLs, or media paths.
+* Added optional `IMAGINE_MEDIA_USAGE_WARNING_BYTES` for PostgreSQL team mode. Team data summary now returns aggregate media directory bytes plus `mediaUsageWarning`, and Settings -> Data shows an attention issue when total media usage reaches the configured threshold without exposing paths.
 
 Still remaining before the full PRD can be considered complete:
 
 * Broader operational hardening beyond basic login/bootstrap rate limiting.
-* Disk usage threshold warnings and deeper monitoring for media/database growth.
 * Residual team settings surfaces outside Provider Settings, audit coverage for all sensitive operations, and deployment/upgrade/rollback automation depth.
 
 ## Requirements
@@ -595,7 +595,7 @@ Limits:
 
 * Team mode should expose configurable upload/media limits, such as max file size and accepted media types. Current implementation enforces accepted MIME categories and requires `IMAGINE_MAX_MEDIA_PAYLOAD_BYTES` for the per-payload byte limit.
 * Exceeding limits should fail visibly before consuming large disk space.
-* Disk usage warnings should be visible in Settings -> Data when usage approaches configured thresholds. This remains operational hardening beyond the per-payload limit.
+* Disk usage warnings should be visible in Settings -> Data when usage approaches configured thresholds. Current implementation supports the optional `IMAGINE_MEDIA_USAGE_WARNING_BYTES` aggregate media-volume warning; deeper monitoring remains operational hardening.
 
 ### Migration
 

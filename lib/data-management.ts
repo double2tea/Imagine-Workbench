@@ -282,6 +282,7 @@ export interface WorkspaceDataSummary {
   teamStorage?: {
     assetLibraryRecords: number;
     generationTasks: number;
+    mediaBytes: number;
     mediaConsistency: {
       missingPayloadFiles: number;
       missingPreviewFiles: number;
@@ -290,6 +291,8 @@ export interface WorkspaceDataSummary {
       tmpFiles: number;
       trashFiles: number;
     };
+    mediaUsageWarning: boolean;
+    mediaUsageWarningBytes?: number;
     payloadBytes: number;
     payloadRefs: number;
     promptTemplates: number;
