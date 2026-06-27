@@ -90,7 +90,7 @@ test("updateTeamGenerationTask merges an editor-scoped task update", async () =>
   assert.equal(savedTask?.status, "complete");
 });
 
-test("deleteTeamGenerationTask removes an editor-scoped task", async () => {
+test("deleteTeamGenerationTask removes an editor-scoped task with audit", async () => {
   const queries: Array<{ text: string; values?: readonly unknown[] }> = [];
   await deleteTeamGenerationTask(
     createTeamGenerationTasksQueryable(queries, { role: "editor" }),
@@ -103,6 +103,21 @@ test("deleteTeamGenerationTask removes an editor-scoped task", async () => {
     queries.find(query => query.text.startsWith("delete from generation_tasks"))?.values,
     [WORKSPACE_ID, TASK_ID],
   );
+  assert.ok(queries.some(query => query.text === "begin"));
+  assert.ok(queries.some(query => query.text === "commit"));
+  assert.equal(queries.some(query => query.text === "rollback"), false);
+  const audit = queries.find(query => query.text.startsWith("insert into audit_events"));
+  assert.deepEqual(audit?.values, [
+    WORKSPACE_ID,
+    "user_1",
+    "team_generation_task.delete",
+    JSON.stringify({
+      boardId: "board_1",
+      mediaType: "image",
+      status: "processing",
+      taskId: TASK_ID,
+    }),
+  ]);
 });
 
 test("team generation task save route rejects missing CSRF before opening a database client", async () => {
@@ -155,6 +170,9 @@ function createTeamGenerationTasksQueryable(
   return {
     query: async <T extends QueryResultRow = QueryResultRow>(text: string, values?: readonly unknown[]) => {
       queries.push({ text, values });
+      if (text === "begin" || text === "commit" || text === "rollback") {
+        return typedQueryResult<T>([]);
+      }
       if (text.includes("from sessions")) {
         return typedQueryResult<T>([{
           email: "editor@example.com",
@@ -168,6 +186,9 @@ function createTeamGenerationTasksQueryable(
       }
       if (text.startsWith("select task from generation_tasks")) {
         return typedQueryResult<T>([{ task: createTask({ status: "processing" }) }]);
+      }
+      if (text.startsWith("insert into audit_events")) {
+        return typedQueryResult<T>([]);
       }
       return typedQueryResult<T>([]);
     },

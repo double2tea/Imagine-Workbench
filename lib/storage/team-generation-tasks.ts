@@ -7,6 +7,7 @@ import {
 import type { PostgresStorageConfig } from "@/lib/storage/postgres/config";
 import type { PostgresQueryable } from "@/lib/storage/postgres/connection";
 import type { WorkspaceGenerationTaskListOptions } from "@/lib/storage/repository";
+import { recordTeamAuditEvent } from "@/lib/storage/team-audit";
 import { createTeamWorkspaceStorageContext } from "@/lib/storage/team-context";
 import type {
   TeamGenerationTaskListResult,
@@ -81,5 +82,23 @@ export async function deleteTeamGenerationTask(
   const context = await createTeamWorkspaceStorageContext(queryable, config, request, { minimumRole: "editor" });
   const current = await context.repository.generationTasks.get(taskId);
   if (!current) throw new ApiError(404, "team_generation_task_not_found", "Team generation task not found");
-  await context.repository.generationTasks.delete(taskId);
+  await context.queryable.query("begin");
+  try {
+    await context.repository.generationTasks.delete(taskId);
+    await recordTeamAuditEvent(context.queryable, {
+      eventType: "team_generation_task.delete",
+      metadata: {
+        boardId: current.task.source.boardId ?? null,
+        mediaType: current.task.mediaType,
+        status: current.task.status,
+        taskId,
+      },
+      userId: context.session.userId,
+      workspaceId: context.session.workspaceId,
+    });
+    await context.queryable.query("commit");
+  } catch (error) {
+    await context.queryable.query("rollback");
+    throw error;
+  }
 }
