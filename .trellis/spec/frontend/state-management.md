@@ -624,6 +624,7 @@ if (requestToken !== setupToken) {
 - `POST` must verify `record.assetId` belongs to an asset in the caller workspace before writing the library record.
 - Promoted team library records may point directly at the source asset with `assetId === sourceAssetId`; deleting that library record must not delete the source asset.
 - Imported team library files create a dedicated backing asset with `meta.libraryItemId === record.id`; deleting that library item deletes the backing asset and relies on the database cascade to remove its library row.
+- Team asset-library saves must write `team_asset_library.save` with non-secret item id, asset id, and media type metadata in the same transaction as the upsert. Do not include titles, notes, tags, payload refs, media paths, prompts, or source board/node metadata in audit metadata.
 - Team asset-library deletes must write `team_asset_library.delete` with non-secret item id, asset id, and `deletedBackingAsset` metadata in the same transaction as the delete.
 - Missing CSRF on save/delete fails visibly; do not fall back to IndexedDB after PostgreSQL mode has been selected.
 
@@ -646,7 +647,7 @@ if (requestToken !== setupToken) {
 #### 6. Tests Required
 
 - Service: list returns workspace-scoped entries with safe public payload metadata and no `uri`.
-- Service: save requires editor access, verifies the backing asset exists, and writes `asset_library`.
+- Service: save requires editor access, verifies the backing asset exists, writes `asset_library`, and records `team_asset_library.save` audit metadata without library text or payload details.
 - Service: delete removes only dedicated backing assets (`meta.libraryItemId === itemId`) and otherwise deletes only the library record, with `team_asset_library.delete` audit metadata in the same transaction.
 - Route: invalid query/missing CSRF are rejected before opening a database client for mutating calls.
 - Client: list URL encodes filters, save/delete send CSRF headers, item IDs are encoded, and leaked payload `uri` fields are rejected.
@@ -1493,6 +1494,7 @@ if (storageTarget === "postgres") await resetTeamBoards(readTeamCsrfToken());
 - Unit: authenticated team asset metadata listing scopes repository queries to the session workspace, enforces viewer access, returns safe media/download URLs and payload summaries, and rejects invalid query params with `400 invalid_team_asset_query`.
 - Unit: authenticated team asset save scopes repository writes to the session workspace, enforces editor access, writes supported data URI bytes through the local payload store, strips browser data URLs from persisted metadata, preserves existing payload refs for metadata-only updates, and rejects invalid CSRF before database client access.
 - Unit: authenticated team asset delete scopes lookup/delete to the session workspace, enforces editor access, writes `team_asset.delete` audit metadata in the delete transaction, returns `404 team_asset_not_found` for missing assets, and rejects invalid CSRF/origin before repository access.
+- Unit: authenticated team asset-library save verifies the referenced asset in the session workspace, writes the library record and `team_asset_library.save` audit metadata in one transaction, and excludes titles, notes, tags, payload refs, media paths, prompts, and source metadata from audit metadata.
 - Unit: authenticated team asset source-link repair scopes asset/board reads to the session workspace, enforces admin access, clears only stale `sourceBoardNodeId` metadata, writes `team_assets.repair_source_links` audit metadata, returns repaired ids, and rejects invalid CSRF before database client access.
 - Unit: authenticated team generation task list/save/update/delete scopes repository access to the session workspace, enforces viewer/editor roles, normalizes task updates through the shared browser update helper, returns `404 team_generation_task_not_found` for missing tasks, records `team_generation_task.delete` metadata without prompt/request/result details, and rejects invalid CSRF before database client access.
 - Unit: authenticated team prompt template list/save/delete scopes repository access to the session workspace, enforces viewer/editor roles, validates custom-template payload shape through `readCustomPromptTemplate()`, writes only the caller workspace row, records `team_prompt_template.delete` metadata without prompt-template details, and rejects invalid CSRF before database client access.

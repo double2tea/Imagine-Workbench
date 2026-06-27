@@ -101,6 +101,7 @@ Completed in the latest continuation:
 * Added `team_voice_profile.delete` audit coverage for team voice-profile deletes. The service now wraps the workspace-scoped delete plus non-secret profile/reference-count metadata in one transaction.
 * Added `team_prompt_template.delete` audit coverage for team prompt-template deletes. The service now wraps the workspace-scoped delete plus non-secret template-id metadata in one transaction.
 * Added `team_generation_task.delete` audit coverage for team generation-task deletes. The service now wraps the workspace-scoped delete plus non-secret task/status/media/board metadata in one transaction.
+* Added `team_asset_library.save` audit coverage for team asset-library saves. The service now wraps the workspace-scoped upsert plus non-secret item/asset/media metadata in one transaction.
 
 Still remaining before the full PRD can be considered complete:
 

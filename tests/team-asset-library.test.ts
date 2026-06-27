@@ -55,7 +55,7 @@ test("listTeamAssetLibrary returns safe library entries scoped to the session wo
   );
 });
 
-test("saveTeamAssetLibraryRecord writes an editor-scoped library record", async () => {
+test("saveTeamAssetLibraryRecord writes an editor-scoped library record with audit", async () => {
   const queries: Array<{ text: string; values?: readonly unknown[] }> = [];
   const record = createLibraryAssetRecord({ title: "Updated character" });
   const result = await saveTeamAssetLibraryRecord(
@@ -71,6 +71,16 @@ test("saveTeamAssetLibraryRecord writes an editor-scoped library record", async 
   assert.equal(insert?.values?.[1], WORKSPACE_ID);
   assert.equal(insert?.values?.[2], ASSET_ID);
   assert.deepEqual(insert?.values?.[3], record);
+  assert.ok(queries.some(query => query.text === "begin"));
+  assert.ok(queries.some(query => query.text === "commit"));
+  assert.equal(queries.some(query => query.text === "rollback"), false);
+  const audit = queries.find(query => query.text.startsWith("insert into audit_events"));
+  assert.deepEqual(audit?.values, [
+    WORKSPACE_ID,
+    "user_1",
+    "team_asset_library.save",
+    JSON.stringify({ assetId: ASSET_ID, itemId: LIBRARY_ITEM_ID, mediaType: "image" }),
+  ]);
 });
 
 test("deleteTeamAssetLibraryRecord deletes dedicated backing assets with audit", async () => {

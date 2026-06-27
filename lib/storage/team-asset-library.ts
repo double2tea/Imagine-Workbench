@@ -42,7 +42,24 @@ export async function saveTeamAssetLibraryRecord(
   const context = await createTeamWorkspaceStorageContext(queryable, config, request, { minimumRole: "editor" });
   const asset = await context.repository.assets.get(input.record.assetId);
   if (!asset) throw new ApiError(404, "team_asset_not_found", "Team library asset was not found");
-  await context.repository.assetLibrary.put({ record: input.record });
+  await context.queryable.query("begin");
+  try {
+    await context.repository.assetLibrary.put({ record: input.record });
+    await recordTeamAuditEvent(context.queryable, {
+      eventType: "team_asset_library.save",
+      metadata: {
+        assetId: input.record.assetId,
+        itemId: input.record.id,
+        mediaType: input.record.mediaType,
+      },
+      userId: context.session.userId,
+      workspaceId: context.session.workspaceId,
+    });
+    await context.queryable.query("commit");
+  } catch (error) {
+    await context.queryable.query("rollback");
+    throw error;
+  }
   return {
     entry: await publicTeamAssetLibraryEntry(context.repository, input.record),
     targetKind: "postgres",
