@@ -30,6 +30,25 @@ test("resolveLocalStorageRuntimeStatus keeps browser storage as the default", ()
   assert.equal(status.paths, undefined);
 });
 
+test("browser storage mode does not require PostgreSQL env even on hosted deployments", () => {
+  const status = resolveLocalStorageRuntimeStatus({
+    CF_PAGES: "1",
+    IMAGINE_STORAGE_TARGET: "browser",
+  }, { homeDir: "/Users/alice" });
+  const publicStatus = resolvePublicLocalStorageRuntimeStatus({
+    CF_PAGES: "1",
+  });
+
+  assert.equal(status.enabled, false);
+  assert.equal(status.mode, "browser");
+  assert.equal(status.targetKind, "indexeddb");
+  assert.equal(status.paths, undefined);
+  assert.equal(publicStatus.enabled, false);
+  assert.equal(publicStatus.mode, "browser");
+  assert.equal(publicStatus.targetKind, "indexeddb");
+  assert.equal(publicStatus.pathPlan, undefined);
+});
+
 test("resolveLocalStorageRuntimeStatus enables PostgreSQL only when explicitly selected", () => {
   const status = resolveLocalStorageRuntimeStatus({
     DATABASE_URL: "postgres://localhost/imagine",

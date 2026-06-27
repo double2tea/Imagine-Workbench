@@ -185,7 +185,9 @@ test("fetchWorkspaceStorageRuntimeStatus parses browser storage status", async (
   }));
 
   assert.equal(status.mode, "browser");
+  assert.equal(status.enabled, false);
   assert.equal(status.targetKind, "indexeddb");
+  assert.equal(status.pathPlan, undefined);
 });
 
 test("fetchTeamWorkspaceDataSummary parses PostgreSQL data summary", async () => {

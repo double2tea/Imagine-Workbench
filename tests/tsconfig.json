@@ -82,6 +82,7 @@
     "./team-secrets.test.ts",
     "./team-settings.test.ts",
     "./team-storage-client.test.ts",
+    "./team-mode-ui-gating.test.ts",
     "./team-workspace-backup.test.ts",
     "./team-auth.test.ts",
     "./workspace-storage-mode-badge.test.ts",

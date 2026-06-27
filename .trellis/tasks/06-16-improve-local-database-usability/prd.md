@@ -121,6 +121,7 @@ Completed in the latest continuation:
 * Added a compact active storage-mode badge to the main workspace and board top bars so users can see whether the current workspace is using IndexedDB or PostgreSQL without opening Settings -> Data.
 * Restored Cloudflare Pages verification for the current checkpoint. `scripts/build-cloudflare-pages.mjs` now hides all `runtime = "nodejs"` route entry files during the adapter build, restores them in `finally`, avoids recursive deletion of heavy `.next` standalone output, and `CI=true pnpm run pages:build` passes with only edge/static routes in the Pages output.
 * Added migration-preview coverage for all currently known persisted `localStorage` sources. `tests/data-management-diagnostics.test.ts` now proves `buildBrowserToPostgresMigrationPreview` classifies default generation models, image-edit feature models, price visibility, Agent orb/chat/auto-execute state, RunningHub saved targets, Resolve toggle, custom prompt templates, board UI preferences, provider settings, model caches, and credential-bearing keys without unknown-source blockers.
+* Added default browser-mode runtime and team-auth gating coverage. `tests/local-storage-runtime.test.ts` now proves hosted/browser deployments keep `mode: "browser"` / `targetKind: "indexeddb"` and do not require PostgreSQL env, `tests/team-storage-client.test.ts` verifies the public storage-status client parses browser mode without any PostgreSQL path plan, and `tests/team-mode-ui-gating.test.ts` proves team login/bootstrap controls plus session refresh stay behind explicit PostgreSQL mode.
 
 Still remaining before the full PRD can be considered complete:
 
@@ -178,7 +179,7 @@ Still remaining before the full PRD can be considered complete:
 ## Acceptance Criteria
 
 * [x] Users can clearly see whether the active storage mode is IndexedDB or PostgreSQL.
-* [ ] Browser/deployed mode continues to work with IndexedDB and does not require PostgreSQL.
+* [x] Browser/deployed mode continues to work with IndexedDB and does not require PostgreSQL.
 * [ ] With no PostgreSQL/team environment variables configured, the app behaves like the current project: no login prompt, no team setup prompt, no required migration, and no visible disruption to existing creation/board/gallery/settings workflows.
 * [ ] Team/PostgreSQL UI, auth bootstrap, and PostgreSQL routes are shown or enabled only when team mode is explicitly configured.
 * [x] Storage-mode code exposes only `browser` and `postgres` for this task; stale SQLite/local-database/local-folder/remote-api planned targets are removed or made non-product-facing.
@@ -203,7 +204,7 @@ Still remaining before the full PRD can be considered complete:
 * [ ] Team members share workspace assets, generated results, boards, asset library records, and generation tasks through PostgreSQL-backed queries.
 * [ ] Team-mode storage preserves current asset/generation fields, including cinematic profiles, reference media snapshots, board/result-stack source links, crop derivative metadata, library backing links, preview status, voice profile asset refs, and transcript assets.
 * [x] Board generated-media viewed markers are classified as local/per-user UX state. They are not written into shared board documents or asset rows unless a later per-user attention-state feature explicitly adds server-side support.
-* [ ] Browser mode remains login-free unless a later task explicitly changes public/single-user behavior.
+* [x] Browser mode remains login-free unless a later task explicitly changes public/single-user behavior.
 * [ ] No code path dual-writes workspace data to IndexedDB and PostgreSQL.
 * [ ] Board/settings updates use version checks or equivalent optimistic concurrency; conflicting edits produce a visible reload/merge prompt rather than silently overwriting another user.
 * [ ] Refreshing the app or relevant view shows the latest shared PostgreSQL-backed assets, generation statuses, boards, and asset library records from other team members.
