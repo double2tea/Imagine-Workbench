@@ -124,6 +124,7 @@ Completed in the latest continuation:
 * Added default browser-mode runtime and team-auth gating coverage. `tests/local-storage-runtime.test.ts` now proves hosted/browser deployments keep `mode: "browser"` / `targetKind: "indexeddb"` and do not require PostgreSQL env, `tests/team-storage-client.test.ts` verifies the public storage-status client parses browser mode without any PostgreSQL path plan, and `tests/team-mode-ui-gating.test.ts` proves team login/bootstrap controls plus session refresh stay behind explicit PostgreSQL mode.
 * Tightened PostgreSQL schema/migration proof. `tests/postgres-storage.test.ts` now verifies unsupported newer schemas fail fast and roll back before applying SQL, and that the initial migration includes versioned migration metadata, deterministic indexes, role-ready team memberships, owner metadata, and payload/preview storage-ref columns.
 * Completed the PostgreSQL repository preview slice. `WorkspaceStorageRepository` now exposes a `previews` repository, PostgreSQL mode can read/write/delete `asset_previews` rows with safe storage refs, and `tests/postgres-storage.test.ts` covers preview record/ref persistence alongside existing asset payload, library, board, task, settings, safety snapshot, and voice-profile storage tests.
+* Audited the team auth and authorization acceptance group against existing coverage. `tests/team-auth.test.ts`, `tests/team-bootstrap.test.ts`, `tests/team-session.test.ts`, `tests/team-rate-limit.test.ts`, `tests/team-members.test.ts`, `tests/team-settings.test.ts`, `tests/team-secrets.test.ts`, `tests/team-provider-config.test.ts`, and `tests/team-provider-targets.test.ts` cover unauthenticated denial, owner bootstrap, cookie/CSRF/origin rules, brute-force protection with generic failures, owner/admin/editor/viewer role enforcement, non-secret settings visibility, encrypted team secrets, and no plaintext credential responses.
 
 Still remaining before the full PRD can be considered complete:
 
@@ -196,13 +197,13 @@ Still remaining before the full PRD can be considered complete:
 * [x] Future schema changes can be applied through ordered migrations; the app reports current/required schema version and refuses unsupported newer schemas.
 * [x] Migrations cover relational tables and payload-ref/media metadata changes when storage structure changes.
 * [x] Team schema includes workspaces, users, teams, memberships, role-ready fields, and ownership metadata.
-* [ ] PostgreSQL team mode has an auth boundary: unauthenticated requests cannot read/write shared workspace data.
-* [ ] An initial owner/admin can be created through a safe bootstrap flow.
-* [ ] Session cookies are HTTP-only, use appropriate SameSite/Secure settings for the configured deployment URL, and mutating routes reject invalid CSRF/origin requests.
-* [ ] Login and first-owner bootstrap routes include brute-force protection and do not reveal whether accounts or setup tokens exist.
-* [ ] Server-side authorization enforces at least owner/admin/editor/viewer roles for destructive, write, and read-only actions.
-* [ ] Configuration and provider settings are hidden from ordinary members. Only privileged roles can view masked configuration status, and only owner/admin-level roles can modify team/workspace configuration.
-* [ ] Team-mode provider credentials and workspace secrets are encrypted at rest, are never returned to the browser after save, and show masked status only.
+* [x] PostgreSQL team mode has an auth boundary: unauthenticated requests cannot read/write shared workspace data.
+* [x] An initial owner/admin can be created through a safe bootstrap flow.
+* [x] Session cookies are HTTP-only, use appropriate SameSite/Secure settings for the configured deployment URL, and mutating routes reject invalid CSRF/origin requests.
+* [x] Login and first-owner bootstrap routes include brute-force protection and do not reveal whether accounts or setup tokens exist.
+* [x] Server-side authorization enforces at least owner/admin/editor/viewer roles for destructive, write, and read-only actions.
+* [x] Configuration and provider settings are hidden from ordinary members. Only privileged roles can view masked configuration status, and only owner/admin-level roles can modify team/workspace configuration.
+* [x] Team-mode provider credentials and workspace secrets are encrypted at rest, are never returned to the browser after save, and show masked status only.
 * [ ] Team members share workspace assets, generated results, boards, asset library records, and generation tasks through PostgreSQL-backed queries.
 * [ ] Team-mode storage preserves current asset/generation fields, including cinematic profiles, reference media snapshots, board/result-stack source links, crop derivative metadata, library backing links, preview status, voice profile asset refs, and transcript assets.
 * [x] Board generated-media viewed markers are classified as local/per-user UX state. They are not written into shared board documents or asset rows unless a later per-user attention-state feature explicitly adds server-side support.
