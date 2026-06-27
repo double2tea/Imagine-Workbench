@@ -65,7 +65,30 @@ export async function updateTeamGenerationTask(
   const current = await context.repository.generationTasks.get(taskId);
   if (!current) throw new ApiError(404, "team_generation_task_not_found", "Team generation task not found");
   const next = applyGenerationTaskUpdate(current.task, input.update);
-  await context.repository.generationTasks.put(next);
+  if (input.update.status === "canceled") {
+    await context.queryable.query("begin");
+    try {
+      await context.repository.generationTasks.put(next);
+      await recordTeamAuditEvent(context.queryable, {
+        eventType: "team_generation_task.cancel",
+        metadata: {
+          boardId: current.task.source.boardId ?? null,
+          mediaType: current.task.mediaType,
+          nextStatus: next.status,
+          previousStatus: current.task.status,
+          taskId,
+        },
+        userId: context.session.userId,
+        workspaceId: context.session.workspaceId,
+      });
+      await context.queryable.query("commit");
+    } catch (error) {
+      await context.queryable.query("rollback");
+      throw error;
+    }
+  } else {
+    await context.repository.generationTasks.put(next);
+  }
   return {
     targetKind: "postgres",
     task: next,

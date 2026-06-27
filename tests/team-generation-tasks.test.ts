@@ -90,6 +90,35 @@ test("updateTeamGenerationTask merges an editor-scoped task update", async () =>
   assert.equal(savedTask?.status, "complete");
 });
 
+test("updateTeamGenerationTask records cancel audit", async () => {
+  const queries: Array<{ text: string; values?: readonly unknown[] }> = [];
+  const result = await updateTeamGenerationTask(
+    createTeamGenerationTasksQueryable(queries, { role: "editor" }),
+    { databaseUrl: "postgres://localhost/imagine", mediaDir: "/srv/imagine/media" },
+    requestWithSession(),
+    TASK_ID,
+    { update: { progress: 100, status: "canceled" } },
+  );
+
+  assert.equal(result.task.status, "canceled");
+  assert.ok(queries.some(query => query.text === "begin"));
+  assert.ok(queries.some(query => query.text === "commit"));
+  assert.equal(queries.some(query => query.text === "rollback"), false);
+  const audit = queries.find(query => query.text.startsWith("insert into audit_events"));
+  assert.deepEqual(audit?.values, [
+    WORKSPACE_ID,
+    "user_1",
+    "team_generation_task.cancel",
+    JSON.stringify({
+      boardId: "board_1",
+      mediaType: "image",
+      nextStatus: "canceled",
+      previousStatus: "processing",
+      taskId: TASK_ID,
+    }),
+  ]);
+});
+
 test("deleteTeamGenerationTask removes an editor-scoped task with audit", async () => {
   const queries: Array<{ text: string; values?: readonly unknown[] }> = [];
   await deleteTeamGenerationTask(
