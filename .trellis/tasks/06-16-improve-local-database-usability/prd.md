@@ -122,6 +122,7 @@ Completed in the latest continuation:
 * Restored Cloudflare Pages verification for the current checkpoint. `scripts/build-cloudflare-pages.mjs` now hides all `runtime = "nodejs"` route entry files during the adapter build, restores them in `finally`, avoids recursive deletion of heavy `.next` standalone output, and `CI=true pnpm run pages:build` passes with only edge/static routes in the Pages output.
 * Added migration-preview coverage for all currently known persisted `localStorage` sources. `tests/data-management-diagnostics.test.ts` now proves `buildBrowserToPostgresMigrationPreview` classifies default generation models, image-edit feature models, price visibility, Agent orb/chat/auto-execute state, RunningHub saved targets, Resolve toggle, custom prompt templates, board UI preferences, provider settings, model caches, and credential-bearing keys without unknown-source blockers.
 * Added default browser-mode runtime and team-auth gating coverage. `tests/local-storage-runtime.test.ts` now proves hosted/browser deployments keep `mode: "browser"` / `targetKind: "indexeddb"` and do not require PostgreSQL env, `tests/team-storage-client.test.ts` verifies the public storage-status client parses browser mode without any PostgreSQL path plan, and `tests/team-mode-ui-gating.test.ts` proves team login/bootstrap controls plus session refresh stay behind explicit PostgreSQL mode.
+* Tightened PostgreSQL schema/migration proof. `tests/postgres-storage.test.ts` now verifies unsupported newer schemas fail fast and roll back before applying SQL, and that the initial migration includes versioned migration metadata, deterministic indexes, role-ready team memberships, owner metadata, and payload/preview storage-ref columns.
 
 Still remaining before the full PRD can be considered complete:
 
@@ -190,10 +191,10 @@ Still remaining before the full PRD can be considered complete:
 * [x] Migration preview reports all detected persistent sources: asset DB, board DB, voice-profile DB, safety snapshot DB, managed localStorage, and known currently-unmanaged localStorage keys.
 * [x] The implementation updates `lib/data-management.ts` so current persisted keys such as default generation models, image-edit feature models, price visibility, Agent orb position, RunningHub saved targets, Resolve toggle, and custom prompt templates are classified before PostgreSQL migration preview uses them.
 * [x] Implementation context includes the refreshed `.trellis/spec/frontend/state-management.md` storage contract so future agents see `browser` + `postgres`, not the superseded SQLite/local-database direction.
-* [ ] PostgreSQL migrations create versioned tables and indexes deterministically.
-* [ ] Future schema changes can be applied through ordered migrations; the app reports current/required schema version and refuses unsupported newer schemas.
-* [ ] Migrations cover relational tables and payload-ref/media metadata changes when storage structure changes.
-* [ ] Team schema includes workspaces, users, teams, memberships, role-ready fields, and ownership metadata.
+* [x] PostgreSQL migrations create versioned tables and indexes deterministically.
+* [x] Future schema changes can be applied through ordered migrations; the app reports current/required schema version and refuses unsupported newer schemas.
+* [x] Migrations cover relational tables and payload-ref/media metadata changes when storage structure changes.
+* [x] Team schema includes workspaces, users, teams, memberships, role-ready fields, and ownership metadata.
 * [ ] PostgreSQL team mode has an auth boundary: unauthenticated requests cannot read/write shared workspace data.
 * [ ] An initial owner/admin can be created through a safe bootstrap flow.
 * [ ] Session cookies are HTTP-only, use appropriate SameSite/Secure settings for the configured deployment URL, and mutating routes reject invalid CSRF/origin requests.

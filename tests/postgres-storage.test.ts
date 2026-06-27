@@ -280,6 +280,28 @@ test("getPostgresMigrationStatus rejects newer schemas through status flag", asy
   assert.equal(status.unsupportedNewerSchema, true);
 });
 
+test("applyPostgresMigrations refuses unsupported newer schemas and rolls back", async () => {
+  const queries: string[] = [];
+  const queryable: PostgresQueryable = {
+    query: async <T extends QueryResultRow = QueryResultRow>(text: string) => {
+      queries.push(text);
+      if (text.includes("to_regclass")) return typedQueryResult<T>([{ regclass: "schema_migrations" }]);
+      if (text.includes("select migration_id")) return typedQueryResult<T>([{ migration_id: "9999_future", app_schema_version: 999 }]);
+      return typedQueryResult<T>([]);
+    },
+  };
+
+  await assert.rejects(
+    () => applyPostgresMigrations(queryable, "0.1.0"),
+    /Database schema version 999 is newer than supported version/,
+  );
+
+  assert.equal(queries[0], "begin");
+  assert.equal(queries.includes("rollback"), true);
+  assert.equal(queries.includes("commit"), false);
+  assert.equal(queries.some(query => query.includes("create table if not exists schema_migrations")), false);
+});
+
 test("applyPostgresMigrations records a non-secret system audit event", async () => {
   let schemaTableExists = false;
   const appliedRows: Array<{ app_schema_version: number; migration_id: string }> = [];
@@ -348,6 +370,21 @@ test("initial PostgreSQL migration contains the team storage foundation tables",
   ]) {
     assert.match(sql, new RegExp(`create table if not exists ${tableName}`));
   }
+
+  for (const indexName of [
+    "assets_workspace_updated_idx",
+    "generation_tasks_workspace_status_idx",
+    "boards_workspace_updated_idx",
+    "audit_events_workspace_created_idx",
+  ]) {
+    assert.match(sql, new RegExp(`create index if not exists ${indexName}`));
+  }
+
+  assert.match(sql, /app_schema_version integer not null/);
+  assert.match(sql, /team_memberships[\s\S]*role text not null check \(role in \('owner', 'admin', 'editor', 'viewer'\)\)/);
+  assert.match(sql, /assets[\s\S]*owner_user_id uuid references users\(id\) on delete set null/);
+  assert.match(sql, /asset_payloads[\s\S]*storage_kind text not null[\s\S]*storage_key text not null/);
+  assert.match(sql, /asset_previews[\s\S]*storage_kind text[\s\S]*storage_key text/);
 });
 
 test("PostgreSQL payload repository stores local files and records asset payload refs", async () => {
