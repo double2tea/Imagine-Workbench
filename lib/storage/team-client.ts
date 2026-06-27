@@ -48,6 +48,12 @@ import type {
   TeamSecretMutationResult,
   TeamSecretSaveInput,
 } from "@/lib/storage/team-secret-types";
+import type {
+  PublicTeamSetting,
+  TeamSettingListResult,
+  TeamSettingMutationResult,
+  TeamSettingSaveInput,
+} from "@/lib/storage/team-setting-types";
 import type { WorkspaceSettingGroup } from "@/lib/storage/schema";
 import type { VoiceProfile } from "@/lib/voice-profiles";
 
@@ -117,6 +123,11 @@ export interface TeamBoardSummaryListOptions {
 export type TeamGenerationTaskListOptions = ListGenerationTasksOptions;
 
 export interface TeamSecretListOptions {
+  groups?: WorkspaceSettingGroup[];
+  keys?: string[];
+}
+
+export interface TeamSettingListOptions {
   groups?: WorkspaceSettingGroup[];
   keys?: string[];
 }
@@ -277,6 +288,19 @@ export async function fetchTeamSecrets(
     throw new Error(error);
   }
   return parseTeamSecretListResult(body);
+}
+
+export async function fetchTeamSettings(
+  options: TeamSettingListOptions = {},
+  fetcher: Fetcher = fetch,
+): Promise<TeamSettingListResult> {
+  const response = await fetcher(teamSettingsUrl(options), { cache: "no-store" });
+  const body: unknown = await response.json();
+  if (!response.ok) {
+    const error = readStringField(body, "error") ?? "Team setting list failed";
+    throw new Error(error);
+  }
+  return parseTeamSettingListResult(body);
 }
 
 export async function fetchTeamProviderTargets(fetcher: Fetcher = fetch): Promise<TeamProviderTargetListResult> {
@@ -462,6 +486,30 @@ export async function saveTeamSecret(
   return parseTeamSecretMutationResult(body);
 }
 
+export async function saveTeamSetting(
+  input: TeamSettingSaveInput,
+  csrfToken: string,
+  fetcher: Fetcher = fetch,
+): Promise<TeamSettingMutationResult> {
+  const token = csrfToken.trim();
+  if (!token) throw new Error("CSRF token is required");
+  const response = await fetcher(API_ROUTES.storage.teamSettings, {
+    cache: "no-store",
+    body: JSON.stringify(input),
+    headers: {
+      "content-type": "application/json",
+      "x-imagine-csrf-token": token,
+    },
+    method: "POST",
+  });
+  const body: unknown = await response.json();
+  if (!response.ok) {
+    const error = readStringField(body, "error") ?? "Team setting save failed";
+    throw new Error(error);
+  }
+  return parseTeamSettingMutationResult(body);
+}
+
 export async function deleteTeamSecret(
   key: string,
   csrfToken: string,
@@ -477,6 +525,25 @@ export async function deleteTeamSecret(
   const body: unknown = await response.json();
   if (!response.ok) {
     const error = readStringField(body, "error") ?? "Team secret delete failed";
+    throw new Error(error);
+  }
+}
+
+export async function deleteTeamSetting(
+  key: string,
+  csrfToken: string,
+  fetcher: Fetcher = fetch,
+): Promise<void> {
+  const token = csrfToken.trim();
+  if (!token) throw new Error("CSRF token is required");
+  const response = await fetcher(API_ROUTES.storage.teamSetting(key), {
+    cache: "no-store",
+    headers: { "x-imagine-csrf-token": token },
+    method: "DELETE",
+  });
+  const body: unknown = await response.json();
+  if (!response.ok) {
+    const error = readStringField(body, "error") ?? "Team setting delete failed";
     throw new Error(error);
   }
 }
@@ -844,6 +911,16 @@ function parseTeamSecretMutationResult(value: unknown): TeamSecretMutationResult
   return value;
 }
 
+function parseTeamSettingListResult(value: unknown): TeamSettingListResult {
+  if (!isTeamSettingListResult(value)) throw new Error("Team setting list response is invalid");
+  return value;
+}
+
+function parseTeamSettingMutationResult(value: unknown): TeamSettingMutationResult {
+  if (!isTeamSettingMutationResult(value)) throw new Error("Team setting response is invalid");
+  return value;
+}
+
 function parseTeamProviderTargetListResult(value: unknown): TeamProviderTargetListResult {
   if (!isTeamProviderTargetListResult(value)) throw new Error("Team provider target list response is invalid");
   return value;
@@ -962,6 +1039,14 @@ function teamSecretsUrl(options: TeamSecretListOptions): string {
   for (const key of options.keys ?? []) searchParams.append("key", key);
   const query = searchParams.toString();
   return query ? `${API_ROUTES.storage.teamSecrets}?${query}` : API_ROUTES.storage.teamSecrets;
+}
+
+function teamSettingsUrl(options: TeamSettingListOptions): string {
+  const searchParams = new URLSearchParams();
+  for (const group of options.groups ?? []) searchParams.append("group", group);
+  for (const key of options.keys ?? []) searchParams.append("key", key);
+  const query = searchParams.toString();
+  return query ? `${API_ROUTES.storage.teamSettings}?${query}` : API_ROUTES.storage.teamSettings;
 }
 
 function readStringField(value: unknown, field: string): string | null {
@@ -1117,6 +1202,25 @@ function isTeamSecretMutationResult(value: unknown): value is TeamSecretMutation
   );
 }
 
+function isTeamSettingListResult(value: unknown): value is TeamSettingListResult {
+  if (!isRecord(value)) return false;
+  return (
+    value.targetKind === "postgres" &&
+    typeof value.workspaceId === "string" &&
+    Array.isArray(value.settings) &&
+    value.settings.every(isPublicTeamSetting)
+  );
+}
+
+function isTeamSettingMutationResult(value: unknown): value is TeamSettingMutationResult {
+  if (!isRecord(value)) return false;
+  return (
+    value.targetKind === "postgres" &&
+    typeof value.workspaceId === "string" &&
+    isPublicTeamSetting(value.setting)
+  );
+}
+
 function isTeamProviderTargetListResult(value: unknown): value is TeamProviderTargetListResult {
   if (!isRecord(value)) return false;
   return (
@@ -1154,6 +1258,18 @@ function isPublicTeamSecretStatus(value: unknown): value is PublicTeamSecretStat
     typeof value.key === "string" &&
     typeof value.updatedAt === "string" &&
     !("value" in value)
+  );
+}
+
+function isPublicTeamSetting(value: unknown): value is PublicTeamSetting {
+  if (!isRecord(value)) return false;
+  return (
+    isWorkspaceSettingGroup(value.group) &&
+    typeof value.key === "string" &&
+    typeof value.updatedAt === "string" &&
+    typeof value.value === "string" &&
+    !("isSecret" in value) &&
+    !("configured" in value)
   );
 }
 

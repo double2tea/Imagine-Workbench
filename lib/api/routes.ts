@@ -41,6 +41,8 @@ export const API_ROUTES = {
     teamVoiceProfile: (profileId: string) => `/api/storage/team/voice-profiles/${encodeURIComponent(profileId)}`,
     teamProviderTargets: "/api/storage/team/provider-targets",
     teamProviderTarget: (targetId: string) => `/api/storage/team/provider-targets/${encodeURIComponent(targetId)}`,
+    teamSettings: "/api/storage/team/settings",
+    teamSetting: (key: string) => `/api/storage/team/settings/${encodeURIComponent(key)}`,
     teamSecrets: "/api/storage/team/secrets",
     teamSecret: (key: string) => `/api/storage/team/secrets/${encodeURIComponent(key)}`,
     teamAssetMedia: (assetId: string, options: { download?: boolean } = {}) => {
