@@ -14,6 +14,8 @@ import type {
   WorkspaceSettingListOptions,
   WorkspaceSettingsRepository,
   WorkspaceStorageRepository,
+  WorkspaceStoragePageOptions,
+  WorkspaceVoiceProfileRepository,
 } from "@/lib/storage/repository";
 import {
   WORKSPACE_STORAGE_SCHEMA_VERSION,
@@ -23,6 +25,7 @@ import {
   type WorkspaceGenerationTaskRecord,
   type WorkspaceSafetySnapshotRecord,
   type WorkspaceSettingRecord,
+  type WorkspaceVoiceProfileRecord,
 } from "@/lib/storage/schema";
 import type { PostgresStorageConfig } from "@/lib/storage/postgres/config";
 import type { PostgresQueryable } from "@/lib/storage/postgres/connection";
@@ -69,6 +72,10 @@ interface SafetySnapshotRow extends QueryResultRow {
   size_bytes: string | number;
 }
 
+interface VoiceProfileRow extends QueryResultRow {
+  profile: WorkspaceVoiceProfileRecord["profile"];
+}
+
 export function createPostgresWorkspaceStorageRepository(
   queryable: PostgresQueryable,
   config: PostgresStorageConfig,
@@ -83,6 +90,7 @@ export function createPostgresWorkspaceStorageRepository(
     schemaVersion: WORKSPACE_STORAGE_SCHEMA_VERSION,
     settings: new PostgresSettingsRepository(queryable, workspaceId),
     targetKind: "postgres",
+    voiceProfiles: new PostgresVoiceProfileRepository(queryable, workspaceId),
   };
 }
 
@@ -375,6 +383,51 @@ class PostgresSafetySnapshotRepository implements WorkspaceSafetySnapshotReposit
        values ($1, $2, $3, $4)
        on conflict (id) do update set snapshot = excluded.snapshot, created_at = excluded.created_at`,
       [record.id, this.workspaceId, record, record.createdAt],
+    );
+  }
+}
+
+class PostgresVoiceProfileRepository implements WorkspaceVoiceProfileRepository {
+  constructor(
+    private readonly queryable: PostgresQueryable,
+    private readonly workspaceId: string,
+  ) {}
+
+  async delete(id: string): Promise<void> {
+    await this.queryable.query("delete from voice_profiles where workspace_id = $1 and id = $2", [this.workspaceId, id]);
+  }
+
+  async get(id: string): Promise<WorkspaceVoiceProfileRecord | null> {
+    const result = await this.queryable.query<VoiceProfileRow>(
+      "select profile from voice_profiles where workspace_id = $1 and id = $2",
+      [this.workspaceId, id],
+    );
+    const profile = result.rows[0]?.profile;
+    return profile ? { profile } : null;
+  }
+
+  async list(options: WorkspaceStoragePageOptions = {}): Promise<WorkspaceVoiceProfileRecord[]> {
+    const result = await this.queryable.query<VoiceProfileRow>(
+      "select profile from voice_profiles where workspace_id = $1 order by updated_at desc limit $2 offset $3",
+      [this.workspaceId, options.limit ?? 100, options.offset ?? 0],
+    );
+    return result.rows.map(row => ({ profile: row.profile }));
+  }
+
+  async put(record: WorkspaceVoiceProfileRecord): Promise<void> {
+    await this.queryable.query(
+      `insert into voice_profiles (id, workspace_id, profile, created_at, updated_at)
+       values ($1, $2, $3, $4, $5)
+       on conflict (id) do update
+         set profile = excluded.profile, updated_at = excluded.updated_at
+         where voice_profiles.workspace_id = excluded.workspace_id`,
+      [
+        record.profile.id,
+        this.workspaceId,
+        record.profile,
+        record.profile.createdAt,
+        record.profile.updatedAt,
+      ],
     );
   }
 }

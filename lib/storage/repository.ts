@@ -10,6 +10,7 @@ import type {
   WorkspaceSafetySnapshotRecord,
   WorkspaceSettingGroup,
   WorkspaceSettingRecord,
+  WorkspaceVoiceProfileRecord,
   WORKSPACE_STORAGE_SCHEMA_VERSION,
 } from "@/lib/storage/schema";
 
@@ -86,6 +87,13 @@ export interface WorkspaceSafetySnapshotRepository {
   put(record: WorkspaceSafetySnapshotRecord): Promise<void>;
 }
 
+export interface WorkspaceVoiceProfileRepository {
+  delete(id: string): Promise<void>;
+  get(id: string): Promise<WorkspaceVoiceProfileRecord | null>;
+  list(options?: WorkspaceStoragePageOptions): Promise<WorkspaceVoiceProfileRecord[]>;
+  put(record: WorkspaceVoiceProfileRecord): Promise<void>;
+}
+
 export interface WorkspaceStorageRepository {
   assets: WorkspaceAssetRepository;
   boards: WorkspaceBoardRepository;
@@ -95,4 +103,5 @@ export interface WorkspaceStorageRepository {
   schemaVersion: typeof WORKSPACE_STORAGE_SCHEMA_VERSION;
   settings: WorkspaceSettingsRepository;
   targetKind: WorkspaceStorageTargetKind;
+  voiceProfiles: WorkspaceVoiceProfileRepository;
 }

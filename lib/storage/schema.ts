@@ -2,6 +2,7 @@ import type { BoardDocument, BoardSummary } from "@/lib/board/types";
 import type { AssetPreviewRecord, LibraryAssetRecord, StorageItemMeta } from "@/lib/db";
 import type { GenerationTask } from "@/lib/generation-tasks";
 import type { WorkspaceStorageTargetKind } from "@/lib/local-storage-targets";
+import type { VoiceProfile } from "@/lib/voice-profiles";
 
 export const WORKSPACE_STORAGE_SCHEMA_VERSION = 1;
 
@@ -89,6 +90,10 @@ export interface WorkspaceSafetySnapshotRecord {
   payload: WorkspaceAssetPayloadRef;
   settingsKeyCount: number;
   sizeBytes: number;
+}
+
+export interface WorkspaceVoiceProfileRecord {
+  profile: VoiceProfile;
 }
 
 export interface WorkspaceAssetPayloadPolicy {

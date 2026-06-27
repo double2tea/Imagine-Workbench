@@ -3,6 +3,13 @@ import { t as globalT, type TFunction } from "./i18n-core";
 import type { AiProvider } from "./providers/model-catalog";
 import { getAudioModelCapabilities, tryParseProviderModel, type AudioOperationMode } from "./providers/model-catalog";
 import { MIMO_BUILT_IN_VOICES } from "./providers/mimo-voices";
+import {
+  deleteTeamVoiceProfile,
+  fetchTeamVoiceProfiles,
+  fetchWorkspaceStorageRuntimeStatus,
+  readTeamCsrfToken,
+  saveTeamVoiceProfile,
+} from "./storage/team-client";
 
 const VOICE_DB_NAME = "ImagineWorkbenchVoiceDB";
 const VOICE_DB_VERSION = 1;
@@ -227,6 +234,14 @@ function openVoiceProfileDatabase(): Promise<IDBDatabase> {
 
 export async function saveVoiceProfile(input: VoiceProfileInput): Promise<VoiceProfile> {
   const profile = toVoiceProfile(input);
+  if (await isPostgresStorageActive()) {
+    const csrfToken = readTeamCsrfToken();
+    if (!csrfToken) throw new Error("CSRF token is required");
+    const result = await saveTeamVoiceProfile(profile, csrfToken);
+    dispatchVoiceProfilesChanged();
+    return normalizeVoiceProfile(result.profile);
+  }
+
   const db = await openVoiceProfileDatabase();
   await new Promise<void>((resolve, reject) => {
     const transaction = db.transaction(VOICE_PROFILE_STORE, "readwrite");
@@ -235,18 +250,23 @@ export async function saveVoiceProfile(input: VoiceProfileInput): Promise<VoiceP
     transaction.onerror = () => reject(transaction.error ?? new Error("VoiceProfile save failed"));
     transaction.onabort = () => reject(transaction.error ?? new Error("VoiceProfile save aborted"));
   });
-  window.dispatchEvent(new Event(VOICE_PROFILES_CHANGED_EVENT));
+  dispatchVoiceProfilesChanged();
   return profile;
 }
 
 export async function listVoiceProfiles(): Promise<VoiceProfile[]> {
+  if (await isPostgresStorageActive()) {
+    const result = await fetchTeamVoiceProfiles();
+    return sortVoiceProfiles(result.profiles.map(normalizeVoiceProfile));
+  }
+
   const db = await openVoiceProfileDatabase();
   return new Promise((resolve, reject) => {
     const transaction = db.transaction(VOICE_PROFILE_STORE, "readonly");
     const request = transaction.objectStore(VOICE_PROFILE_STORE).getAll();
     request.onsuccess = () => {
       const profiles = (request.result as VoiceProfile[]).map(normalizeVoiceProfile);
-      resolve(profiles.sort((left, right) => new Date(right.updatedAt).getTime() - new Date(left.updatedAt).getTime()));
+      resolve(sortVoiceProfiles(profiles));
     };
     request.onerror = () => reject(request.error ?? new Error("VoiceProfile list failed"));
     transaction.onerror = () => reject(transaction.error ?? request.error ?? new Error("VoiceProfile list transaction failed"));
@@ -256,6 +276,11 @@ export async function listVoiceProfiles(): Promise<VoiceProfile[]> {
 export async function getVoiceProfile(id: string): Promise<VoiceProfile | null> {
   const builtInProfile = getBuiltInVoiceProfile(id);
   if (builtInProfile) return builtInProfile;
+
+  if (await isPostgresStorageActive()) {
+    const result = await fetchTeamVoiceProfiles();
+    return result.profiles.map(normalizeVoiceProfile).find(profile => profile.id === id) ?? null;
+  }
 
   const db = await openVoiceProfileDatabase();
   return new Promise((resolve, reject) => {
@@ -271,6 +296,14 @@ export async function getVoiceProfile(id: string): Promise<VoiceProfile | null> 
 }
 
 export async function deleteVoiceProfile(id: string): Promise<void> {
+  if (await isPostgresStorageActive()) {
+    const csrfToken = readTeamCsrfToken();
+    if (!csrfToken) throw new Error("CSRF token is required");
+    await deleteTeamVoiceProfile(id, csrfToken);
+    dispatchVoiceProfilesChanged();
+    return;
+  }
+
   const db = await openVoiceProfileDatabase();
   await new Promise<void>((resolve, reject) => {
     const transaction = db.transaction(VOICE_PROFILE_STORE, "readwrite");
@@ -279,5 +312,20 @@ export async function deleteVoiceProfile(id: string): Promise<void> {
     transaction.onerror = () => reject(transaction.error ?? new Error("VoiceProfile delete failed"));
     transaction.onabort = () => reject(transaction.error ?? new Error("VoiceProfile delete aborted"));
   });
-  window.dispatchEvent(new Event(VOICE_PROFILES_CHANGED_EVENT));
+  dispatchVoiceProfilesChanged();
+}
+
+async function isPostgresStorageActive(): Promise<boolean> {
+  if (typeof window === "undefined") return false;
+  return (await fetchWorkspaceStorageRuntimeStatus()).targetKind === "postgres";
+}
+
+function sortVoiceProfiles(profiles: VoiceProfile[]): VoiceProfile[] {
+  return profiles.sort((left, right) => new Date(right.updatedAt).getTime() - new Date(left.updatedAt).getTime());
+}
+
+function dispatchVoiceProfilesChanged(): void {
+  if (typeof window !== "undefined") {
+    window.dispatchEvent(new Event(VOICE_PROFILES_CHANGED_EVENT));
+  }
 }

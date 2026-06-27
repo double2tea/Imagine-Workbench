@@ -37,6 +37,8 @@ export const API_ROUTES = {
     teamMember: (userId: string) => `/api/storage/team/members/${encodeURIComponent(userId)}`,
     teamPromptTemplates: "/api/storage/team/prompt-templates",
     teamPromptTemplate: (templateId: string) => `/api/storage/team/prompt-templates/${encodeURIComponent(templateId)}`,
+    teamVoiceProfiles: "/api/storage/team/voice-profiles",
+    teamVoiceProfile: (profileId: string) => `/api/storage/team/voice-profiles/${encodeURIComponent(profileId)}`,
     teamProviderTargets: "/api/storage/team/provider-targets",
     teamProviderTarget: (targetId: string) => `/api/storage/team/provider-targets/${encodeURIComponent(targetId)}`,
     teamSecrets: "/api/storage/team/secrets",

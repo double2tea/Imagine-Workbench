@@ -231,3 +231,43 @@ test("PostgreSQL settings repository rejects plaintext secret records", async ()
 
   assert.deepEqual(writes[0], ["workspace_1", "provider:demo:apiKey", "provider", encryptedValue, true]);
 });
+
+test("PostgreSQL voice profile repository scopes profile rows", async () => {
+  const queries: Array<{ text: string; values?: readonly unknown[] }> = [];
+  const queryable: PostgresQueryable = {
+    query: async <T extends QueryResultRow = QueryResultRow>(text: string, values?: unknown[]) => {
+      queries.push({ text, values });
+      if (text.startsWith("select profile from voice_profiles")) {
+        return typedQueryResult<T>([{ profile: {
+          createdAt: "2026-06-27T00:00:00.000Z",
+          id: "voice_profile_1",
+          name: "Narration Voice",
+          provider: "mimo",
+          referenceAudioAssetIds: ["asset_audio_1"],
+          source: "cloned",
+          tags: [],
+          updatedAt: "2026-06-27T00:00:00.000Z",
+        } }]);
+      }
+      return typedQueryResult<T>([]);
+    },
+  };
+  const repository = createPostgresWorkspaceStorageRepository(
+    queryable,
+    { databaseUrl: "postgres://localhost/imagine", mediaDir: "/srv/imagine/media" },
+    "workspace_1",
+  );
+
+  const records = await repository.voiceProfiles.list({ limit: 20, offset: 5 });
+  await repository.voiceProfiles.delete("voice_profile_1");
+
+  assert.deepEqual(records.map(record => record.profile.id), ["voice_profile_1"]);
+  assert.deepEqual(
+    queries.find(query => query.text.startsWith("select profile from voice_profiles"))?.values,
+    ["workspace_1", 20, 5],
+  );
+  assert.deepEqual(
+    queries.find(query => query.text.startsWith("delete from voice_profiles"))?.values,
+    ["workspace_1", "voice_profile_1"],
+  );
+});

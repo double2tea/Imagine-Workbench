@@ -39,12 +39,17 @@ import type {
   TeamPromptTemplateMutationResult,
 } from "@/lib/storage/team-prompt-template-types";
 import type {
+  TeamVoiceProfileListResult,
+  TeamVoiceProfileMutationResult,
+} from "@/lib/storage/team-voice-profile-types";
+import type {
   PublicTeamSecretStatus,
   TeamSecretListResult,
   TeamSecretMutationResult,
   TeamSecretSaveInput,
 } from "@/lib/storage/team-secret-types";
 import type { WorkspaceSettingGroup } from "@/lib/storage/schema";
+import type { VoiceProfile } from "@/lib/voice-profiles";
 
 export interface TeamStorageMigrationStatus {
   appliedMigrationIds: string[];
@@ -294,6 +299,16 @@ export async function fetchTeamPromptTemplates(fetcher: Fetcher = fetch): Promis
   return parseTeamPromptTemplateListResult(body);
 }
 
+export async function fetchTeamVoiceProfiles(fetcher: Fetcher = fetch): Promise<TeamVoiceProfileListResult> {
+  const response = await fetcher(API_ROUTES.storage.teamVoiceProfiles, { cache: "no-store" });
+  const body: unknown = await response.json();
+  if (!response.ok) {
+    const error = readStringField(body, "error") ?? "Team voice profile list failed";
+    throw new Error(error);
+  }
+  return parseTeamVoiceProfileListResult(body);
+}
+
 export async function saveTeamPromptTemplate(
   template: CustomPromptTemplate,
   csrfToken: string,
@@ -318,6 +333,30 @@ export async function saveTeamPromptTemplate(
   return parseTeamPromptTemplateMutationResult(body);
 }
 
+export async function saveTeamVoiceProfile(
+  profile: VoiceProfile,
+  csrfToken: string,
+  fetcher: Fetcher = fetch,
+): Promise<TeamVoiceProfileMutationResult> {
+  const token = csrfToken.trim();
+  if (!token) throw new Error("CSRF token is required");
+  const response = await fetcher(API_ROUTES.storage.teamVoiceProfiles, {
+    cache: "no-store",
+    body: JSON.stringify({ profile }),
+    headers: {
+      "content-type": "application/json",
+      "x-imagine-csrf-token": token,
+    },
+    method: "POST",
+  });
+  const body: unknown = await response.json();
+  if (!response.ok) {
+    const error = readStringField(body, "error") ?? "Team voice profile save failed";
+    throw new Error(error);
+  }
+  return parseTeamVoiceProfileMutationResult(body);
+}
+
 export async function deleteTeamPromptTemplate(
   templateId: string,
   csrfToken: string,
@@ -333,6 +372,25 @@ export async function deleteTeamPromptTemplate(
   const body: unknown = await response.json();
   if (!response.ok) {
     const error = readStringField(body, "error") ?? "Team prompt template delete failed";
+    throw new Error(error);
+  }
+}
+
+export async function deleteTeamVoiceProfile(
+  profileId: string,
+  csrfToken: string,
+  fetcher: Fetcher = fetch,
+): Promise<void> {
+  const token = csrfToken.trim();
+  if (!token) throw new Error("CSRF token is required");
+  const response = await fetcher(API_ROUTES.storage.teamVoiceProfile(profileId), {
+    cache: "no-store",
+    headers: { "x-imagine-csrf-token": token },
+    method: "DELETE",
+  });
+  const body: unknown = await response.json();
+  if (!response.ok) {
+    const error = readStringField(body, "error") ?? "Team voice profile delete failed";
     throw new Error(error);
   }
 }
@@ -818,6 +876,21 @@ function parseTeamPromptTemplateMutationResult(value: unknown): TeamPromptTempla
   };
 }
 
+function parseTeamVoiceProfileListResult(value: unknown): TeamVoiceProfileListResult {
+  if (!isRecord(value) || value.targetKind !== "postgres" || typeof value.workspaceId !== "string" || !Array.isArray(value.profiles)) {
+    throw new Error("Team voice profile list response is invalid");
+  }
+  if (!value.profiles.every(isVoiceProfile)) throw new Error("Team voice profile list response is invalid");
+  return value as unknown as TeamVoiceProfileListResult;
+}
+
+function parseTeamVoiceProfileMutationResult(value: unknown): TeamVoiceProfileMutationResult {
+  if (!isRecord(value) || value.targetKind !== "postgres" || typeof value.workspaceId !== "string" || !isVoiceProfile(value.profile)) {
+    throw new Error("Team voice profile response is invalid");
+  }
+  return value as unknown as TeamVoiceProfileMutationResult;
+}
+
 function parseTeamAssetListResult(value: unknown): TeamAssetListResult {
   if (!isTeamAssetListResult(value)) throw new Error("Team asset list response is invalid");
   return value;
@@ -899,6 +972,31 @@ function readStringField(value: unknown, field: string): string | null {
 
 function isRecord(value: unknown): value is Record<string, unknown> {
   return typeof value === "object" && value !== null;
+}
+
+function isVoiceProfile(value: unknown): value is VoiceProfile {
+  if (!isRecord(value)) return false;
+  return (
+    typeof value.id === "string" &&
+    value.id.trim().length > 0 &&
+    typeof value.name === "string" &&
+    value.name.trim().length > 0 &&
+    typeof value.provider === "string" &&
+    value.provider.trim().length > 0 &&
+    (value.source === "designed" || value.source === "cloned" || value.source === "imported") &&
+    Array.isArray(value.tags) &&
+    value.tags.every(item => typeof item === "string") &&
+    optionalString(value.description) &&
+    optionalString(value.providerVoiceId) &&
+    optionalString(value.designPrompt) &&
+    Array.isArray(value.referenceAudioAssetIds) &&
+    value.referenceAudioAssetIds.every(item => typeof item === "string") &&
+    optionalStringArray(value.sourceAssetIds) &&
+    optionalString(value.consentAcceptedAt) &&
+    optionalString(value.previewAudioAssetId) &&
+    typeof value.createdAt === "string" &&
+    typeof value.updatedAt === "string"
+  );
 }
 
 function isPublicLocalStorageRuntimeStatus(value: unknown): value is PublicLocalStorageRuntimeStatus {
@@ -1229,4 +1327,8 @@ function isPayloadKind(value: unknown): value is PublicTeamAssetPayload["kind"] 
 
 function optionalString(value: unknown): boolean {
   return value === undefined || typeof value === "string";
+}
+
+function optionalStringArray(value: unknown): boolean {
+  return value === undefined || (Array.isArray(value) && value.every(item => typeof item === "string"));
 }
