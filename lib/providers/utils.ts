@@ -24,7 +24,9 @@ export function optionalText(value: unknown): string | undefined {
 
 export interface ResolveProviderConfigOptions {
   apiKeyOverride?: string;
+  baseUrlOverride?: string;
   ignoredBearerToken?: string;
+  providerLabelOverride?: string;
 }
 
 export function resolveProviderConfig(
@@ -34,10 +36,11 @@ export function resolveProviderConfig(
 ): ProviderConfig {
   const requestKey = readProviderRequestApiKey(req, options);
   const headerBaseUrl = trimCredential(req.headers.get("x-ai-base-url") ?? "");
-  const providerLabel = optionalText(req.headers.get("x-ai-provider-label"));
+  const providerLabel = optionalText(req.headers.get("x-ai-provider-label")) ?? optionalText(options.providerLabelOverride);
   const envKey = trimCredential(resolveProviderApiKey(provider));
   const overrideKey = trimCredential(options.apiKeyOverride ?? "");
-  const configuredBaseUrl = headerBaseUrl || trimCredential(resolveProviderBaseUrl(provider));
+  const overrideBaseUrl = trimCredential(options.baseUrlOverride ?? "");
+  const configuredBaseUrl = headerBaseUrl || overrideBaseUrl || trimCredential(resolveProviderBaseUrl(provider));
   const videoBaseUrl = resolveProviderVideoBaseUrl(provider) || configuredBaseUrl;
 
   const apiKey = requestKey || overrideKey || envKey;
