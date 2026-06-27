@@ -55,13 +55,17 @@ export interface WorkspaceAssetPayloadRecord {
   ref: WorkspaceAssetPayloadRef;
 }
 
-export interface WorkspaceAssetPreviewRecord {
-  preview: AssetPreviewRecord;
-  ref?: WorkspaceAssetPayloadRef;
-}
-
 export interface WorkspaceAssetLibraryRecord {
   record: LibraryAssetRecord;
+}
+
+export type WorkspaceAssetPreviewMetadata = Omit<AssetPreviewRecord, "dataUrl"> & {
+  dataUrl?: string;
+};
+
+export interface WorkspaceAssetPreviewRecord {
+  preview: WorkspaceAssetPreviewMetadata;
+  ref?: WorkspaceAssetPayloadRef;
 }
 
 export interface WorkspaceBoardRecord {

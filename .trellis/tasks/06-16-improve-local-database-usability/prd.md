@@ -123,6 +123,7 @@ Completed in the latest continuation:
 * Added migration-preview coverage for all currently known persisted `localStorage` sources. `tests/data-management-diagnostics.test.ts` now proves `buildBrowserToPostgresMigrationPreview` classifies default generation models, image-edit feature models, price visibility, Agent orb/chat/auto-execute state, RunningHub saved targets, Resolve toggle, custom prompt templates, board UI preferences, provider settings, model caches, and credential-bearing keys without unknown-source blockers.
 * Added default browser-mode runtime and team-auth gating coverage. `tests/local-storage-runtime.test.ts` now proves hosted/browser deployments keep `mode: "browser"` / `targetKind: "indexeddb"` and do not require PostgreSQL env, `tests/team-storage-client.test.ts` verifies the public storage-status client parses browser mode without any PostgreSQL path plan, and `tests/team-mode-ui-gating.test.ts` proves team login/bootstrap controls plus session refresh stay behind explicit PostgreSQL mode.
 * Tightened PostgreSQL schema/migration proof. `tests/postgres-storage.test.ts` now verifies unsupported newer schemas fail fast and roll back before applying SQL, and that the initial migration includes versioned migration metadata, deterministic indexes, role-ready team memberships, owner metadata, and payload/preview storage-ref columns.
+* Completed the PostgreSQL repository preview slice. `WorkspaceStorageRepository` now exposes a `previews` repository, PostgreSQL mode can read/write/delete `asset_previews` rows with safe storage refs, and `tests/postgres-storage.test.ts` covers preview record/ref persistence alongside existing asset payload, library, board, task, settings, safety snapshot, and voice-profile storage tests.
 
 Still remaining before the full PRD can be considered complete:
 
@@ -186,7 +187,7 @@ Still remaining before the full PRD can be considered complete:
 * [x] Storage-mode code exposes only `browser` and `postgres` for this task; stale SQLite/local-database/local-folder/remote-api planned targets are removed or made non-product-facing.
 * [x] Team deployment templates are included and documented: Dockerfile, Docker Compose, team env example, media volume mapping, PostgreSQL volume mapping, and first-run bootstrap instructions.
 * [x] Deployment templates do not change the default local/browser workflow and are opt-in.
-* [ ] PostgreSQL mode reads/writes assets, asset payload refs, previews, asset library records, boards, generation tasks, managed settings, safety snapshots, and voice profiles, or any exclusions are explicitly documented before implementation.
+* [x] PostgreSQL mode reads/writes assets, asset payload refs, previews, asset library records, boards, generation tasks, managed settings, safety snapshots, and voice profiles, or any exclusions are explicitly documented before implementation.
 * [x] Migration coverage includes custom prompt templates and any other user-created localStorage data, or explicitly reports them as excluded before migration.
 * [x] Migration preview reports all detected persistent sources: asset DB, board DB, voice-profile DB, safety snapshot DB, managed localStorage, and known currently-unmanaged localStorage keys.
 * [x] The implementation updates `lib/data-management.ts` so current persisted keys such as default generation models, image-edit feature models, price visibility, Agent orb position, RunningHub saved targets, Resolve toggle, and custom prompt templates are classified before PostgreSQL migration preview uses them.
@@ -210,7 +211,7 @@ Still remaining before the full PRD can be considered complete:
 * [ ] Board/settings updates use version checks or equivalent optimistic concurrency; conflicting edits produce a visible reload/merge prompt rather than silently overwriting another user.
 * [ ] Refreshing the app or relevant view shows the latest shared PostgreSQL-backed assets, generation statuses, boards, and asset library records from other team members.
 * [x] Generation/task status surfaces either poll on an interval or expose an event-stream-ready query cursor so users can see progress without relying only on full-page reloads.
-* [ ] Media payloads are stored outside PostgreSQL rows by default and resolved through safe payload refs.
+* [x] Media payloads are stored outside PostgreSQL rows by default and resolved through safe payload refs.
 * [ ] Generated results, imported assets, and asset-library items all resolve through `assets` + `asset_payloads`; `asset_library` records reference backing assets instead of storing separate files.
 * [ ] Browser clients can view/download media through app routes without seeing `IMAGINE_MEDIA_DIR`, database credentials, or raw filesystem paths.
 * [ ] Server-side media writes are staged before metadata commit; failed writes/commits clean staged files or mark them for explicit cleanup.

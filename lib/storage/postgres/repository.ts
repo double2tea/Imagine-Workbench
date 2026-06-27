@@ -6,6 +6,7 @@ import type {
   WorkspaceAssetListOptions,
   WorkspaceAssetLibraryRepository,
   WorkspaceAssetPayloadRepository,
+  WorkspaceAssetPreviewRepository,
   WorkspaceAssetRepository,
   WorkspaceBoardListOptions,
   WorkspaceBoardRepository,
@@ -22,6 +23,7 @@ import {
   WORKSPACE_STORAGE_SCHEMA_VERSION,
   type WorkspaceAssetPayloadRef,
   type WorkspaceAssetLibraryRecord,
+  type WorkspaceAssetPreviewRecord,
   type WorkspaceAssetRecord,
   type WorkspaceBoardRecord,
   type WorkspaceGenerationTaskRecord,
@@ -43,6 +45,12 @@ interface PayloadRow extends QueryResultRow {
   size_bytes: string | number | null;
   storage_key: string;
   storage_kind: WorkspaceAssetPayloadRef["kind"];
+}
+
+interface PreviewRow extends QueryResultRow {
+  preview: WorkspaceAssetPreviewRecord["preview"];
+  storage_key: string | null;
+  storage_kind: WorkspaceAssetPayloadRef["kind"] | null;
 }
 
 interface AssetLibraryRow extends QueryResultRow {
@@ -100,6 +108,7 @@ export function createPostgresWorkspaceStorageRepository(
       queryable,
       new LocalFilePayloadStore(config.mediaDir, { maxPayloadBytes: config.maxMediaPayloadBytes }),
     ),
+    previews: new PostgresAssetPreviewRepository(queryable),
     safetySnapshots: new PostgresSafetySnapshotRepository(queryable, workspaceId),
     schemaVersion: WORKSPACE_STORAGE_SCHEMA_VERSION,
     settings: new PostgresSettingsRepository(queryable, workspaceId),
@@ -243,6 +252,41 @@ class PostgresAssetPayloadRepository implements WorkspaceAssetPayloadRepository 
     const ref = await this.payloadStore.write(input);
     await upsertAssetPayloadRef(this.queryable, input.assetId, ref);
     return ref;
+  }
+}
+
+class PostgresAssetPreviewRepository implements WorkspaceAssetPreviewRepository {
+  constructor(private readonly queryable: PostgresQueryable) {}
+
+  async delete(assetId: string): Promise<void> {
+    await this.queryable.query("delete from asset_previews where asset_id = $1", [assetId]);
+  }
+
+  async get(assetId: string): Promise<WorkspaceAssetPreviewRecord | null> {
+    const result = await this.queryable.query<PreviewRow>(
+      "select preview, storage_kind, storage_key from asset_previews where asset_id = $1",
+      [assetId],
+    );
+    return previewRecordFromRow(result.rows[0]);
+  }
+
+  async put(record: WorkspaceAssetPreviewRecord): Promise<void> {
+    await this.queryable.query(
+      `insert into asset_previews (asset_id, preview, storage_kind, storage_key, created_at, updated_at)
+       values ($1, $2, $3, $4, $5, now())
+       on conflict (asset_id) do update
+         set preview = excluded.preview,
+           storage_kind = excluded.storage_kind,
+           storage_key = excluded.storage_key,
+           updated_at = now()`,
+      [
+        record.preview.assetId,
+        previewMetadataForStorage(record.preview),
+        record.ref?.kind ?? null,
+        record.ref?.uri ?? null,
+        record.preview.createdAt,
+      ],
+    );
   }
 }
 
@@ -535,6 +579,27 @@ function payloadRefFromRow(row: PayloadRow): WorkspaceAssetPayloadRef {
     sizeBytes: row.size_bytes === null ? undefined : Number(row.size_bytes),
     uri: row.storage_key,
   };
+}
+
+function previewRecordFromRow(row: PreviewRow | undefined): WorkspaceAssetPreviewRecord | null {
+  if (!row) return null;
+  return {
+    preview: row.preview,
+    ref: row.storage_kind && row.storage_key
+      ? {
+          kind: row.storage_kind,
+          mimeType: row.preview.mimeType,
+          uri: row.storage_key,
+        }
+      : undefined,
+  };
+}
+
+function previewMetadataForStorage(
+  preview: WorkspaceAssetPreviewRecord["preview"],
+): Omit<WorkspaceAssetPreviewRecord["preview"], "dataUrl"> {
+  const { dataUrl: _dataUrl, ...metadata } = preview;
+  return metadata;
 }
 
 function toBoardSummary(board: BoardDocument): BoardSummary {

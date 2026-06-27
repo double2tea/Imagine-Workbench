@@ -421,6 +421,71 @@ test("PostgreSQL payload repository stores local files and records asset payload
   }
 });
 
+test("PostgreSQL preview repository stores preview records and refs", async () => {
+  const preview = {
+    assetId: "asset_1",
+    createdAt: "2026-06-27T00:00:00.000Z",
+    dataUrl: "data:image/webp;base64,cHJldmlldw==",
+    height: 90,
+    mimeType: "image/webp",
+    type: "image" as const,
+    width: 160,
+  };
+  const previewMetadata = {
+    assetId: "asset_1",
+    createdAt: "2026-06-27T00:00:00.000Z",
+    height: 90,
+    mimeType: "image/webp",
+    type: "image" as const,
+    width: 160,
+  };
+  const queries: Array<{ text: string; values?: readonly unknown[] }> = [];
+  const queryable: PostgresQueryable = {
+    query: async <T extends QueryResultRow = QueryResultRow>(text: string, values?: unknown[]) => {
+      queries.push({ text, values });
+      if (text.startsWith("select preview")) {
+        return typedQueryResult<T>([{
+          preview: previewMetadata,
+          storage_kind: "local-file",
+          storage_key: "previews/image/asset_1.webp",
+        }]);
+      }
+      return typedQueryResult<T>([]);
+    },
+  };
+  const repository = createPostgresWorkspaceStorageRepository(
+    queryable,
+    { databaseUrl: "postgres://localhost/imagine", mediaDir: "/srv/imagine/media" },
+    "workspace_1",
+  );
+
+  await repository.previews.put({
+    preview,
+    ref: {
+      kind: "local-file",
+      mimeType: "image/webp",
+      uri: "previews/image/asset_1.webp",
+    },
+  });
+  const storedPreview = await repository.previews.get("asset_1");
+  await repository.previews.delete("asset_1");
+
+  assert.deepEqual(
+    queries.find(query => query.text.includes("insert into asset_previews"))?.values,
+    ["asset_1", previewMetadata, "local-file", "previews/image/asset_1.webp", "2026-06-27T00:00:00.000Z"],
+  );
+  assert.equal(Object.hasOwn(storedPreview?.preview ?? {}, "dataUrl"), false);
+  assert.deepEqual(storedPreview?.ref, {
+    kind: "local-file",
+    mimeType: "image/webp",
+    uri: "previews/image/asset_1.webp",
+  });
+  assert.deepEqual(
+    queries.find(query => query.text.startsWith("delete from asset_previews"))?.values,
+    ["asset_1"],
+  );
+});
+
 test("PostgreSQL settings repository rejects plaintext secret records", async () => {
   const writes: unknown[][] = [];
   const queryable: PostgresQueryable = {

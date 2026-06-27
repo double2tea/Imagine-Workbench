@@ -5,6 +5,7 @@ import type { WorkspaceStorageTargetKind } from "@/lib/local-storage-targets";
 import type {
   WorkspaceAssetPayloadRef,
   WorkspaceAssetLibraryRecord,
+  WorkspaceAssetPreviewRecord,
   WorkspaceAssetRecord,
   WorkspaceBoardRecord,
   WorkspaceGenerationTaskRecord,
@@ -61,6 +62,12 @@ export interface WorkspaceAssetPayloadRepository {
   }): Promise<WorkspaceAssetPayloadRef>;
 }
 
+export interface WorkspaceAssetPreviewRepository {
+  delete(assetId: string): Promise<void>;
+  get(assetId: string): Promise<WorkspaceAssetPreviewRecord | null>;
+  put(record: WorkspaceAssetPreviewRecord): Promise<void>;
+}
+
 export interface WorkspaceAssetLibraryRepository {
   delete(id: string): Promise<void>;
   get(id: string): Promise<WorkspaceAssetLibraryRecord | null>;
@@ -108,6 +115,7 @@ export interface WorkspaceStorageRepository {
   boards: WorkspaceBoardRepository;
   generationTasks: WorkspaceGenerationTaskRepository;
   payloads: WorkspaceAssetPayloadRepository;
+  previews: WorkspaceAssetPreviewRepository;
   safetySnapshots: WorkspaceSafetySnapshotRepository;
   schemaVersion: typeof WORKSPACE_STORAGE_SCHEMA_VERSION;
   settings: WorkspaceSettingsRepository;
