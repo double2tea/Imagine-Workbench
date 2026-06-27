@@ -11,6 +11,15 @@ import {
 
 export const IMAGINE_TEAM_SETUP_TOKEN_ENV = "IMAGINE_TEAM_SETUP_TOKEN";
 export const IMAGINE_TEAM_SECRET_ENCRYPTION_KEY_ENV = "IMAGINE_TEAM_SECRET_ENCRYPTION_KEY";
+export const IMAGINE_POSTGRES_CONNECTION_TIMEOUT_MS_ENV = "IMAGINE_POSTGRES_CONNECTION_TIMEOUT_MS";
+export const IMAGINE_POSTGRES_IDLE_TIMEOUT_MS_ENV = "IMAGINE_POSTGRES_IDLE_TIMEOUT_MS";
+export const IMAGINE_POSTGRES_POOL_MAX_ENV = "IMAGINE_POSTGRES_POOL_MAX";
+export const IMAGINE_POSTGRES_QUERY_TIMEOUT_MS_ENV = "IMAGINE_POSTGRES_QUERY_TIMEOUT_MS";
+
+export const DEFAULT_POSTGRES_CONNECTION_TIMEOUT_MS = 3000;
+export const DEFAULT_POSTGRES_IDLE_TIMEOUT_MS = 1000;
+export const DEFAULT_POSTGRES_POOL_MAX = 5;
+export const DEFAULT_POSTGRES_QUERY_TIMEOUT_MS = 30000;
 
 export class PostgresStorageConfigError extends Error {
   constructor(message: string) {
@@ -24,6 +33,10 @@ export interface PostgresStorageConfig {
   maxMediaPayloadBytes?: number;
   mediaDir: string;
   mediaUsageWarningBytes?: number;
+  postgresConnectionTimeoutMillis?: number;
+  postgresIdleTimeoutMillis?: number;
+  postgresPoolMax?: number;
+  postgresQueryTimeoutMillis?: number;
 }
 
 export function resolvePostgresStorageConfig(env: LocalStorageEnvironment): PostgresStorageConfig {
@@ -46,6 +59,26 @@ export function resolvePostgresStorageConfig(env: LocalStorageEnvironment): Post
     maxMediaPayloadBytes: parseMaxMediaPayloadBytes(env[IMAGINE_MAX_MEDIA_PAYLOAD_BYTES_ENV]),
     mediaDir,
     mediaUsageWarningBytes: parseOptionalPositiveByteCount(env[IMAGINE_MEDIA_USAGE_WARNING_BYTES_ENV], IMAGINE_MEDIA_USAGE_WARNING_BYTES_ENV),
+    postgresConnectionTimeoutMillis: parseOptionalPositiveInteger(
+      env[IMAGINE_POSTGRES_CONNECTION_TIMEOUT_MS_ENV],
+      IMAGINE_POSTGRES_CONNECTION_TIMEOUT_MS_ENV,
+      DEFAULT_POSTGRES_CONNECTION_TIMEOUT_MS,
+    ),
+    postgresIdleTimeoutMillis: parseOptionalPositiveInteger(
+      env[IMAGINE_POSTGRES_IDLE_TIMEOUT_MS_ENV],
+      IMAGINE_POSTGRES_IDLE_TIMEOUT_MS_ENV,
+      DEFAULT_POSTGRES_IDLE_TIMEOUT_MS,
+    ),
+    postgresPoolMax: parseOptionalPositiveInteger(
+      env[IMAGINE_POSTGRES_POOL_MAX_ENV],
+      IMAGINE_POSTGRES_POOL_MAX_ENV,
+      DEFAULT_POSTGRES_POOL_MAX,
+    ),
+    postgresQueryTimeoutMillis: parseOptionalPositiveInteger(
+      env[IMAGINE_POSTGRES_QUERY_TIMEOUT_MS_ENV],
+      IMAGINE_POSTGRES_QUERY_TIMEOUT_MS_ENV,
+      DEFAULT_POSTGRES_QUERY_TIMEOUT_MS,
+    ),
   };
 }
 
@@ -73,6 +106,19 @@ function parseOptionalPositiveByteCount(value: string | undefined, envName: stri
   const parsed = Number(trimmed);
   if (!Number.isSafeInteger(parsed) || parsed <= 0) {
     throw new PostgresStorageConfigError(`${envName} must be a positive integer byte count`);
+  }
+  return parsed;
+}
+
+function parseOptionalPositiveInteger(value: string | undefined, envName: string, defaultValue: number): number {
+  const trimmed = value?.trim();
+  if (!trimmed) return defaultValue;
+  if (!/^\d+$/.test(trimmed)) {
+    throw new PostgresStorageConfigError(`${envName} must be a positive integer`);
+  }
+  const parsed = Number(trimmed);
+  if (!Number.isSafeInteger(parsed) || parsed <= 0) {
+    throw new PostgresStorageConfigError(`${envName} must be a positive integer`);
   }
   return parsed;
 }

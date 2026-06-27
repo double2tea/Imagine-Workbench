@@ -6,6 +6,10 @@ import test from "node:test";
 import type { QueryResult, QueryResultRow } from "pg";
 
 import {
+  DEFAULT_POSTGRES_CONNECTION_TIMEOUT_MS,
+  DEFAULT_POSTGRES_IDLE_TIMEOUT_MS,
+  DEFAULT_POSTGRES_POOL_MAX,
+  DEFAULT_POSTGRES_QUERY_TIMEOUT_MS,
   resolvePostgresStorageConfig,
   requireTeamSecretEncryptionKey,
   requireTeamSetupToken,
@@ -16,7 +20,7 @@ import {
   applyPostgresMigrations,
   getPostgresMigrationStatus,
 } from "../lib/storage/postgres/migrations";
-import type { PostgresQueryable } from "../lib/storage/postgres/connection";
+import { createPostgresPoolConfig, type PostgresQueryable } from "../lib/storage/postgres/connection";
 import {
   decryptWorkspaceSecret,
   encryptWorkspaceSecret,
@@ -80,6 +84,26 @@ test("resolvePostgresStorageConfig requires explicit PostgreSQL mode and private
     }),
     /IMAGINE_MEDIA_USAGE_WARNING_BYTES must be a positive integer byte count/,
   );
+  assert.throws(
+    () => resolvePostgresStorageConfig({
+      DATABASE_URL: "postgres://localhost/imagine",
+      IMAGINE_MAX_MEDIA_PAYLOAD_BYTES: "1048576",
+      IMAGINE_MEDIA_DIR: "/srv/imagine/media",
+      IMAGINE_POSTGRES_POOL_MAX: "0",
+      IMAGINE_STORAGE_TARGET: "postgres",
+    }),
+    /IMAGINE_POSTGRES_POOL_MAX must be a positive integer/,
+  );
+  assert.throws(
+    () => resolvePostgresStorageConfig({
+      DATABASE_URL: "postgres://localhost/imagine",
+      IMAGINE_MAX_MEDIA_PAYLOAD_BYTES: "1048576",
+      IMAGINE_MEDIA_DIR: "/srv/imagine/media",
+      IMAGINE_POSTGRES_QUERY_TIMEOUT_MS: "slow",
+      IMAGINE_STORAGE_TARGET: "postgres",
+    }),
+    /IMAGINE_POSTGRES_QUERY_TIMEOUT_MS must be a positive integer/,
+  );
 
   assert.deepEqual(
     resolvePostgresStorageConfig({
@@ -94,6 +118,52 @@ test("resolvePostgresStorageConfig requires explicit PostgreSQL mode and private
       maxMediaPayloadBytes: 1048576,
       mediaDir: "/srv/imagine/media",
       mediaUsageWarningBytes: 10737418240,
+      postgresConnectionTimeoutMillis: DEFAULT_POSTGRES_CONNECTION_TIMEOUT_MS,
+      postgresIdleTimeoutMillis: DEFAULT_POSTGRES_IDLE_TIMEOUT_MS,
+      postgresPoolMax: DEFAULT_POSTGRES_POOL_MAX,
+      postgresQueryTimeoutMillis: DEFAULT_POSTGRES_QUERY_TIMEOUT_MS,
+    },
+  );
+  assert.deepEqual(
+    resolvePostgresStorageConfig({
+      DATABASE_URL: "postgres://localhost/imagine",
+      IMAGINE_MAX_MEDIA_PAYLOAD_BYTES: "1048576",
+      IMAGINE_MEDIA_DIR: "/srv/imagine/media",
+      IMAGINE_POSTGRES_CONNECTION_TIMEOUT_MS: "4000",
+      IMAGINE_POSTGRES_IDLE_TIMEOUT_MS: "2000",
+      IMAGINE_POSTGRES_POOL_MAX: "8",
+      IMAGINE_POSTGRES_QUERY_TIMEOUT_MS: "45000",
+      IMAGINE_STORAGE_TARGET: "postgres",
+    }),
+    {
+      databaseUrl: "postgres://localhost/imagine",
+      maxMediaPayloadBytes: 1048576,
+      mediaDir: "/srv/imagine/media",
+      mediaUsageWarningBytes: undefined,
+      postgresConnectionTimeoutMillis: 4000,
+      postgresIdleTimeoutMillis: 2000,
+      postgresPoolMax: 8,
+      postgresQueryTimeoutMillis: 45000,
+    },
+  );
+});
+
+test("createPostgresPoolConfig applies bounded pool and timeout config", () => {
+  assert.deepEqual(
+    createPostgresPoolConfig({
+      databaseUrl: "postgres://localhost/imagine",
+      mediaDir: "/srv/imagine/media",
+      postgresConnectionTimeoutMillis: 4000,
+      postgresIdleTimeoutMillis: 2000,
+      postgresPoolMax: 8,
+      postgresQueryTimeoutMillis: 45000,
+    }),
+    {
+      connectionString: "postgres://localhost/imagine",
+      connectionTimeoutMillis: 4000,
+      idleTimeoutMillis: 2000,
+      max: 8,
+      query_timeout: 45000,
     },
   );
 });

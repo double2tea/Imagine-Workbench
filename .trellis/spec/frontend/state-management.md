@@ -1113,7 +1113,7 @@ const diagnostics = buildWorkspaceIntegrityDiagnostics(assetMetas, boards);
 - Runtime mode: `WorkspaceStorageMode = "browser" | "postgres"`.
 - Runtime target kind: `WorkspaceRuntimeStorageTargetKind = "indexeddb" | "postgres"`.
 - Environment selector: `IMAGINE_STORAGE_TARGET`; empty/undefined means `"browser"`, and the only non-default accepted value is `"postgres"`.
-- PostgreSQL connection: `DATABASE_URL`, server-only.
+- PostgreSQL connection: `DATABASE_URL`, server-only. Pool settings are explicit server env values with safe defaults: `IMAGINE_POSTGRES_POOL_MAX` defaults to `5`, `IMAGINE_POSTGRES_CONNECTION_TIMEOUT_MS` defaults to `3000`, `IMAGINE_POSTGRES_IDLE_TIMEOUT_MS` defaults to `1000`, and `IMAGINE_POSTGRES_QUERY_TIMEOUT_MS` defaults to `30000`.
 - Media volume: `IMAGINE_MEDIA_DIR`, server-only, used only by PostgreSQL team mode's local payload store.
 - Media usage warning: optional `IMAGINE_MEDIA_USAGE_WARNING_BYTES`, server-only, positive integer bytes. When configured, Settings -> Data shows an aggregate warning after total media-volume bytes reach the threshold.
 - Team setup token: `IMAGINE_TEAM_SETUP_TOKEN`, server-only, required by explicit PostgreSQL migration routes.
@@ -1337,6 +1337,8 @@ if (storageTarget === "postgres") await resetTeamBoards(readTeamCsrfToken());
 - `IMAGINE_STORAGE_TARGET=postgres` and `IMAGINE_MEDIA_DIR` missing/unwritable -> fail startup or health check visibly.
 - `IMAGINE_STORAGE_TARGET=postgres` and missing/invalid `IMAGINE_MAX_MEDIA_PAYLOAD_BYTES` -> fail startup or health check visibly.
 - `IMAGINE_STORAGE_TARGET=postgres` and invalid `IMAGINE_MEDIA_USAGE_WARNING_BYTES` -> fail startup or health check visibly.
+- `IMAGINE_STORAGE_TARGET=postgres` and invalid PostgreSQL pool/timeout env values -> fail config/health visibly.
+- PostgreSQL pool/database connection failure or query timeout -> `/api/storage/team/health` returns `reachable: false` with `503`, never falling back to browser storage.
 - PostgreSQL media write larger than `IMAGINE_MAX_MEDIA_PAYLOAD_BYTES` -> fail visibly before writing a local-file payload ref.
 - PostgreSQL media directory bytes greater than or equal to configured `IMAGINE_MEDIA_USAGE_WARNING_BYTES` -> `summary.teamStorage.mediaUsageWarning` is true and Settings -> Data shows an attention issue with only aggregate byte counts.
 - `POST /api/storage/team/migrations` with missing `IMAGINE_TEAM_SETUP_TOKEN` -> `400` with explicit setup-token config error.
@@ -1415,7 +1417,7 @@ if (storageTarget === "postgres") await resetTeamBoards(readTeamCsrfToken());
 
 - Good: normal local dev and Cloudflare Pages builds run in browser mode with no login prompt and no database requirement.
 - Good: self-hosted Docker Compose sets `IMAGINE_STORAGE_TARGET=postgres`, `DATABASE_URL`, `IMAGINE_MEDIA_DIR`, `IMAGINE_MAX_MEDIA_PAYLOAD_BYTES`, optional `IMAGINE_MEDIA_USAGE_WARNING_BYTES`, session/setup/encryption secrets, and app trusted origin, then uses PostgreSQL plus a media volume.
-- Good: `GET /api/storage/team/health` in a configured Node deployment reports `reachable: true`, current schema version, max media payload bytes, and pending migration ids without returning raw config values.
+- Good: `GET /api/storage/team/health` in a configured Node deployment reports `reachable: true`, current schema version, max media payload bytes, and pending migration ids without returning raw config values, while PostgreSQL clients use a shared bounded `pg` pool with configured max connections and timeouts.
 - Good: `GET /api/storage/team/assets` returns workspace-scoped asset metadata, safe media/download URLs, and payload summaries without returning raw storage keys or media-volume paths.
 - Good: `GET /api/storage/team/assets/[assetId]/media` reads only assets visible in the caller's workspace and returns private, no-store media bytes with the stored MIME type; `?download=1` adds `Content-Disposition: attachment`.
 - Good: `/` in PostgreSQL team mode uses `/api/storage/team/assets?boardId=&limit=200` for the main workspace gallery and hides library backing assets, while default browser mode still uses IndexedDB placeholders plus progressive hydration.

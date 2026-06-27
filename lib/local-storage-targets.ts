@@ -3,11 +3,15 @@ export type WorkspaceStorageTargetStatus = "active" | "planned";
 export type WorkspaceTeamDatabaseEngine = "postgres";
 
 export interface WorkspacePostgresStorageConfig {
+  connectionTimeoutMillisEnv: "IMAGINE_POSTGRES_CONNECTION_TIMEOUT_MS";
   engine: WorkspaceTeamDatabaseEngine;
+  idleTimeoutMillisEnv: "IMAGINE_POSTGRES_IDLE_TIMEOUT_MS";
   maxMediaPayloadBytesEnv: "IMAGINE_MAX_MEDIA_PAYLOAD_BYTES";
   mediaDirectoryEnv: "IMAGINE_MEDIA_DIR";
   previewDirectoryName: string;
   payloadDirectoryName: string;
+  poolMaxEnv: "IMAGINE_POSTGRES_POOL_MAX";
+  queryTimeoutMillisEnv: "IMAGINE_POSTGRES_QUERY_TIMEOUT_MS";
   requiredDatabaseUrlEnv: "DATABASE_URL";
 }
 
@@ -48,11 +52,15 @@ export const POSTGRES_STORAGE_ADAPTER: WorkspaceStorageAdapterContract = {
   kind: "postgres",
   label: "PostgreSQL 团队工作区",
   postgres: {
+    connectionTimeoutMillisEnv: "IMAGINE_POSTGRES_CONNECTION_TIMEOUT_MS",
     engine: "postgres",
+    idleTimeoutMillisEnv: "IMAGINE_POSTGRES_IDLE_TIMEOUT_MS",
     maxMediaPayloadBytesEnv: "IMAGINE_MAX_MEDIA_PAYLOAD_BYTES",
     mediaDirectoryEnv: "IMAGINE_MEDIA_DIR",
     previewDirectoryName: "previews",
     payloadDirectoryName: "originals",
+    poolMaxEnv: "IMAGINE_POSTGRES_POOL_MAX",
+    queryTimeoutMillisEnv: "IMAGINE_POSTGRES_QUERY_TIMEOUT_MS",
     requiredDatabaseUrlEnv: "DATABASE_URL",
   },
   status: "planned",

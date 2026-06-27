@@ -17,6 +17,7 @@ Edit `.env.team` before starting the stack:
 - Replace `DATABASE_URL` with the same PostgreSQL password.
 - Set `IMAGINE_MAX_MEDIA_PAYLOAD_BYTES` to the largest single generated/imported media payload the team may store, in bytes.
 - Set `IMAGINE_MEDIA_USAGE_WARNING_BYTES` to the media-volume byte count that should show a Settings -> Data warning.
+- Keep the default PostgreSQL pool settings for a small LAN team, or tune `IMAGINE_POSTGRES_POOL_MAX`, `IMAGINE_POSTGRES_CONNECTION_TIMEOUT_MS`, `IMAGINE_POSTGRES_IDLE_TIMEOUT_MS`, and `IMAGINE_POSTGRES_QUERY_TIMEOUT_MS` when the app server and database need different limits.
 - Replace `IMAGINE_TEAM_SETUP_TOKEN`.
 - Replace `IMAGINE_TEAM_SECRET_ENCRYPTION_KEY` with a long random server-side key. Keep it stable across restarts and backups, because team workspace secrets encrypted with it cannot be read with a different key.
 - Set `APP_URL` to the URL users will open on the LAN.
@@ -28,7 +29,7 @@ Edit `.env.team` before starting the stack:
 docker compose --env-file .env.team -f docker-compose.team.yml up --build
 ```
 
-The app listens on `http://localhost:3000` by default. PostgreSQL data is stored in the `postgres-data` volume. Generated media is stored in the `imagine-media` volume under `/data/imagine-media` inside the app container. Any single media payload larger than `IMAGINE_MAX_MEDIA_PAYLOAD_BYTES` is rejected before it is written to the media volume, and the failing request returns a visible error. When total media-volume usage reaches `IMAGINE_MEDIA_USAGE_WARNING_BYTES`, Settings -> Data shows a non-secret aggregate warning with used bytes and threshold bytes.
+The app listens on `http://localhost:3000` by default. PostgreSQL data is stored in the `postgres-data` volume. Generated media is stored in the `imagine-media` volume under `/data/imagine-media` inside the app container. Any single media payload larger than `IMAGINE_MAX_MEDIA_PAYLOAD_BYTES` is rejected before it is written to the media volume, and the failing request returns a visible error. When total media-volume usage reaches `IMAGINE_MEDIA_USAGE_WARNING_BYTES`, Settings -> Data shows a non-secret aggregate warning with used bytes and threshold bytes. PostgreSQL access uses a bounded app-server pool; the default pool max is 5 connections, with 3000 ms connection timeout, 1000 ms idle timeout, and 30000 ms query timeout.
 
 ## Run Schema Migrations
 
