@@ -51,7 +51,7 @@ test("listTeamVoiceProfiles returns workspace-scoped voice profiles", async () =
   );
 });
 
-test("saveTeamVoiceProfile upserts an editor-scoped profile", async () => {
+test("saveTeamVoiceProfile upserts an editor-scoped profile with audit", async () => {
   const queries: Array<{ text: string; values?: readonly unknown[] }> = [];
   const result = await saveTeamVoiceProfile(
     createTeamVoiceProfilesQueryable(queries, { role: "editor" }),
@@ -63,6 +63,21 @@ test("saveTeamVoiceProfile upserts an editor-scoped profile", async () => {
   const insert = queries.find(query => query.text.includes("insert into voice_profiles"));
   assert.equal(result.profile.id, PROFILE_ID);
   assert.deepEqual(insert?.values, [PROFILE_ID, WORKSPACE_ID, PROFILE, PROFILE.createdAt, PROFILE.updatedAt]);
+  assert.ok(queries.some(query => query.text === "begin"));
+  assert.ok(queries.some(query => query.text === "commit"));
+  assert.equal(queries.some(query => query.text === "rollback"), false);
+  const audit = queries.find(query => query.text.startsWith("insert into audit_events"));
+  assert.deepEqual(audit?.values, [
+    WORKSPACE_ID,
+    "user_1",
+    "team_voice_profile.save",
+    JSON.stringify({
+      profileId: PROFILE_ID,
+      referenceAudioAssetCount: 1,
+      source: "cloned",
+      sourceAssetCount: 1,
+    }),
+  ]);
 });
 
 test("deleteTeamVoiceProfile removes an editor-scoped profile with audit", async () => {

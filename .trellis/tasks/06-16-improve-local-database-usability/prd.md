@@ -103,6 +103,7 @@ Completed in the latest continuation:
 * Added `team_generation_task.delete` audit coverage for team generation-task deletes. The service now wraps the workspace-scoped delete plus non-secret task/status/media/board metadata in one transaction.
 * Added `team_asset_library.save` audit coverage for team asset-library saves. The service now wraps the workspace-scoped upsert plus non-secret item/asset/media metadata in one transaction.
 * Added `team_generation_task.cancel` audit coverage for explicit team generation-task cancellations, while leaving routine polling/progress updates unaudited to avoid noisy audit logs.
+* Added `team_voice_profile.save` audit coverage for team voice-profile saves. The service now wraps the workspace-scoped upsert plus non-secret profile/source/reference-count metadata in one transaction.
 
 Still remaining before the full PRD can be considered complete:
 

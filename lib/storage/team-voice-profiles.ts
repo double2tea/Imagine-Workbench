@@ -33,7 +33,25 @@ export async function saveTeamVoiceProfile(
   input: TeamVoiceProfileSaveInput,
 ): Promise<TeamVoiceProfileMutationResult> {
   const context = await createTeamWorkspaceStorageContext(queryable, config, request, { minimumRole: "editor" });
-  await context.repository.voiceProfiles.put({ profile: input.profile });
+  await context.queryable.query("begin");
+  try {
+    await context.repository.voiceProfiles.put({ profile: input.profile });
+    await recordTeamAuditEvent(context.queryable, {
+      eventType: "team_voice_profile.save",
+      metadata: {
+        profileId: input.profile.id,
+        referenceAudioAssetCount: input.profile.referenceAudioAssetIds.length,
+        source: input.profile.source,
+        sourceAssetCount: input.profile.sourceAssetIds?.length ?? 0,
+      },
+      userId: context.session.userId,
+      workspaceId: context.session.workspaceId,
+    });
+    await context.queryable.query("commit");
+  } catch (error) {
+    await context.queryable.query("rollback");
+    throw error;
+  }
   return {
     profile: input.profile,
     targetKind: "postgres",
