@@ -51,7 +51,7 @@ test("listTeamPromptTemplates returns workspace-scoped custom templates", async 
   );
 });
 
-test("saveTeamPromptTemplate upserts an editor-scoped custom template", async () => {
+test("saveTeamPromptTemplate upserts an editor-scoped custom template with audit", async () => {
   const queries: Array<{ text: string; values?: readonly unknown[] }> = [];
   const result = await saveTeamPromptTemplate(
     createTeamPromptTemplatesQueryable(queries, { role: "editor" }),
@@ -63,6 +63,16 @@ test("saveTeamPromptTemplate upserts an editor-scoped custom template", async ()
   const insert = queries.find(query => query.text.includes("insert into prompt_templates"));
   assert.equal(result.template.id, TEMPLATE_ID);
   assert.deepEqual(insert?.values, [TEMPLATE_ID, WORKSPACE_ID, TEMPLATE, TEMPLATE.createdAt, TEMPLATE.updatedAt]);
+  assert.ok(queries.some(query => query.text === "begin"));
+  assert.ok(queries.some(query => query.text === "commit"));
+  assert.equal(queries.some(query => query.text === "rollback"), false);
+  const audit = queries.find(query => query.text.startsWith("insert into audit_events"));
+  assert.deepEqual(audit?.values, [
+    WORKSPACE_ID,
+    "user_1",
+    "team_prompt_template.save",
+    JSON.stringify({ category: "custom", templateId: TEMPLATE_ID }),
+  ]);
 });
 
 test("deleteTeamPromptTemplate removes an editor-scoped custom template with audit", async () => {

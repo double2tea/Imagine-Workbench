@@ -41,20 +41,33 @@ export async function saveTeamPromptTemplate(
   input: TeamPromptTemplateSaveInput,
 ): Promise<TeamPromptTemplateMutationResult> {
   const context = await createTeamWorkspaceStorageContext(queryable, config, request, { minimumRole: "editor" });
-  await queryable.query(
-    `insert into prompt_templates (id, workspace_id, template, created_at, updated_at)
-     values ($1, $2, $3, $4, $5)
-     on conflict (id) do update
-       set template = excluded.template, updated_at = excluded.updated_at
-       where prompt_templates.workspace_id = excluded.workspace_id`,
-    [
-      input.template.id,
-      context.session.workspaceId,
-      input.template,
-      input.template.createdAt,
-      input.template.updatedAt,
-    ],
-  );
+  await queryable.query("begin");
+  try {
+    await queryable.query(
+      `insert into prompt_templates (id, workspace_id, template, created_at, updated_at)
+       values ($1, $2, $3, $4, $5)
+       on conflict (id) do update
+         set template = excluded.template, updated_at = excluded.updated_at
+         where prompt_templates.workspace_id = excluded.workspace_id`,
+      [
+        input.template.id,
+        context.session.workspaceId,
+        input.template,
+        input.template.createdAt,
+        input.template.updatedAt,
+      ],
+    );
+    await recordTeamAuditEvent(queryable, {
+      eventType: "team_prompt_template.save",
+      metadata: { category: input.template.category, templateId: input.template.id },
+      userId: context.session.userId,
+      workspaceId: context.session.workspaceId,
+    });
+    await queryable.query("commit");
+  } catch (error) {
+    await queryable.query("rollback");
+    throw error;
+  }
   return {
     targetKind: "postgres",
     template: input.template,
