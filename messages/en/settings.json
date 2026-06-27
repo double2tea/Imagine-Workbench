@@ -139,8 +139,11 @@
       "teamOrphanedPayloadFiles": "{count} orphaned payload files",
       "teamOrphanedPreviewFiles": "{count} orphaned preview files",
       "teamTmpFiles": "{count} tmp files",
-      "teamTrashFiles": "{count} trash files"
+      "teamTrashFiles": "{count} trash files",
+      "teamCleanMaintenanceFiles": "Clean files",
+      "teamCleanMaintenanceFilesBusy": "Cleaning files..."
     },
+    "teamMediaMaintenanceConfirm": "Delete team media files that are not referenced by PostgreSQL, including tmp and trash files. Database records and missing referenced files will not be changed.",
     "storageStructure": "Storage Structure", "storageStructureDescription": "Asset meta, shared payload, preview cache, and legacy format migration status", "teamStorageStructureDescription": "PostgreSQL workspace records, media payload references, library entries, and team settings",
     "backupAndSafety": "Backup & Safety", "backupSourcePrefix": "Source: {origin}",
     "backupLastSnapshotPrefix": "Last safety snapshot: {snapshot}", "backupSummaryTemplate": "Source: {origin}; Last safety snapshot: {snapshot}", "backupNone": "None",

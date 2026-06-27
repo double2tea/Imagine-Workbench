@@ -55,6 +55,7 @@ export const API_ROUTES = {
     },
     teamAsset: (assetId: string) => `/api/storage/team/assets/${encodeURIComponent(assetId)}`,
     teamHealth: "/api/storage/team/health",
+    teamMediaMaintenance: "/api/storage/team/media-maintenance",
     teamMigrations: "/api/storage/team/migrations",
     teamSession: "/api/storage/team/session",
   },

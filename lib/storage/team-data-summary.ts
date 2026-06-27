@@ -1,5 +1,3 @@
-import { readdir, stat } from "node:fs/promises";
-import path from "node:path";
 import type { QueryResultRow } from "pg";
 import type { BoardDocument, BoardNode } from "@/lib/board/types";
 import { collectBoardAssetIdsFromNodes } from "@/lib/assets/board-scope";
@@ -13,6 +11,11 @@ import type { PostgresStorageConfig } from "@/lib/storage/postgres/config";
 import type { PostgresQueryable } from "@/lib/storage/postgres/connection";
 import { createTeamWorkspaceStorageContext } from "@/lib/storage/team-context";
 import type { TeamWorkspaceDataSummaryResult } from "@/lib/storage/team-data-summary-types";
+import {
+  countTeamMediaConsistencyIssues,
+  inspectTeamMediaConsistency,
+  type TeamMediaConsistencySummary,
+} from "@/lib/storage/team-media-consistency";
 import type { VoiceProfile } from "@/lib/voice-profiles";
 import type {
   WorkspaceBoardAssetReference,
@@ -52,15 +55,6 @@ interface TeamSummaryCountRow extends QueryResultRow {
 interface PreviewRow extends QueryResultRow {
   storage_key: string | null;
   storage_kind: string | null;
-}
-
-interface TeamMediaConsistencySummary {
-  missingPayloadFiles: number;
-  missingPreviewFiles: number;
-  orphanedPayloadFiles: number;
-  orphanedPreviewFiles: number;
-  tmpFiles: number;
-  trashFiles: number;
 }
 
 export async function getTeamWorkspaceDataSummary(
@@ -220,47 +214,6 @@ export async function getTeamWorkspaceDataSummary(
   };
 }
 
-async function inspectTeamMediaConsistency(
-  mediaDir: string,
-  input: { payloadStorageKeys: string[]; previewStorageKeys: string[] },
-): Promise<TeamMediaConsistencySummary> {
-  const payloadStorageKeys = new Set(input.payloadStorageKeys);
-  const previewStorageKeys = new Set(input.previewStorageKeys);
-  const [
-    missingPayloadFiles,
-    missingPreviewFiles,
-    originalFiles,
-    previewFiles,
-    tmpFiles,
-    trashFiles,
-  ] = await Promise.all([
-    countMissingStorageKeys(mediaDir, payloadStorageKeys),
-    countMissingStorageKeys(mediaDir, previewStorageKeys),
-    collectStorageKeysUnder(mediaDir, "originals"),
-    collectStorageKeysUnder(mediaDir, "previews"),
-    collectStorageKeysUnder(mediaDir, "tmp"),
-    collectStorageKeysUnder(mediaDir, "trash"),
-  ]);
-
-  return {
-    missingPayloadFiles,
-    missingPreviewFiles,
-    orphanedPayloadFiles: originalFiles.filter(storageKey => !payloadStorageKeys.has(storageKey)).length,
-    orphanedPreviewFiles: previewFiles.filter(storageKey => !previewStorageKeys.has(storageKey)).length,
-    tmpFiles: tmpFiles.length,
-    trashFiles: trashFiles.length,
-  };
-}
-
-function countTeamMediaConsistencyIssues(summary: TeamMediaConsistencySummary): number {
-  return summary.missingPayloadFiles +
-    summary.missingPreviewFiles +
-    summary.orphanedPayloadFiles +
-    summary.orphanedPreviewFiles +
-    summary.tmpFiles +
-    summary.trashFiles;
-}
-
 function withTeamMediaConsistencyIssues(
   integrity: WorkspaceIntegrityDiagnostics,
   mediaConsistency: TeamMediaConsistencySummary,
@@ -270,70 +223,6 @@ function withTeamMediaConsistencyIssues(
     ? "critical"
     : issueCount > 0 ? "attention" : "healthy";
   return { ...integrity, issueCount, status };
-}
-
-async function countMissingStorageKeys(mediaDir: string, storageKeys: ReadonlySet<string>): Promise<number> {
-  let missing = 0;
-  for (const storageKey of storageKeys) {
-    if (!await storageKeyExists(mediaDir, storageKey)) missing += 1;
-  }
-  return missing;
-}
-
-async function storageKeyExists(mediaDir: string, storageKey: string): Promise<boolean> {
-  try {
-    const stats = await stat(resolveMediaStorageKey(mediaDir, storageKey));
-    return stats.isFile();
-  } catch (error) {
-    if (isNodeErrorCode(error, "ENOENT")) return false;
-    throw error;
-  }
-}
-
-async function collectStorageKeysUnder(mediaDir: string, relativeDir: "originals" | "previews" | "tmp" | "trash"): Promise<string[]> {
-  const absoluteDir = resolveMediaStorageKey(mediaDir, relativeDir);
-  return collectStorageKeys(mediaDir, absoluteDir);
-}
-
-async function collectStorageKeys(mediaDir: string, absoluteDir: string): Promise<string[]> {
-  let entries: import("node:fs").Dirent<string>[];
-  try {
-    entries = await readdir(absoluteDir, { encoding: "utf8", withFileTypes: true });
-  } catch (error) {
-    if (isNodeErrorCode(error, "ENOENT")) return [];
-    throw error;
-  }
-
-  const storageKeys: string[] = [];
-  for (const entry of entries) {
-    const absolutePath = path.join(absoluteDir, entry.name);
-    if (entry.isDirectory()) {
-      storageKeys.push(...await collectStorageKeys(mediaDir, absolutePath));
-    } else if (entry.isFile()) {
-      storageKeys.push(relativeMediaStorageKey(mediaDir, absolutePath));
-    }
-  }
-  return storageKeys;
-}
-
-function resolveMediaStorageKey(mediaDir: string, storageKey: string): string {
-  if (path.isAbsolute(storageKey)) throw new Error("Invalid team media storage key");
-  const parts = storageKey.split(/[\\/]+/);
-  if (parts.includes("..") || parts.includes("")) throw new Error("Invalid team media storage key");
-  const resolvedMediaDir = path.resolve(mediaDir);
-  const resolved = path.resolve(resolvedMediaDir, ...parts);
-  if (resolved !== resolvedMediaDir && !resolved.startsWith(`${resolvedMediaDir}${path.sep}`)) {
-    throw new Error("Invalid team media storage key");
-  }
-  return resolved;
-}
-
-function relativeMediaStorageKey(mediaDir: string, absolutePath: string): string {
-  return path.relative(path.resolve(mediaDir), absolutePath).split(path.sep).join(path.posix.sep);
-}
-
-function isNodeErrorCode(error: unknown, code: string): boolean {
-  return error instanceof Error && "code" in error && error.code === code;
 }
 
 function emptyCounts(): TeamSummaryCountRow {

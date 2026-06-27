@@ -24,6 +24,10 @@ import type {
   TeamAssetLibraryMutationResult,
 } from "@/lib/storage/team-asset-library-types";
 import type { TeamWorkspaceDataSummaryResult } from "@/lib/storage/team-data-summary-types";
+import type {
+  TeamMediaMaintenanceCleanupResult,
+  TeamMediaMaintenanceTarget,
+} from "@/lib/storage/team-media-maintenance-types";
 import type { TeamBoardDocumentResult, TeamBoardSummaryListResult } from "@/lib/storage/team-board-types";
 import type {
   TeamGenerationTaskListResult,
@@ -208,6 +212,30 @@ export async function fetchTeamWorkspaceDataSummary(fetcher: Fetcher = fetch): P
     throw new Error(error);
   }
   return parseTeamWorkspaceDataSummaryResult(body).summary;
+}
+
+export async function cleanupTeamMediaMaintenance(
+  target: TeamMediaMaintenanceTarget,
+  csrfToken: string,
+  fetcher: Fetcher = fetch,
+): Promise<TeamMediaMaintenanceCleanupResult> {
+  const token = csrfToken.trim();
+  if (!token) throw new Error("CSRF token is required");
+  const response = await fetcher(API_ROUTES.storage.teamMediaMaintenance, {
+    cache: "no-store",
+    body: JSON.stringify({ target }),
+    headers: {
+      "content-type": "application/json",
+      "x-imagine-csrf-token": token,
+    },
+    method: "POST",
+  });
+  const body: unknown = await response.json();
+  if (!response.ok) {
+    const error = readStringField(body, "error") ?? "Team media maintenance failed";
+    throw new Error(error);
+  }
+  return parseTeamMediaMaintenanceCleanupResult(body);
 }
 
 export async function fetchTeamSession(fetcher: Fetcher = fetch): Promise<TeamSessionContext> {
@@ -964,6 +992,11 @@ function parseTeamWorkspaceDataSummaryResult(value: unknown): TeamWorkspaceDataS
   return value;
 }
 
+function parseTeamMediaMaintenanceCleanupResult(value: unknown): TeamMediaMaintenanceCleanupResult {
+  if (!isTeamMediaMaintenanceCleanupResult(value)) throw new Error("Team media maintenance response is invalid");
+  return value;
+}
+
 function parseTeamStorageMigrationResult(value: unknown): TeamStorageMigrationResult {
   if (!isRecord(value)) throw new Error("PostgreSQL migration response is invalid");
   if (value.mode !== "postgres" || value.targetKind !== "postgres") throw new Error("PostgreSQL migration target is invalid");
@@ -1237,6 +1270,20 @@ function isTeamWorkspaceDataSummaryResult(value: unknown): value is TeamWorkspac
     value.targetKind === "postgres" &&
     typeof value.workspaceId === "string" &&
     isWorkspaceDataSummary(value.summary)
+  );
+}
+
+function isTeamMediaMaintenanceCleanupResult(value: unknown): value is TeamMediaMaintenanceCleanupResult {
+  if (!isRecord(value)) return false;
+  return (
+    value.targetKind === "postgres" &&
+    value.target === "maintenance-files" &&
+    typeof value.workspaceId === "string" &&
+    typeof value.deletedFiles === "number" &&
+    typeof value.deletedOrphanedPayloadFiles === "number" &&
+    typeof value.deletedOrphanedPreviewFiles === "number" &&
+    typeof value.deletedTmpFiles === "number" &&
+    typeof value.deletedTrashFiles === "number"
   );
 }
 

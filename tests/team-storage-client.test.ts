@@ -7,6 +7,7 @@ import type { GenerationTask } from "../lib/generation-tasks";
 import {
   bootstrapTeamOwner,
   cancelTeamGenerationTask,
+  cleanupTeamMediaMaintenance,
   createTeamMember,
   deleteTeamAsset,
   deleteTeamAssetLibraryRecord,
@@ -148,6 +149,41 @@ test("fetchTeamWorkspaceDataSummary parses PostgreSQL data summary", async () =>
       workspaceId: "workspace_1",
     })),
     /Team data summary response is invalid/,
+  );
+});
+
+test("cleanupTeamMediaMaintenance posts target and CSRF token", async () => {
+  let requestedUrl = "";
+  let requestedInit: RequestInit | undefined;
+  const result = await cleanupTeamMediaMaintenance("maintenance-files", " csrf-token ", async (input, init) => {
+    requestedUrl = String(input);
+    requestedInit = init;
+    return jsonResponse({
+      deletedFiles: 4,
+      deletedOrphanedPayloadFiles: 1,
+      deletedOrphanedPreviewFiles: 1,
+      deletedTmpFiles: 1,
+      deletedTrashFiles: 1,
+      target: "maintenance-files",
+      targetKind: "postgres",
+      workspaceId: "workspace_1",
+    });
+  });
+
+  assert.equal(requestedUrl, "/api/storage/team/media-maintenance");
+  assert.ok(requestedInit);
+  assert.equal(requestedInit.method, "POST");
+  assert.equal((requestedInit.headers as Record<string, string>)["x-imagine-csrf-token"], "csrf-token");
+  assert.deepEqual(JSON.parse(String(requestedInit.body)), { target: "maintenance-files" });
+  assert.equal(result.deletedFiles, 4);
+
+  await assert.rejects(
+    cleanupTeamMediaMaintenance("maintenance-files", "", async () => jsonResponse({})),
+    /CSRF token is required/,
+  );
+  await assert.rejects(
+    cleanupTeamMediaMaintenance("maintenance-files", "csrf-token", async () => jsonResponse({ error: "nope" }, { status: 500 })),
+    /nope/,
   );
 });
 

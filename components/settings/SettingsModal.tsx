@@ -20,6 +20,7 @@ import {
 } from "@/lib/data-management";
 import {
   bootstrapTeamOwner,
+  cleanupTeamMediaMaintenance,
   createTeamMember,
   deleteTeamMember,
   fetchTeamStorageHealth,
@@ -373,6 +374,14 @@ export default function SettingsModal({
     await refreshTeamMembersForSession(teamSession);
   }, [refreshTeamMembersForSession, t, teamSession]);
 
+  const runTeamMediaMaintenanceCleanup = useCallback(async () => {
+    if (!teamSession) throw new Error(t("dataManagement.teamSessionRequired"));
+    const csrfToken = readTeamCsrfToken();
+    if (!csrfToken) throw new Error(t("dataManagement.teamSessionCsrfMissing"));
+    await cleanupTeamMediaMaintenance("maintenance-files", csrfToken);
+    await refreshDataSummary();
+  }, [refreshDataSummary, t, teamSession]);
+
   const runTeamMigrations = useCallback(async () => {
     setTeamMigrationBusy(true);
     try {
@@ -588,6 +597,7 @@ export default function SettingsModal({
                   onRefreshStorageStatus={refreshStorageStatus}
                   onRepairAssetSources={onRepairAssetSources}
                   onResetBoards={onResetBoards}
+                  onCleanupTeamMediaMaintenance={runTeamMediaMaintenanceCleanup}
                   onRunTeamMigrations={runTeamMigrations}
                   onRefreshTeamMembers={refreshTeamMembers}
                   onCreateTeamMember={runCreateTeamMember}

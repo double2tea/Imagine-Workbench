@@ -68,6 +68,7 @@ interface DataManagementWorkspaceProps {
   onRefreshStorageStatus: () => Promise<void>;
   onRepairAssetSources: () => Promise<void>;
   onResetBoards: () => Promise<void>;
+  onCleanupTeamMediaMaintenance: () => Promise<void>;
   onRunTeamMigrations: () => Promise<void>;
   onRefreshTeamMembers: () => Promise<void>;
   onCreateTeamMember: () => Promise<void>;
@@ -212,6 +213,14 @@ function buildTeamMemberDeleteConfirmRequest(email: string, t: TranslateFn): Con
   };
 }
 
+function buildTeamMediaMaintenanceConfirmRequest(t: TranslateFn): ConfirmRequest {
+  return {
+    message: t("dataManagement.teamMediaMaintenanceConfirm"),
+    tone: "danger",
+    confirmLabel: t("dataManagement.issueGroups.teamCleanMaintenanceFiles"),
+  };
+}
+
 function teamRoleLabel(role: PublicTeamMember["role"], t: TranslateFn): string {
   if (role === "owner") return t("dataManagement.teamMemberRoleOwner");
   if (role === "admin") return t("dataManagement.teamMemberRoleAdmin");
@@ -309,6 +318,7 @@ export default function DataManagementWorkspace({
   onRefreshStorageStatus,
   onRepairAssetSources,
   onResetBoards,
+  onCleanupTeamMediaMaintenance,
   onRunTeamMigrations,
   onRefreshTeamMembers,
   onCreateTeamMember,
@@ -485,6 +495,12 @@ export default function DataManagementWorkspace({
           title: t("dataManagement.issueGroups.teamOrphanedMediaFiles"),
           count: mediaConsistency.orphanedPayloadFiles + mediaConsistency.orphanedPreviewFiles + mediaConsistency.tmpFiles + mediaConsistency.trashFiles,
           tone: "attention" as const,
+          action: {
+            label: t("dataManagement.issueGroups.teamCleanMaintenanceFiles"),
+            busyLabel: t("dataManagement.issueGroups.teamCleanMaintenanceFilesBusy"),
+            confirmRequest: buildTeamMediaMaintenanceConfirmRequest(t),
+            run: onCleanupTeamMediaMaintenance,
+          },
           details: [
             t("dataManagement.issueGroups.teamOrphanedPayloadFiles", { count: mediaConsistency.orphanedPayloadFiles }),
             t("dataManagement.issueGroups.teamOrphanedPreviewFiles", { count: mediaConsistency.orphanedPreviewFiles }),
@@ -494,7 +510,7 @@ export default function DataManagementWorkspace({
         },
       ] : []),
     ];
-  }, [integrity, isTeamStorageMode, onCleanupAssets, onRepairAssetSources, t, teamStorageSummary]);
+  }, [integrity, isTeamStorageMode, onCleanupAssets, onCleanupTeamMediaMaintenance, onRepairAssetSources, t, teamStorageSummary]);
 
   const toggleGroup = (key: string) => {
     setExpandedGroups(current => ({ ...current, [key]: !current[key] }));
