@@ -75,7 +75,7 @@ export async function saveTeamAsset(
   };
 }
 
-function publicTeamAssetRecord(record: {
+export function publicTeamAssetRecord(record: {
   meta: StorageItemMeta;
   payload?: WorkspaceAssetPayloadRef;
   preview?: WorkspaceAssetPayloadRef;

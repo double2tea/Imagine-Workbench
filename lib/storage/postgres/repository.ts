@@ -4,6 +4,7 @@ import type { GenerationTask } from "@/lib/generation-tasks";
 import { LocalFilePayloadStore } from "@/lib/storage/local-file-payload-store";
 import type {
   WorkspaceAssetListOptions,
+  WorkspaceAssetLibraryRepository,
   WorkspaceAssetPayloadRepository,
   WorkspaceAssetRepository,
   WorkspaceBoardListOptions,
@@ -20,6 +21,7 @@ import type {
 import {
   WORKSPACE_STORAGE_SCHEMA_VERSION,
   type WorkspaceAssetPayloadRef,
+  type WorkspaceAssetLibraryRecord,
   type WorkspaceAssetRecord,
   type WorkspaceBoardRecord,
   type WorkspaceGenerationTaskRecord,
@@ -41,6 +43,10 @@ interface PayloadRow extends QueryResultRow {
   size_bytes: string | number | null;
   storage_key: string;
   storage_kind: WorkspaceAssetPayloadRef["kind"];
+}
+
+interface AssetLibraryRow extends QueryResultRow {
+  record: WorkspaceAssetLibraryRecord["record"];
 }
 
 interface BoardRow extends QueryResultRow {
@@ -86,6 +92,7 @@ export function createPostgresWorkspaceStorageRepository(
   workspaceId: string,
 ): WorkspaceStorageRepository {
   return {
+    assetLibrary: new PostgresAssetLibraryRepository(queryable, workspaceId),
     assets: new PostgresAssetRepository(queryable, workspaceId),
     boards: new PostgresBoardRepository(queryable, workspaceId),
     generationTasks: new PostgresGenerationTaskRepository(queryable, workspaceId),
@@ -96,6 +103,52 @@ export function createPostgresWorkspaceStorageRepository(
     targetKind: "postgres",
     voiceProfiles: new PostgresVoiceProfileRepository(queryable, workspaceId),
   };
+}
+
+class PostgresAssetLibraryRepository implements WorkspaceAssetLibraryRepository {
+  constructor(
+    private readonly queryable: PostgresQueryable,
+    private readonly workspaceId: string,
+  ) {}
+
+  async delete(id: string): Promise<void> {
+    await this.queryable.query("delete from asset_library where workspace_id = $1 and id = $2", [this.workspaceId, id]);
+  }
+
+  async get(id: string): Promise<WorkspaceAssetLibraryRecord | null> {
+    const result = await this.queryable.query<AssetLibraryRow>(
+      "select record from asset_library where workspace_id = $1 and id = $2",
+      [this.workspaceId, id],
+    );
+    const record = result.rows[0]?.record;
+    return record ? { record } : null;
+  }
+
+  async list(options: WorkspaceStoragePageOptions = {}): Promise<WorkspaceAssetLibraryRecord[]> {
+    const result = await this.queryable.query<AssetLibraryRow>(
+      "select record from asset_library where workspace_id = $1 order by updated_at desc limit $2 offset $3",
+      [this.workspaceId, options.limit ?? 200, options.offset ?? 0],
+    );
+    return result.rows.map(row => ({ record: row.record }));
+  }
+
+  async put(record: WorkspaceAssetLibraryRecord): Promise<void> {
+    await this.queryable.query(
+      `insert into asset_library (id, workspace_id, asset_id, record, created_at, updated_at)
+       values ($1, $2, $3, $4, $5, $6)
+       on conflict (id) do update
+         set asset_id = excluded.asset_id, record = excluded.record, updated_at = excluded.updated_at
+         where asset_library.workspace_id = excluded.workspace_id`,
+      [
+        record.record.id,
+        this.workspaceId,
+        record.record.assetId,
+        record.record,
+        record.record.createdAt,
+        record.record.updatedAt,
+      ],
+    );
+  }
 }
 
 class PostgresAssetRepository implements WorkspaceAssetRepository {

@@ -31,7 +31,7 @@ export const LIBRARY_ASSET_MEDIA_TYPE_LABELS: Record<LibraryAssetMediaType, stri
   video: t("media.referenceLabels.video"),
 };
 
-function makeClientId(prefix: string): string {
+export function makeLibraryClientId(prefix: string): string {
   const cryptoApi = typeof crypto !== "undefined" ? crypto : null;
   if (cryptoApi && typeof cryptoApi.randomUUID === "function") {
     return `${prefix}_${cryptoApi.randomUUID()}`;
@@ -39,15 +39,15 @@ function makeClientId(prefix: string): string {
   return `${prefix}_${Date.now()}_${Math.random().toString(36).slice(2, 9)}`;
 }
 
-function isLibraryMediaType(type: StorageItem["type"]): type is LibraryAssetMediaType {
+export function isLibraryMediaType(type: StorageItem["type"]): type is LibraryAssetMediaType {
   return type === "image" || type === "video" || type === "audio";
 }
 
-function isLibraryFileType(file: File): boolean {
+export function isLibraryFileType(file: File): boolean {
   return file.type.startsWith("image/") || file.type.startsWith("video/") || file.type.startsWith("audio/");
 }
 
-function defaultLibraryTitle(item: Pick<StorageItem, "prompt" | "model" | "operationName">, fallback: string): string {
+export function defaultLibraryTitle(item: Pick<StorageItem, "prompt" | "model" | "operationName">, fallback: string): string {
   const prompt = item.prompt.trim();
   if (prompt) return prompt.slice(0, 80);
   const operation = item.operationName?.trim();
@@ -99,8 +99,8 @@ export async function addSourceAssetToLibrary(
   if (existing) return { record: existing, created: false };
 
   const now = new Date().toISOString();
-  const recordId = makeClientId("library_item");
-  const backingAssetId = makeClientId("library_asset");
+  const recordId = makeLibraryClientId("library_item");
+  const backingAssetId = makeLibraryClientId("library_asset");
   const backing = await buildLibraryBackingAsset(source, recordId, backingAssetId);
   const record: LibraryAssetRecord = {
     id: recordId,
@@ -125,30 +125,7 @@ export async function importFilesToLibrary(files: File[]): Promise<LibraryAssetR
   const backingAssetIds: string[] = [];
   try {
     for (const file of files) {
-      if (!isLibraryFileType(file)) throw new Error(t("common.notices.libraryImportFailed"));
-      const recordId = makeClientId("library_item");
-      const asset = await createLocalUploadAsset(file, makeClientId("library_asset"));
-      if (!isLibraryMediaType(asset.type)) throw new Error(t("common.notices.libraryImportFailed"));
-      const mediaType = asset.type;
-      const now = new Date().toISOString();
-      const backing = buildStorageItem({
-        ...asset,
-        operationName: "asset-library",
-        libraryItemId: recordId,
-      });
-      const record: LibraryAssetRecord = {
-        id: recordId,
-        assetId: backing.id,
-        origin: "imported",
-        mediaType,
-        category: "other",
-        title: file.name || defaultLibraryTitle(backing, LIBRARY_ASSET_MEDIA_TYPE_LABELS[mediaType]),
-        notes: "",
-        tags: [],
-        favorite: false,
-        createdAt: now,
-        updatedAt: now,
-      };
+      const { backing, record } = await buildImportedLibraryAssetPair(file);
       backingAssetIds.push(backing.id);
       await saveLibraryAssetPair(backing, record);
       records.push(record);
@@ -164,4 +141,34 @@ export async function importFilesToLibrary(files: File[]): Promise<LibraryAssetR
     throw error;
   }
   return records;
+}
+
+export async function buildImportedLibraryAssetPair(
+  file: File,
+): Promise<{ backing: StorageItem; record: LibraryAssetRecord }> {
+  if (!isLibraryFileType(file)) throw new Error(t("common.notices.libraryImportFailed"));
+  const recordId = makeLibraryClientId("library_item");
+  const asset = await createLocalUploadAsset(file, makeLibraryClientId("library_asset"));
+  if (!isLibraryMediaType(asset.type)) throw new Error(t("common.notices.libraryImportFailed"));
+  const mediaType = asset.type;
+  const now = new Date().toISOString();
+  const backing = buildStorageItem({
+    ...asset,
+    operationName: "asset-library",
+    libraryItemId: recordId,
+  });
+  const record: LibraryAssetRecord = {
+    id: recordId,
+    assetId: backing.id,
+    origin: "imported",
+    mediaType,
+    category: "other",
+    title: file.name || defaultLibraryTitle(backing, LIBRARY_ASSET_MEDIA_TYPE_LABELS[mediaType]),
+    notes: "",
+    tags: [],
+    favorite: false,
+    createdAt: now,
+    updatedAt: now,
+  };
+  return { backing, record };
 }

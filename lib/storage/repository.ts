@@ -4,6 +4,7 @@ import type { GenerationTask, GenerationTaskStatus } from "@/lib/generation-task
 import type { WorkspaceStorageTargetKind } from "@/lib/local-storage-targets";
 import type {
   WorkspaceAssetPayloadRef,
+  WorkspaceAssetLibraryRecord,
   WorkspaceAssetRecord,
   WorkspaceBoardRecord,
   WorkspaceGenerationTaskRecord,
@@ -60,6 +61,13 @@ export interface WorkspaceAssetPayloadRepository {
   }): Promise<WorkspaceAssetPayloadRef>;
 }
 
+export interface WorkspaceAssetLibraryRepository {
+  delete(id: string): Promise<void>;
+  get(id: string): Promise<WorkspaceAssetLibraryRecord | null>;
+  list(options?: WorkspaceStoragePageOptions): Promise<WorkspaceAssetLibraryRecord[]>;
+  put(record: WorkspaceAssetLibraryRecord): Promise<void>;
+}
+
 export interface WorkspaceBoardRepository {
   delete(id: string): Promise<void>;
   get(id: string): Promise<WorkspaceBoardRecord | null>;
@@ -95,6 +103,7 @@ export interface WorkspaceVoiceProfileRepository {
 }
 
 export interface WorkspaceStorageRepository {
+  assetLibrary: WorkspaceAssetLibraryRepository;
   assets: WorkspaceAssetRepository;
   boards: WorkspaceBoardRepository;
   generationTasks: WorkspaceGenerationTaskRepository;

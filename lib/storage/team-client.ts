@@ -2,7 +2,7 @@ import { API_ROUTES } from "@/lib/api/routes";
 import type { BoardDocument, BoardSummary } from "@/lib/board/types";
 import { readFetchError } from "@/lib/client-fetch-error";
 import { readCustomPromptTemplate, type CustomPromptTemplate } from "@/lib/custom-prompt-templates";
-import type { StorageItem, StorageItemMeta } from "@/lib/db";
+import type { LibraryAssetRecord, StorageItem, StorageItemMeta } from "@/lib/db";
 import type {
   GenerationTask,
   GenerationTaskStatus,
@@ -17,6 +17,11 @@ import type {
   TeamAssetListResult,
   TeamAssetMutationResult,
 } from "@/lib/storage/team-asset-types";
+import type {
+  PublicTeamAssetLibraryEntry,
+  TeamAssetLibraryListResult,
+  TeamAssetLibraryMutationResult,
+} from "@/lib/storage/team-asset-library-types";
 import type { TeamBoardDocumentResult, TeamBoardSummaryListResult } from "@/lib/storage/team-board-types";
 import type {
   TeamGenerationTaskListResult,
@@ -618,6 +623,62 @@ export async function fetchTeamAssets(
   return parseTeamAssetListResult(body);
 }
 
+export async function fetchTeamAssetLibrary(
+  options: { limit?: number; offset?: number } = {},
+  fetcher: Fetcher = fetch,
+): Promise<TeamAssetLibraryListResult> {
+  const response = await fetcher(teamAssetLibraryUrl(options), { cache: "no-store" });
+  const body: unknown = await response.json();
+  if (!response.ok) {
+    const error = readStringField(body, "error") ?? "Team asset library list failed";
+    throw new Error(error);
+  }
+  return parseTeamAssetLibraryListResult(body);
+}
+
+export async function saveTeamAssetLibraryRecord(
+  record: LibraryAssetRecord,
+  csrfToken: string,
+  fetcher: Fetcher = fetch,
+): Promise<PublicTeamAssetLibraryEntry> {
+  const token = csrfToken.trim();
+  if (!token) throw new Error("CSRF token is required");
+  const response = await fetcher(API_ROUTES.storage.teamAssetLibrary, {
+    cache: "no-store",
+    body: JSON.stringify({ record }),
+    headers: {
+      "content-type": "application/json",
+      "x-imagine-csrf-token": token,
+    },
+    method: "POST",
+  });
+  const body: unknown = await response.json();
+  if (!response.ok) {
+    const error = readStringField(body, "error") ?? "Team asset library save failed";
+    throw new Error(error);
+  }
+  return parseTeamAssetLibraryMutationResult(body).entry;
+}
+
+export async function deleteTeamAssetLibraryRecord(
+  itemId: string,
+  csrfToken: string,
+  fetcher: Fetcher = fetch,
+): Promise<void> {
+  const token = csrfToken.trim();
+  if (!token) throw new Error("CSRF token is required");
+  const response = await fetcher(API_ROUTES.storage.teamAssetLibraryItem(itemId), {
+    cache: "no-store",
+    headers: { "x-imagine-csrf-token": token },
+    method: "DELETE",
+  });
+  const body: unknown = await response.json();
+  if (!response.ok) {
+    const error = readStringField(body, "error") ?? "Team asset library delete failed";
+    throw new Error(error);
+  }
+}
+
 export async function fetchTeamGenerationTasks(
   options: TeamGenerationTaskListOptions = {},
   fetcher: Fetcher = fetch,
@@ -1002,6 +1063,16 @@ function parseTeamAssetMutationResult(value: unknown): TeamAssetMutationResult {
   return value;
 }
 
+function parseTeamAssetLibraryListResult(value: unknown): TeamAssetLibraryListResult {
+  if (!isTeamAssetLibraryListResult(value)) throw new Error("Team asset library list response is invalid");
+  return value;
+}
+
+function parseTeamAssetLibraryMutationResult(value: unknown): TeamAssetLibraryMutationResult {
+  if (!isTeamAssetLibraryMutationResult(value)) throw new Error("Team asset library response is invalid");
+  return value;
+}
+
 function parseTeamGenerationTaskListResult(value: unknown): TeamGenerationTaskListResult {
   if (!isTeamGenerationTaskListResult(value)) throw new Error("Team generation task list response is invalid");
   return value;
@@ -1035,6 +1106,14 @@ function teamAssetsUrl(options: TeamAssetListOptions): string {
   for (const status of options.statuses ?? []) searchParams.append("status", status);
   const query = searchParams.toString();
   return query ? `${API_ROUTES.storage.teamAssets}?${query}` : API_ROUTES.storage.teamAssets;
+}
+
+function teamAssetLibraryUrl(options: { limit?: number; offset?: number }): string {
+  const searchParams = new URLSearchParams();
+  if (options.limit !== undefined) searchParams.set("limit", String(options.limit));
+  if (options.offset !== undefined) searchParams.set("offset", String(options.offset));
+  const query = searchParams.toString();
+  return query ? `${API_ROUTES.storage.teamAssetLibrary}?${query}` : API_ROUTES.storage.teamAssetLibrary;
 }
 
 function teamGenerationTasksUrl(options: TeamGenerationTaskListOptions): string {
@@ -1141,6 +1220,27 @@ function isTeamAssetMutationResult(value: unknown): value is TeamAssetMutationRe
     value.targetKind === "postgres" &&
     typeof value.workspaceId === "string" &&
     isPublicTeamAssetRecord(value.asset)
+  );
+}
+
+function isTeamAssetLibraryListResult(value: unknown): value is TeamAssetLibraryListResult {
+  if (!isRecord(value)) return false;
+  return (
+    value.targetKind === "postgres" &&
+    typeof value.workspaceId === "string" &&
+    Number.isInteger(value.limit) &&
+    Number.isInteger(value.offset) &&
+    Array.isArray(value.entries) &&
+    value.entries.every(isPublicTeamAssetLibraryEntry)
+  );
+}
+
+function isTeamAssetLibraryMutationResult(value: unknown): value is TeamAssetLibraryMutationResult {
+  if (!isRecord(value)) return false;
+  return (
+    value.targetKind === "postgres" &&
+    typeof value.workspaceId === "string" &&
+    isPublicTeamAssetLibraryEntry(value.entry)
   );
 }
 
@@ -1344,6 +1444,33 @@ function isPublicTeamAssetRecord(value: unknown): value is PublicTeamAssetRecord
     optionalString(value.downloadUrl) &&
     (payload === undefined || isPublicTeamAssetPayload(payload)) &&
     (preview === undefined || isPublicTeamAssetPayload(preview))
+  );
+}
+
+function isPublicTeamAssetLibraryEntry(value: unknown): value is PublicTeamAssetLibraryEntry {
+  if (!isRecord(value)) return false;
+  return (
+    isLibraryAssetRecord(value.record) &&
+    (value.asset === null || isPublicTeamAssetRecord(value.asset))
+  );
+}
+
+function isLibraryAssetRecord(value: unknown): value is LibraryAssetRecord {
+  if (!isRecord(value)) return false;
+  return (
+    typeof value.id === "string" &&
+    typeof value.assetId === "string" &&
+    optionalString(value.sourceAssetId) &&
+    (value.origin === "promoted" || value.origin === "imported") &&
+    (value.mediaType === "image" || value.mediaType === "video" || value.mediaType === "audio") &&
+    (value.category === "character" || value.category === "scene" || value.category === "prop" || value.category === "style" || value.category === "other") &&
+    typeof value.title === "string" &&
+    typeof value.notes === "string" &&
+    Array.isArray(value.tags) &&
+    value.tags.every(tag => typeof tag === "string") &&
+    typeof value.favorite === "boolean" &&
+    typeof value.createdAt === "string" &&
+    typeof value.updatedAt === "string"
   );
 }
 

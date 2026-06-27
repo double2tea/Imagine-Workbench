@@ -1,6 +1,7 @@
 import assert from "node:assert/strict";
 import test from "node:test";
 import type { BoardDocument, BoardSummary } from "../lib/board/types";
+import type { LibraryAssetRecord } from "../lib/db";
 import type { GenerationTask } from "../lib/generation-tasks";
 
 import {
@@ -8,6 +9,7 @@ import {
   cancelTeamGenerationTask,
   createTeamMember,
   deleteTeamAsset,
+  deleteTeamAssetLibraryRecord,
   deleteTeamGenerationTask,
   deleteTeamMember,
   deleteTeamSecret,
@@ -16,6 +18,7 @@ import {
   fetchTeamBoardDocument,
   fetchTeamMembers,
   fetchTeamAssets,
+  fetchTeamAssetLibrary,
   fetchTeamBoardSummaries,
   fetchTeamGenerationTasks,
   fetchTeamSecrets,
@@ -27,6 +30,7 @@ import {
   readTeamCsrfToken,
   saveTeamBoardDocument,
   saveTeamAsset,
+  saveTeamAssetLibraryRecord,
   saveTeamGenerationTask,
   saveTeamSecret,
   teamAssetRecordToStorageItem,
@@ -58,6 +62,24 @@ function createStorageItem() {
     status: "complete" as const,
     type: "image" as const,
     url: "data:image/png;base64,aW1hZ2U=",
+  };
+}
+
+function createLibraryAssetRecord(overrides: Partial<LibraryAssetRecord> = {}): LibraryAssetRecord {
+  return {
+    assetId: "asset_1",
+    category: "character",
+    createdAt: "2026-06-27T00:00:00.000Z",
+    favorite: false,
+    id: "library_1",
+    mediaType: "image",
+    notes: "",
+    origin: "promoted",
+    sourceAssetId: "asset_1",
+    tags: ["hero"],
+    title: "Hero character",
+    updatedAt: "2026-06-27T00:00:00.000Z",
+    ...overrides,
   };
 }
 
@@ -232,6 +254,109 @@ test("fetchTeamWorkspaceGalleryItems reads workspace-global team assets", async 
   assert.equal(requestedUrl, "/api/storage/team/assets?boardId=&limit=200");
   assert.deepEqual(result.map(item => item.id), ["workspace_asset"]);
   assert.equal(result[0]?.url, "/api/storage/team/assets/workspace_asset/media");
+});
+
+test("team asset library client sends filters and rejects payload storage keys", async () => {
+  let listUrl = "";
+  const record = createLibraryAssetRecord();
+  const listResult = await fetchTeamAssetLibrary({ limit: 20, offset: 5 }, async input => {
+    listUrl = String(input);
+    return jsonResponse({
+      entries: [{
+        asset: {
+          mediaUrl: "/api/storage/team/assets/asset_1/media",
+          meta: {
+            hasBlob: true,
+            id: "asset_1",
+            status: "complete",
+            type: "image",
+          },
+          payload: {
+            contentHash: "sha256:abc",
+            kind: "local-file",
+            mimeType: "image/png",
+            sizeBytes: 12,
+          },
+        },
+        record,
+      }],
+      limit: 20,
+      offset: 5,
+      targetKind: "postgres",
+      workspaceId: "workspace_1",
+    });
+  });
+
+  assert.equal(listUrl, "/api/storage/team/asset-library?limit=20&offset=5");
+  assert.equal(listResult.entries[0]?.record.id, "library_1");
+  const firstLibraryAsset = listResult.entries[0]?.asset;
+  assert.ok(firstLibraryAsset);
+  assert.equal(teamAssetRecordToStorageItem(firstLibraryAsset).url, "/api/storage/team/assets/asset_1/media");
+
+  await assert.rejects(
+    fetchTeamAssetLibrary(undefined, async () => jsonResponse({
+      entries: [{
+        asset: {
+          meta: {
+            hasBlob: true,
+            id: "asset_1",
+            status: "complete",
+            type: "image",
+          },
+          payload: {
+            kind: "local-file",
+            uri: "originals/image/secret.png",
+          },
+        },
+        record,
+      }],
+      limit: 100,
+      offset: 0,
+      targetKind: "postgres",
+      workspaceId: "workspace_1",
+    })),
+    /Team asset library list response is invalid/,
+  );
+
+  let saveCsrfHeader: string | null = null;
+  let saveBody: string | null = null;
+  const saved = await saveTeamAssetLibraryRecord(record, "csrf-token", async (input, init) => {
+    assert.equal(String(input), "/api/storage/team/asset-library");
+    assert.equal(init?.method, "POST");
+    saveCsrfHeader = new Headers(init?.headers).get("x-imagine-csrf-token");
+    saveBody = String(init?.body);
+    return jsonResponse({
+      entry: {
+        asset: null,
+        record,
+      },
+      targetKind: "postgres",
+      workspaceId: "workspace_1",
+    });
+  });
+  assert.equal(saveCsrfHeader, "csrf-token");
+  assert.equal(saveBody, JSON.stringify({ record }));
+  assert.equal(saved.record.id, "library_1");
+
+  let deleteUrl = "";
+  let deleteCsrfHeader: string | null = null;
+  await deleteTeamAssetLibraryRecord("library/with spaces", "csrf-token", async (input, init) => {
+    deleteUrl = String(input);
+    assert.equal(init?.method, "DELETE");
+    deleteCsrfHeader = new Headers(init?.headers).get("x-imagine-csrf-token");
+    return jsonResponse({ ok: true });
+  });
+  assert.equal(deleteUrl, "/api/storage/team/asset-library/library%2Fwith%20spaces");
+  assert.equal(deleteCsrfHeader, "csrf-token");
+
+  await assert.rejects(
+    saveTeamAssetLibraryRecord(record, " "),
+    /CSRF token is required/,
+  );
+  await assert.rejects(
+    deleteTeamAssetLibraryRecord("library_1", " "),
+    /CSRF token is required/,
+  );
 });
 
 test("deleteTeamAsset sends CSRF header to encoded asset route", async () => {
