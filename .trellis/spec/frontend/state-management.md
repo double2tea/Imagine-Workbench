@@ -48,7 +48,7 @@ Managed provider model caches in `lib/data-management.ts` must include every per
 
 - Runtime check: `fetchWorkspaceStorageRuntimeStatus(): Promise<{ targetKind: "indexeddb" | "postgres"; ... }>` determines the active persistence branch.
 - Secrets API: `saveTeamSecret({ group: "provider", key: "provider:<provider>:apiKey", value }, csrfToken)` and `deleteTeamSecret(key, csrfToken)` store provider API keys only.
-- Settings API: `fetchTeamSettings({ groups: ["provider"] })`, `saveTeamSetting({ group: "provider", key, value }, csrfToken)`, and `deleteTeamSetting(key, csrfToken)` store non-secret provider settings.
+- Settings API: `fetchTeamSettings({ groups: ["provider"] })`, `saveTeamSetting({ group: "provider", key, value, expectedUpdatedAt? }, csrfToken)`, and `deleteTeamSetting(key, csrfToken, expectedUpdatedAt?)` store non-secret provider settings.
 - Provider setting keys:
   - `provider:selected`
   - `provider:chatModel`
@@ -66,6 +66,9 @@ Managed provider model caches in `lib/data-management.ts` must include every per
 - API keys are secret records and must never be saved through `/api/storage/team/settings`.
 - Base URLs, selected provider, selected chat model, custom provider definitions, and saved model option lists are non-secret records and must never be saved through `/api/storage/team/secrets`.
 - Team setting values are JSON strings only where the existing browser setting already stores JSON, such as custom provider arrays and model option maps.
+- `PublicTeamSetting.updatedAt` is also the optimistic concurrency token for non-secret team setting writes. Provider Settings stores the loaded token per key, sends it on updates/deletes, refreshes it after successful saves, and clears it after successful deletes.
+- Saving a new setting may omit `expectedUpdatedAt`; updating or deleting an existing non-secret setting without a token must fail with `409 team_setting_version_required`.
+- Updating or deleting a setting with a stale token must fail with `409 team_setting_version_conflict` instead of overwriting another admin's change.
 - Provider base URL text may stay in React state while editing, but committing in PostgreSQL mode happens through an explicit save boundary such as input blur.
 
 #### 4. Validation & Error Matrix
@@ -73,6 +76,8 @@ Managed provider model caches in `lib/data-management.ts` must include every per
 - Missing CSRF token on a PostgreSQL save/delete -> show the existing provider credential CSRF notice and do not mutate team settings.
 - `fetchTeamSettings({ groups: ["provider"] })` rejects because the user is not authorized -> keep defaults for non-secret provider settings without falling back to localStorage.
 - Secret-shaped response from team settings client -> client parser rejects; settings UI must not accept leaked secret values.
+- Existing setting save/delete without a loaded `updatedAt` token -> `409 team_setting_version_required`.
+- Stale setting `updatedAt` token -> `409 team_setting_version_conflict`.
 - Empty built-in provider base URL in PostgreSQL mode -> delete `provider:<provider>:baseUrl`.
 - Empty custom provider base URL in PostgreSQL mode -> save `provider:<provider>:baseUrl` with an empty string so the custom provider definition URL does not rehydrate after reload.
 - Corrupt JSON in `provider:customProviders` or `provider:modelOptions:*` -> ignore that value and restore defaults for that category.
@@ -1471,7 +1476,7 @@ if (storageTarget === "postgres") await resetTeamBoards(readTeamCsrfToken());
 - Unit: team-storage client fetches team generation tasks with `boardId`, repeated `sourceBoardNodeId`, repeated `status`, `limit`, and `offset`; save/update/cancel/delete send CSRF only as `x-imagine-csrf-token`, encode task ids, reject blank CSRF before fetch, and parse returned `GenerationTask` records.
 - Unit: team-storage client fetches team prompt templates, parses each value through `readCustomPromptTemplate()`, saves `{ template }` with CSRF only as `x-imagine-csrf-token`, encodes template ids for delete, and rejects blank CSRF tokens before fetch.
 - Unit: team-storage client fetches team voice profiles, validates profile shape, saves `{ profile }` with CSRF only as `x-imagine-csrf-token`, encodes profile ids for delete, preserves audio asset-reference arrays, and rejects blank CSRF tokens before fetch.
-- Unit: team-storage client fetches team settings with repeated `group` and `key` filters, saves non-secret `{ group, key, value }` with CSRF only as `x-imagine-csrf-token`, encodes setting keys for delete, rejects secret-shaped setting responses, and rejects blank CSRF tokens before fetch.
+- Unit: team-storage client fetches team settings with repeated `group` and `key` filters, saves non-secret `{ group, key, value, expectedUpdatedAt? }` with CSRF only as `x-imagine-csrf-token`, sends setting delete concurrency tokens as `If-Match`, encodes setting keys for delete, rejects secret-shaped setting responses, and rejects blank CSRF tokens before fetch.
 - Unit: team-storage client fetches team board summaries with repeated `id`, `limit`, and `offset`, parses summary fields, and rejects malformed summaries.
 - Unit: team-storage client creates team boards with CSRF, fetches redacted team board documents, saves them with `If-Match` and CSRF headers, deletes single boards with CSRF, resets the board collection with CSRF, requires CSRF tokens for mutating board calls, and rejects responses containing `runninghub-app.accessPassword`.
 - Unit: team-storage client lists team members, creates members, updates roles, deletes members, sends CSRF headers for mutating member calls, and requires non-empty CSRF tokens.
@@ -1484,7 +1489,7 @@ if (storageTarget === "postgres") await resetTeamBoards(readTeamCsrfToken());
 - Unit: `LocalFilePayloadStore` writes/reads/deletes local-file refs, rejects unsafe keys and unsupported locations, validates MIME type, rejects configured byte-limit overages, and rejects mismatched content hashes.
 - Unit: PostgreSQL payload repository writes through `LocalFilePayloadStore` and records matching `asset_payloads` refs.
 - Unit: PostgreSQL settings repository rejects plaintext `isSecret` records, team secret crypto round-trips ciphertext, and team secret service/API/client tests prove only masked statuses are returned.
-- Unit: authenticated team setting list/save/delete scopes repository access to the session workspace, enforces admin access, writes only `isSecret: false`, records non-secret audit metadata for save/delete, rejects invalid CSRF before database client access, and refuses to delete existing secret settings.
+- Unit: authenticated team setting list/save/delete scopes repository access to the session workspace, enforces admin access, writes only `isSecret: false`, records non-secret audit metadata for save/delete, rejects invalid CSRF before database client access, refuses to delete existing secret settings, requires `updatedAt` tokens for existing setting updates/deletes, and rejects stale tokens with `409 team_setting_version_conflict`.
 - Database tests: migrations create deterministic tables/indexes and record checksums in `schema_migrations`.
 - Authz/security tests: unauthenticated, wrong-role, and invalid CSRF/origin requests cannot read/write shared workspace data.
 - Unit: team auth core hashes/verifies passwords, serializes HTTP-only session cookies, serializes CSRF cookies, rejects untrusted origins, rejects invalid CSRF, resolves hashed sessions, and fails closed on missing sessions or insufficient roles.

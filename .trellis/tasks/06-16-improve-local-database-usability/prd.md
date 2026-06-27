@@ -109,6 +109,7 @@ Completed in the latest continuation:
 * Hardened team setting and secret mutation audit consistency. Team setting/secret saves and deletes now wrap the settings table mutation plus non-secret audit metadata in one transaction, without auditing plaintext secret values.
 * Hardened RunningHub provider target audit consistency. Provider target saves and deletes now wrap the saved target mutation plus non-secret audit metadata in one transaction, without auditing plaintext or encrypted access passwords.
 * Hardened team safety snapshot audit consistency. Safety snapshot saves now wrap the trusted snapshot record write plus non-secret audit metadata in one transaction without exposing payload refs publicly.
+* Added optimistic concurrency for PostgreSQL non-secret team settings. Provider Settings now stores each loaded setting `updatedAt` token, sends it on saves/deletes, and team setting services reject missing or stale tokens with `409` instead of silently overwriting another admin's changes.
 
 Still remaining before the full PRD can be considered complete:
 

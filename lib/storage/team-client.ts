@@ -646,13 +646,18 @@ export async function deleteTeamSecret(
 export async function deleteTeamSetting(
   key: string,
   csrfToken: string,
+  expectedUpdatedAtOrFetcher?: string | Fetcher,
   fetcher: Fetcher = fetch,
 ): Promise<void> {
   const token = csrfToken.trim();
   if (!token) throw new Error("CSRF token is required");
-  const response = await fetcher(API_ROUTES.storage.teamSetting(key), {
+  const expectedUpdatedAt = typeof expectedUpdatedAtOrFetcher === "string" ? expectedUpdatedAtOrFetcher : undefined;
+  const requestFetcher = typeof expectedUpdatedAtOrFetcher === "function" ? expectedUpdatedAtOrFetcher : fetcher;
+  const headers: Record<string, string> = { "x-imagine-csrf-token": token };
+  if (expectedUpdatedAt !== undefined) headers["if-match"] = expectedUpdatedAt;
+  const response = await requestFetcher(API_ROUTES.storage.teamSetting(key), {
     cache: "no-store",
-    headers: { "x-imagine-csrf-token": token },
+    headers,
     method: "DELETE",
   });
   const body: unknown = await response.json();

@@ -236,6 +236,7 @@ export function useProviderSettings({
   });
   const [hasRestoredSettings, setHasRestoredSettings] = useState(false);
   const hasSyncedResolveCredentialsRef = useRef(false);
+  const teamSettingVersionsRef = useRef(new Map<string, string>());
 
   const getProviderLabel = useCallback((provider: AiProvider): string => (
     customProviderByKey.get(provider)?.label ?? getProviderMeta(provider).label
@@ -281,9 +282,16 @@ export function useProviderSettings({
       pushWorkspaceNotice("error", t("common.notices.providerCredentialCsrfMissing"));
       return;
     }
+    const expectedUpdatedAt = teamSettingVersionsRef.current.get(key);
     void (value
-      ? saveTeamSetting({ group: "provider", key, value }, csrfToken)
-      : deleteTeamSetting(key, csrfToken)
+      ? saveTeamSetting({ expectedUpdatedAt, group: "provider", key, value }, csrfToken)
+        .then(result => {
+          teamSettingVersionsRef.current.set(key, result.setting.updatedAt);
+        })
+      : deleteTeamSetting(key, csrfToken, expectedUpdatedAt)
+        .then(() => {
+          teamSettingVersionsRef.current.delete(key);
+        })
     ).catch(error => {
       pushWorkspaceNotice("error", toErrorMessage(error, t("common.notices.providerCredentialSaveFailed")));
     });
@@ -312,9 +320,16 @@ export function useProviderSettings({
     if (field === "baseUrl") {
       const baseUrl = providerCredentials[provider]?.baseUrl.trim() ?? "";
       const key = providerBaseUrlSettingKey(provider);
+      const expectedUpdatedAt = teamSettingVersionsRef.current.get(key);
       void (baseUrl || customProviderByKey.has(provider)
-        ? saveTeamSetting({ group: "provider", key, value: baseUrl }, csrfToken)
-        : deleteTeamSetting(key, csrfToken)
+        ? saveTeamSetting({ expectedUpdatedAt, group: "provider", key, value: baseUrl }, csrfToken)
+          .then(result => {
+            teamSettingVersionsRef.current.set(key, result.setting.updatedAt);
+          })
+        : deleteTeamSetting(key, csrfToken, expectedUpdatedAt)
+          .then(() => {
+            teamSettingVersionsRef.current.delete(key);
+          })
       ).catch(error => {
         pushWorkspaceNotice("error", toErrorMessage(error, t("common.notices.providerCredentialSaveFailed")));
       });
@@ -351,11 +366,18 @@ export function useProviderSettings({
       return;
     }
     const baseUrlSettingKey = providerBaseUrlSettingKey(provider);
+    const expectedBaseUrlUpdatedAt = teamSettingVersionsRef.current.get(baseUrlSettingKey);
     void Promise.all([
       deleteTeamSecret(providerApiKeySecretKey(provider), csrfToken),
       customProviderByKey.has(provider)
-        ? saveTeamSetting({ group: "provider", key: baseUrlSettingKey, value: "" }, csrfToken)
-        : deleteTeamSetting(baseUrlSettingKey, csrfToken),
+        ? saveTeamSetting({ expectedUpdatedAt: expectedBaseUrlUpdatedAt, group: "provider", key: baseUrlSettingKey, value: "" }, csrfToken)
+          .then(result => {
+            teamSettingVersionsRef.current.set(baseUrlSettingKey, result.setting.updatedAt);
+          })
+        : deleteTeamSetting(baseUrlSettingKey, csrfToken, expectedBaseUrlUpdatedAt)
+          .then(() => {
+            teamSettingVersionsRef.current.delete(baseUrlSettingKey);
+          }),
     ])
       .then(() => {
         setProviderCredentialStatus(prev => ({
@@ -660,12 +682,15 @@ export function useProviderSettings({
           try {
             const teamSettings = await fetchTeamSettings({ groups: ["provider"] });
             if (!isActive) return;
+            teamSettingVersionsRef.current = new Map(teamSettings.settings.map(setting => [setting.key, setting.updatedAt]));
             teamSettingsByKey = new Map(teamSettings.settings.map(setting => [setting.key, setting.value]));
             restoredCustomProviders = readStoredCustomProviders(teamSettingsByKey.get(PROVIDER_CUSTOM_PROVIDERS_SETTING_KEY) ?? "");
           } catch {
+            teamSettingVersionsRef.current = new Map();
             // Non-secret provider settings are admin-scoped. Non-admin sessions keep defaults without localStorage fallback.
           }
         } else {
+          teamSettingVersionsRef.current = new Map();
           const storedCustomProviders = localStorage.getItem(CUSTOM_PROVIDERS_STORAGE_KEY);
           restoredCustomProviders = storedCustomProviders
             ? readStoredCustomProviders(storedCustomProviders)

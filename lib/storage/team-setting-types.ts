@@ -20,6 +20,7 @@ export interface TeamSettingMutationResult {
 }
 
 export interface TeamSettingSaveInput {
+  expectedUpdatedAt?: string;
   group: WorkspaceSettingGroup;
   key: string;
   value: string;

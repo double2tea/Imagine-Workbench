@@ -373,7 +373,9 @@ class PostgresSettingsRepository implements WorkspaceSettingsRepository {
 
   async get(key: string): Promise<WorkspaceSettingRecord | null> {
     const result = await this.queryable.query<SettingRow>(
-      "select key, value #>> '{}' as value_text, is_secret, group_name, updated_at from settings where workspace_id = $1 and key = $2",
+      `select key, value #>> '{}' as value_text, is_secret, group_name,
+        to_char(updated_at at time zone 'UTC', 'YYYY-MM-DD"T"HH24:MI:SS.US"Z"') as updated_at
+       from settings where workspace_id = $1 and key = $2`,
       [this.workspaceId, key],
     );
     return settingRecordFromRow(result.rows[0]);
@@ -393,7 +395,9 @@ class PostgresSettingsRepository implements WorkspaceSettingsRepository {
     if (!options.includeSecrets) clauses.push("is_secret = false");
     const where = clauses.length ? `where ${clauses.join(" and ")}` : "";
     const result = await this.queryable.query<SettingRow>(
-      `select key, value #>> '{}' as value_text, is_secret, group_name, updated_at from settings ${where} order by key`,
+      `select key, value #>> '{}' as value_text, is_secret, group_name,
+        to_char(updated_at at time zone 'UTC', 'YYYY-MM-DD"T"HH24:MI:SS.US"Z"') as updated_at
+       from settings ${where} order by key`,
       values,
     );
     return result.rows.map(row => settingRecordFromRow(row)).filter(record => record !== null);
@@ -549,9 +553,13 @@ function settingRecordFromRow(row: SettingRow | undefined): WorkspaceSettingReco
     group: row.group_name,
     isSecret: row.is_secret,
     key: row.key,
-    updatedAt: new Date(row.updated_at).toISOString(),
+    updatedAt: timestampTokenFromRow(row.updated_at),
     value: row.value_text,
   };
+}
+
+function timestampTokenFromRow(value: Date | string): string {
+  return value instanceof Date ? value.toISOString() : value;
 }
 
 function safetySnapshotFromRow(row: SafetySnapshotRow | undefined): WorkspaceSafetySnapshotRecord | null {

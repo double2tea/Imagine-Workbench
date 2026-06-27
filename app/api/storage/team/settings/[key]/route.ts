@@ -23,7 +23,7 @@ export async function DELETE(request: Request, context: TeamSettingRouteContext)
     assertTeamCsrf(request);
     const { key } = await context.params;
     const config = resolvePostgresStorageConfig(process.env);
-    await withPostgresClient(config, client => deleteTeamSetting(client, config, request, key));
+    await withPostgresClient(config, client => deleteTeamSetting(client, config, request, key, request.headers.get("if-match") ?? undefined));
     return Response.json({ ok: true });
   } catch (error) {
     const response = apiErrorResponse(error, "Team setting delete failed");

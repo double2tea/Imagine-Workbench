@@ -69,17 +69,24 @@ function groupParams(searchParams: URLSearchParams): WorkspaceSettingGroup[] | u
   });
 }
 
-async function readTeamSettingRequestJson(request: Request): Promise<{ group: WorkspaceSettingGroup; key: string; value: string }> {
+async function readTeamSettingRequestJson(request: Request): Promise<{ expectedUpdatedAt?: string; group: WorkspaceSettingGroup; key: string; value: string }> {
   let body: unknown;
   try {
     body = await request.json();
   } catch {
     throw badRequest("Invalid team setting request", "invalid_team_setting_request");
   }
-  if (!isRecord(body) || typeof body.key !== "string" || typeof body.value !== "string" || !isWorkspaceSettingGroup(body.group)) {
+  if (
+    !isRecord(body) ||
+    (body.expectedUpdatedAt !== undefined && typeof body.expectedUpdatedAt !== "string") ||
+    typeof body.key !== "string" ||
+    typeof body.value !== "string" ||
+    !isWorkspaceSettingGroup(body.group)
+  ) {
     throw badRequest("Invalid team setting request", "invalid_team_setting_request");
   }
   return {
+    expectedUpdatedAt: body.expectedUpdatedAt,
     group: body.group,
     key: body.key,
     value: body.value,

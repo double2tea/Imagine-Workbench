@@ -58,18 +58,29 @@ test("listTeamSettings returns admin-scoped non-secret settings", async () => {
   );
 });
 
-test("saveTeamSetting writes a non-secret setting and audit event", async () => {
+test("saveTeamSetting updates a non-secret setting with version and audit event", async () => {
   const queries: Array<{ text: string; values?: readonly unknown[] }> = [];
   const result = await saveTeamSetting(
     createTeamSettingsQueryable(queries),
     { databaseUrl: "postgres://localhost/imagine", mediaDir: "/srv/imagine/media" },
     requestWithSession(),
-    { group: "provider", key: ` ${SETTING_KEY} `, value: "https://provider.example.test" },
+    {
+      expectedUpdatedAt: "2026-06-27T00:00:00.000Z",
+      group: "provider",
+      key: ` ${SETTING_KEY} `,
+      value: "https://provider.example.test",
+    },
   );
 
-  const write = queries.find(query => query.text.includes("insert into settings"));
+  const write = queries.find(query => query.text.trim().startsWith("update settings"));
   assert.equal(result.setting.key, SETTING_KEY);
-  assert.deepEqual(write?.values, [WORKSPACE_ID, SETTING_KEY, "provider", "https://provider.example.test", false]);
+  assert.deepEqual(write?.values, [
+    WORKSPACE_ID,
+    SETTING_KEY,
+    "provider",
+    "https://provider.example.test",
+    "2026-06-27T00:00:00.000Z",
+  ]);
   assert.ok(queries.some(query => query.text === "begin"));
   assert.ok(queries.some(query => query.text === "commit"));
   assert.equal(queries.some(query => query.text === "rollback"), false);
@@ -81,6 +92,33 @@ test("saveTeamSetting writes a non-secret setting and audit event", async () => 
   });
 });
 
+test("saveTeamSetting rejects existing settings without a version and stale versions", async () => {
+  await assert.rejects(
+    () => saveTeamSetting(
+      createTeamSettingsQueryable(),
+      { databaseUrl: "postgres://localhost/imagine", mediaDir: "/srv/imagine/media" },
+      requestWithSession(),
+      { group: "provider", key: SETTING_KEY, value: "https://provider.example.test" },
+    ),
+    (error: unknown) => error instanceof ApiError && error.status === 409 && error.code === "team_setting_version_required",
+  );
+
+  await assert.rejects(
+    () => saveTeamSetting(
+      createTeamSettingsQueryable([], { updateMatched: false }),
+      { databaseUrl: "postgres://localhost/imagine", mediaDir: "/srv/imagine/media" },
+      requestWithSession(),
+      {
+        expectedUpdatedAt: "2026-06-26T00:00:00.000Z",
+        group: "provider",
+        key: SETTING_KEY,
+        value: "https://provider.example.test",
+      },
+    ),
+    (error: unknown) => error instanceof ApiError && error.status === 409 && error.code === "team_setting_version_conflict",
+  );
+});
+
 test("deleteTeamSetting removes a non-secret setting with audit", async () => {
   const queries: Array<{ text: string; values?: readonly unknown[] }> = [];
   await deleteTeamSetting(
@@ -88,11 +126,12 @@ test("deleteTeamSetting removes a non-secret setting with audit", async () => {
     { databaseUrl: "postgres://localhost/imagine", mediaDir: "/srv/imagine/media" },
     requestWithSession(),
     ` ${SETTING_KEY} `,
+    "2026-06-27T00:00:00.000Z",
   );
 
   assert.deepEqual(
     queries.find(query => query.text.startsWith("delete from settings"))?.values,
-    [WORKSPACE_ID, SETTING_KEY],
+    [WORKSPACE_ID, SETTING_KEY, "2026-06-27T00:00:00.000Z"],
   );
   assert.ok(queries.some(query => query.text === "begin"));
   assert.ok(queries.some(query => query.text === "commit"));
@@ -100,6 +139,18 @@ test("deleteTeamSetting removes a non-secret setting with audit", async () => {
   const audit = queries.find(query => query.text.includes("insert into audit_events"));
   assert.deepEqual(audit?.values?.slice(0, 3), [WORKSPACE_ID, "user_1", "team_setting.delete"]);
   assert.deepEqual(JSON.parse(String(audit?.values?.[3])) as unknown, { key: SETTING_KEY });
+});
+
+test("deleteTeamSetting rejects existing settings without a version", async () => {
+  await assert.rejects(
+    () => deleteTeamSetting(
+      createTeamSettingsQueryable(),
+      { databaseUrl: "postgres://localhost/imagine", mediaDir: "/srv/imagine/media" },
+      requestWithSession(),
+      SETTING_KEY,
+    ),
+    (error: unknown) => error instanceof ApiError && error.status === 409 && error.code === "team_setting_version_required",
+  );
 });
 
 test("deleteTeamSetting refuses to delete secret settings", async () => {
@@ -194,6 +245,7 @@ test("team setting client sends filters and rejects secret-shaped responses", as
   let saveCsrfHeader: string | null = null;
   let saveBody = "";
   const saveResult = await saveTeamSettingClient({
+    expectedUpdatedAt: "2026-06-27T00:00:00.000Z",
     group: "provider",
     key: SETTING_KEY,
     value: "https://provider.example.test",
@@ -215,6 +267,7 @@ test("team setting client sends filters and rejects secret-shaped responses", as
   });
   assert.equal(saveCsrfHeader, "csrf-token");
   assert.equal(saveBody, JSON.stringify({
+    expectedUpdatedAt: "2026-06-27T00:00:00.000Z",
     group: "provider",
     key: SETTING_KEY,
     value: "https://provider.example.test",
@@ -222,10 +275,11 @@ test("team setting client sends filters and rejects secret-shaped responses", as
   assert.equal(saveResult.setting.key, SETTING_KEY);
 
   let deleteUrl = "";
-  await deleteTeamSettingClient("provider/base url", "csrf-token", async (input, init) => {
+  await deleteTeamSettingClient("provider/base url", "csrf-token", "2026-06-27T00:00:00.000Z", async (input, init) => {
     deleteUrl = String(input);
     assert.equal(init?.method, "DELETE");
     assert.equal(new Headers(init?.headers).get("x-imagine-csrf-token"), "csrf-token");
+    assert.equal(new Headers(init?.headers).get("if-match"), "2026-06-27T00:00:00.000Z");
     return Response.json({ ok: true });
   });
   assert.equal(deleteUrl, "/api/storage/team/settings/provider%2Fbase%20url");
@@ -239,7 +293,7 @@ function requestWithSession(): Request {
 
 function createTeamSettingsQueryable(
   queries: Array<{ text: string; values?: readonly unknown[] }> = [],
-  options: { existingSecret?: boolean; role?: "owner" | "admin" | "editor" | "viewer" } = {},
+  options: { existingSecret?: boolean; insertMatched?: boolean; role?: "owner" | "admin" | "editor" | "viewer"; updateMatched?: boolean } = {},
 ): PostgresQueryable {
   return {
     query: async <T extends QueryResultRow = QueryResultRow>(text: string, values?: readonly unknown[]) => {
@@ -255,17 +309,30 @@ function createTeamSettingsQueryable(
           workspace_id: WORKSPACE_ID,
         }]);
       }
+      if (text.trim().startsWith("insert into settings")) {
+        return typedQueryResult<T>(options.insertMatched === true ? [settingRow()] : []);
+      }
+      if (text.trim().startsWith("update settings")) {
+        return typedQueryResult<T>(options.updateMatched === false ? [] : [settingRow()]);
+      }
+      if (text.trim().startsWith("delete from settings")) {
+        return typedQueryResult<T>([settingRow()]);
+      }
       if (text.includes("from settings")) {
-        return typedQueryResult<T>([{
-          group_name: "provider",
-          is_secret: options.existingSecret ?? false,
-          key: SETTING_KEY,
-          updated_at: "2026-06-27T00:00:00.000Z",
-          value_text: options.existingSecret ? "encrypted:v1:secret" : "https://provider.example.test",
-        }]);
+        return typedQueryResult<T>([settingRow(options.existingSecret)]);
       }
       return typedQueryResult<T>([]);
     },
+  };
+}
+
+function settingRow(existingSecret = false): QueryResultRow {
+  return {
+    group_name: "provider",
+    is_secret: existingSecret,
+    key: SETTING_KEY,
+    updated_at: "2026-06-27T00:00:00.000Z",
+    value_text: existingSecret ? "encrypted:v1:secret" : "https://provider.example.test",
   };
 }
 
