@@ -79,6 +79,7 @@
     "./team-secrets.test.ts",
     "./team-settings.test.ts",
     "./team-storage-client.test.ts",
+    "./team-workspace-backup.test.ts",
     "./team-auth.test.ts",
     "./provider-utils.test.ts",
     "./reference-images.test.ts",
@@ -162,6 +163,8 @@
     "../lib/storage/team-prompt-templates.ts",
     "../lib/storage/team-voice-profile-types.ts",
     "../lib/storage/team-voice-profiles.ts",
+    "../lib/storage/team-workspace-backup.ts",
+    "../lib/storage/team-workspace-backup-types.ts",
     "../lib/storage/team-provider-target-types.ts",
     "../lib/storage/team-provider-targets.ts",
     "../lib/storage/team-rate-limit.ts",
@@ -180,6 +183,7 @@
     "../app/api/storage/team/asset-library/[itemId]/route.ts",
     "../app/api/storage/team/asset-library/route.ts",
     "../app/api/storage/team/assets/route.ts",
+    "../app/api/storage/team/backup/route.ts",
     "../app/api/storage/team/generation-tasks/[taskId]/route.ts",
     "../app/api/storage/team/generation-tasks/route.ts",
     "../app/api/storage/team/assets/[assetId]/media/route.ts",
@@ -208,6 +212,7 @@
     "../lib/providers/team-config.ts",
     "../lib/providers/utils.ts",
     "../lib/reference-images.ts",
-    "../lib/transcripts.ts"
+    "../lib/transcripts.ts",
+    "../lib/workspace-backup-format.ts"
   ]
 }

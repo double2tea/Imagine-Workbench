@@ -14,6 +14,7 @@ import {
   deleteTeamGenerationTask,
   deleteTeamMember,
   deleteTeamSecret,
+  downloadTeamWorkspaceBackup,
   createTeamBoardDocument,
   deleteTeamBoardDocument,
   fetchTeamBoardDocument,
@@ -48,6 +49,60 @@ function jsonResponse(body: unknown, init?: ResponseInit): Response {
     headers: { "content-type": "application/json" },
     ...init,
   });
+}
+
+const downloadState: { clicked: boolean; fileName: string } = {
+  clicked: false,
+  fileName: "",
+};
+
+function installDownloadDom(): () => void {
+  const originalDocument = globalThis.document;
+  const originalCreateObjectUrl = URL.createObjectURL;
+  const originalRevokeObjectUrl = URL.revokeObjectURL;
+  const anchor = {
+    click: () => {
+      downloadState.clicked = true;
+      downloadState.fileName = anchor.download;
+    },
+    download: "",
+    href: "",
+  };
+  const documentStub = {
+    body: {
+      appendChild: () => undefined,
+      removeChild: () => undefined,
+    },
+    createElement: () => anchor,
+  };
+  downloadState.clicked = false;
+  downloadState.fileName = "";
+  Object.defineProperty(globalThis, "document", {
+    configurable: true,
+    value: documentStub,
+  });
+  Object.defineProperty(URL, "createObjectURL", {
+    configurable: true,
+    value: () => "blob:team-backup",
+  });
+  Object.defineProperty(URL, "revokeObjectURL", {
+    configurable: true,
+    value: () => undefined,
+  });
+  return () => {
+    Object.defineProperty(globalThis, "document", {
+      configurable: true,
+      value: originalDocument,
+    });
+    Object.defineProperty(URL, "createObjectURL", {
+      configurable: true,
+      value: originalCreateObjectUrl,
+    });
+    Object.defineProperty(URL, "revokeObjectURL", {
+      configurable: true,
+      value: originalRevokeObjectUrl,
+    });
+  };
 }
 
 function createStorageItem() {
@@ -185,6 +240,47 @@ test("cleanupTeamMediaMaintenance posts target and CSRF token", async () => {
     cleanupTeamMediaMaintenance("maintenance-files", "csrf-token", async () => jsonResponse({ error: "nope" }, { status: 500 })),
     /nope/,
   );
+});
+
+test("downloadTeamWorkspaceBackup downloads zip responses and parses counts", async () => {
+  const restoreDom = installDownloadDom();
+  try {
+    let requestedUrl = "";
+    const result = await downloadTeamWorkspaceBackup(false, async input => {
+      requestedUrl = String(input);
+      return new Response(new Blob(["zip"]), {
+        headers: {
+          "x-imagine-asset-count": "1",
+          "x-imagine-backup-file-name": "Imagine_Team_Backup.zip",
+          "x-imagine-board-count": "2",
+          "x-imagine-generation-task-count": "3",
+          "x-imagine-library-asset-count": "4",
+          "x-imagine-settings-key-count": "0",
+          "x-imagine-voice-profile-count": "5",
+        },
+      });
+    });
+
+    assert.equal(requestedUrl, "/api/storage/team/backup");
+    assert.deepEqual(result, {
+      assetCount: 1,
+      boardCount: 2,
+      fileName: "Imagine_Team_Backup.zip",
+      generationTaskCount: 3,
+      libraryAssetCount: 4,
+      settingsKeyCount: 0,
+      voiceProfileCount: 5,
+    });
+    assert.equal(downloadState.fileName, "Imagine_Team_Backup.zip");
+    assert.equal(downloadState.clicked, true);
+
+    await assert.rejects(
+      downloadTeamWorkspaceBackup(false, async () => jsonResponse({ error: "no backup" }, { status: 500 })),
+      /no backup/,
+    );
+  } finally {
+    restoreDom();
+  }
 });
 
 test("teamAssetMediaUrl encodes asset ids and download intent", () => {

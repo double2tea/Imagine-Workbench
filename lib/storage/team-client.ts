@@ -71,6 +71,7 @@ import type {
 } from "@/lib/storage/team-setting-types";
 import type { WorkspaceSettingGroup } from "@/lib/storage/schema";
 import type { VoiceProfile } from "@/lib/voice-profiles";
+import type { WorkspaceExportResult } from "@/lib/workspace-backup-format";
 
 export interface TeamStorageMigrationStatus {
   appliedMigrationIds: string[];
@@ -390,6 +391,29 @@ export async function fetchTeamSafetySnapshot(fetcher: Fetcher = fetch): Promise
     throw new Error(error);
   }
   return parseTeamSafetySnapshotResult(body);
+}
+
+export async function downloadTeamWorkspaceBackup(
+  includeCredentials: boolean,
+  fetcher: Fetcher = fetch,
+): Promise<WorkspaceExportResult> {
+  const url = includeCredentials
+    ? `${API_ROUTES.storage.teamBackup}?includeCredentials=1`
+    : API_ROUTES.storage.teamBackup;
+  const response = await fetcher(url, { cache: "no-store" });
+  if (!response.ok) throw new Error(await readFetchError(response, "Team backup export failed"));
+  const blob = await response.blob();
+  const fileName = response.headers.get("x-imagine-backup-file-name") ?? "Imagine_Team_Backup.zip";
+  downloadBlob(blob, fileName);
+  return {
+    assetCount: readBackupCountHeader(response.headers, "x-imagine-asset-count"),
+    boardCount: readBackupCountHeader(response.headers, "x-imagine-board-count"),
+    fileName,
+    generationTaskCount: readBackupCountHeader(response.headers, "x-imagine-generation-task-count"),
+    libraryAssetCount: readBackupCountHeader(response.headers, "x-imagine-library-asset-count"),
+    settingsKeyCount: readBackupCountHeader(response.headers, "x-imagine-settings-key-count"),
+    voiceProfileCount: readBackupCountHeader(response.headers, "x-imagine-voice-profile-count"),
+  };
 }
 
 export async function saveTeamPromptTemplate(
@@ -1206,6 +1230,25 @@ function readStringField(value: unknown, field: string): string | null {
   if (!isRecord(value)) return null;
   const fieldValue = value[field];
   return typeof fieldValue === "string" && fieldValue.trim() ? fieldValue : null;
+}
+
+function readBackupCountHeader(headers: Headers, key: string): number {
+  const value = headers.get(key);
+  if (!value) throw new Error("Team backup response is invalid");
+  const count = Number(value);
+  if (!Number.isInteger(count) || count < 0) throw new Error("Team backup response is invalid");
+  return count;
+}
+
+function downloadBlob(blob: Blob, fileName: string): void {
+  const url = URL.createObjectURL(blob);
+  const anchor = document.createElement("a");
+  anchor.href = url;
+  anchor.download = fileName;
+  document.body.appendChild(anchor);
+  anchor.click();
+  document.body.removeChild(anchor);
+  URL.revokeObjectURL(url);
 }
 
 function isRecord(value: unknown): value is Record<string, unknown> {

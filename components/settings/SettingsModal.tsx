@@ -23,6 +23,7 @@ import {
   cleanupTeamMediaMaintenance,
   createTeamMember,
   deleteTeamMember,
+  downloadTeamWorkspaceBackup,
   fetchTeamStorageHealth,
   fetchTeamMembers,
   fetchTeamSession,
@@ -382,6 +383,32 @@ export default function SettingsModal({
     await refreshDataSummary();
   }, [refreshDataSummary, t, teamSession]);
 
+  const runExportWorkspace = useCallback(async (includeCredentials: boolean) => {
+    if (storageStatus?.mode !== "postgres") {
+      await onExportWorkspace(includeCredentials);
+      return;
+    }
+    if (!teamSession) throw new Error(t("dataManagement.teamSessionRequired"));
+    await downloadTeamWorkspaceBackup(includeCredentials);
+    await refreshDataSummary();
+  }, [onExportWorkspace, refreshDataSummary, storageStatus?.mode, t, teamSession]);
+
+  const runImportWorkspace = useCallback(async (file: File, includeCredentials: boolean) => {
+    if (storageStatus?.mode !== "postgres") {
+      await onImportWorkspace(file, includeCredentials);
+      return;
+    }
+    throw new Error(t("dataManagement.teamRestoreUnsupported"));
+  }, [onImportWorkspace, storageStatus?.mode, t]);
+
+  const runDownloadSafetySnapshot = useCallback(async () => {
+    if (storageStatus?.mode !== "postgres") {
+      await onDownloadSafetySnapshot();
+      return;
+    }
+    throw new Error(t("dataManagement.teamSafetySnapshotDownloadUnsupported"));
+  }, [onDownloadSafetySnapshot, storageStatus?.mode, t]);
+
   const runTeamMigrations = useCallback(async () => {
     setTeamMigrationBusy(true);
     try {
@@ -587,12 +614,12 @@ export default function SettingsModal({
                   onCleanupAssets={onCleanupAssets}
                   onClearAssets={onClearAssets}
                   onClearLocalStorage={onClearLocalStorage}
-                  onDownloadSafetySnapshot={onDownloadSafetySnapshot}
+                  onDownloadSafetySnapshot={runDownloadSafetySnapshot}
                   onDuplicateCurrentBoard={onDuplicateCurrentBoard}
-                  onExportCurrentBoard={onExportCurrentBoard}
-                  onExportWorkspace={onExportWorkspace}
+                  onExportCurrentBoard={storageStatus?.mode === "postgres" ? undefined : onExportCurrentBoard}
+                  onExportWorkspace={runExportWorkspace}
                   onImportLocalAssets={onImportLocalAssets}
-                  onImportWorkspace={onImportWorkspace}
+                  onImportWorkspace={runImportWorkspace}
                   onRefreshSummary={refreshDataSummary}
                   onRefreshStorageStatus={refreshStorageStatus}
                   onRepairAssetSources={onRepairAssetSources}

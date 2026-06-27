@@ -40,6 +40,7 @@ export const API_ROUTES = {
     teamMember: (userId: string) => `/api/storage/team/members/${encodeURIComponent(userId)}`,
     teamPromptTemplates: "/api/storage/team/prompt-templates",
     teamPromptTemplate: (templateId: string) => `/api/storage/team/prompt-templates/${encodeURIComponent(templateId)}`,
+    teamBackup: "/api/storage/team/backup",
     teamSafetySnapshot: "/api/storage/team/safety-snapshot",
     teamVoiceProfiles: "/api/storage/team/voice-profiles",
     teamVoiceProfile: (profileId: string) => `/api/storage/team/voice-profiles/${encodeURIComponent(profileId)}`,
