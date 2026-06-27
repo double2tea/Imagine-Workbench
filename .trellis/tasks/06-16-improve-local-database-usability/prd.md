@@ -99,6 +99,7 @@ Completed in the latest continuation:
 * Added `team_board.delete` audit coverage for single team board deletes. The service now wraps the workspace-scoped delete plus non-secret board-id audit metadata in one transaction.
 * Added `team_asset_library.delete` audit coverage for team asset-library deletes. The service now wraps the dedicated backing-asset or promoted-library-row delete plus non-secret item/asset metadata in one transaction.
 * Added `team_voice_profile.delete` audit coverage for team voice-profile deletes. The service now wraps the workspace-scoped delete plus non-secret profile/reference-count metadata in one transaction.
+* Added `team_prompt_template.delete` audit coverage for team prompt-template deletes. The service now wraps the workspace-scoped delete plus non-secret template-id metadata in one transaction.
 
 Still remaining before the full PRD can be considered complete:
 

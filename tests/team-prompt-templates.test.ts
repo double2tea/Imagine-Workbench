@@ -65,7 +65,7 @@ test("saveTeamPromptTemplate upserts an editor-scoped custom template", async ()
   assert.deepEqual(insert?.values, [TEMPLATE_ID, WORKSPACE_ID, TEMPLATE, TEMPLATE.createdAt, TEMPLATE.updatedAt]);
 });
 
-test("deleteTeamPromptTemplate removes an editor-scoped custom template", async () => {
+test("deleteTeamPromptTemplate removes an editor-scoped custom template with audit", async () => {
   const queries: Array<{ text: string; values?: readonly unknown[] }> = [];
   await deleteTeamPromptTemplate(
     createTeamPromptTemplatesQueryable(queries, { role: "editor" }),
@@ -78,6 +78,16 @@ test("deleteTeamPromptTemplate removes an editor-scoped custom template", async 
     queries.find(query => query.text.startsWith("delete from prompt_templates"))?.values,
     [WORKSPACE_ID, TEMPLATE_ID],
   );
+  assert.ok(queries.some(query => query.text === "begin"));
+  assert.ok(queries.some(query => query.text === "commit"));
+  assert.equal(queries.some(query => query.text === "rollback"), false);
+  const audit = queries.find(query => query.text.startsWith("insert into audit_events"));
+  assert.deepEqual(audit?.values, [
+    WORKSPACE_ID,
+    "user_1",
+    "team_prompt_template.delete",
+    JSON.stringify({ templateId: TEMPLATE_ID }),
+  ]);
 });
 
 test("team prompt template save route rejects missing CSRF before opening a database client", async () => {
@@ -169,6 +179,9 @@ function createTeamPromptTemplatesQueryable(
   return {
     query: async <T extends QueryResultRow = QueryResultRow>(text: string, values?: readonly unknown[]) => {
       queries.push({ text, values });
+      if (text === "begin" || text === "commit" || text === "rollback") {
+        return typedQueryResult<T>([]);
+      }
       if (text.includes("from sessions")) {
         return typedQueryResult<T>([{
           email: "editor@example.com",
@@ -182,6 +195,9 @@ function createTeamPromptTemplatesQueryable(
       }
       if (text.startsWith("select template from prompt_templates")) {
         return typedQueryResult<T>([{ template: TEMPLATE }]);
+      }
+      if (text.startsWith("insert into audit_events")) {
+        return typedQueryResult<T>([]);
       }
       return typedQueryResult<T>([]);
     },

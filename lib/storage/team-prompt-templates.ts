@@ -2,6 +2,7 @@ import type { QueryResultRow } from "pg";
 import { readCustomPromptTemplate, type CustomPromptTemplate } from "@/lib/custom-prompt-templates";
 import type { PostgresStorageConfig } from "@/lib/storage/postgres/config";
 import type { PostgresQueryable } from "@/lib/storage/postgres/connection";
+import { recordTeamAuditEvent } from "@/lib/storage/team-audit";
 import { createTeamWorkspaceStorageContext } from "@/lib/storage/team-context";
 import type {
   TeamPromptTemplateListResult,
@@ -68,8 +69,21 @@ export async function deleteTeamPromptTemplate(
   templateId: string,
 ): Promise<void> {
   const context = await createTeamWorkspaceStorageContext(queryable, config, request, { minimumRole: "editor" });
-  await queryable.query("delete from prompt_templates where workspace_id = $1 and id = $2", [
-    context.session.workspaceId,
-    templateId,
-  ]);
+  await queryable.query("begin");
+  try {
+    await queryable.query("delete from prompt_templates where workspace_id = $1 and id = $2", [
+      context.session.workspaceId,
+      templateId,
+    ]);
+    await recordTeamAuditEvent(queryable, {
+      eventType: "team_prompt_template.delete",
+      metadata: { templateId },
+      userId: context.session.userId,
+      workspaceId: context.session.workspaceId,
+    });
+    await queryable.query("commit");
+  } catch (error) {
+    await queryable.query("rollback");
+    throw error;
+  }
 }
