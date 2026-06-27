@@ -116,6 +116,8 @@ Completed in the latest continuation:
 * Extended setup-token brute-force protection to PostgreSQL migrations. `/api/storage/team/migrations` now rate-limits invalid `x-imagine-setup-token` attempts with generic errors before database access, using a separate migrations scope from first-owner bootstrap.
 * Hardened the PostgreSQL migration request boundary. `/api/storage/team/migrations` now rejects untrusted origins before setup-token validation, matching the rest of the team-mode mutating route surface.
 * Added a scripted PostgreSQL migration entrypoint. `pnpm db:migrate` calls the existing setup-token-protected migration API with `Origin: APP_URL`, prints non-secret schema/migration counts, and is documented for Docker Compose upgrade flows.
+* Promoted the PostgreSQL storage adapter from planned to active now that the team storage vertical slices are implemented, and tightened the adapter test so only IndexedDB and PostgreSQL are exposed with no planned SQLite/local-folder/remote-api targets.
+* Migrated pnpm build-script approvals from ignored `package.json.pnpm.onlyBuiltDependencies` to `pnpm-workspace.yaml` `allowBuilds`, restoring clean pnpm 11 installs/checks after dependency rebuilds.
 
 Still remaining before the full PRD can be considered complete:
 
@@ -177,14 +179,14 @@ Still remaining before the full PRD can be considered complete:
 * [ ] Browser/deployed mode continues to work with IndexedDB and does not require PostgreSQL.
 * [ ] With no PostgreSQL/team environment variables configured, the app behaves like the current project: no login prompt, no team setup prompt, no required migration, and no visible disruption to existing creation/board/gallery/settings workflows.
 * [ ] Team/PostgreSQL UI, auth bootstrap, and PostgreSQL routes are shown or enabled only when team mode is explicitly configured.
-* [ ] Storage-mode code exposes only `browser` and `postgres` for this task; stale SQLite/local-database/local-folder/remote-api planned targets are removed or made non-product-facing.
+* [x] Storage-mode code exposes only `browser` and `postgres` for this task; stale SQLite/local-database/local-folder/remote-api planned targets are removed or made non-product-facing.
 * [x] Team deployment templates are included and documented: Dockerfile, Docker Compose, team env example, media volume mapping, PostgreSQL volume mapping, and first-run bootstrap instructions.
 * [x] Deployment templates do not change the default local/browser workflow and are opt-in.
 * [ ] PostgreSQL mode reads/writes assets, asset payload refs, previews, asset library records, boards, generation tasks, managed settings, safety snapshots, and voice profiles, or any exclusions are explicitly documented before implementation.
 * [ ] Migration coverage includes custom prompt templates and any other user-created localStorage data, or explicitly reports them as excluded before migration.
 * [ ] Migration preview reports all detected persistent sources: asset DB, board DB, voice-profile DB, safety snapshot DB, managed localStorage, and known currently-unmanaged localStorage keys.
 * [ ] The implementation updates `lib/data-management.ts` so current persisted keys such as default generation models, image-edit feature models, price visibility, Agent orb position, RunningHub saved targets, Resolve toggle, and custom prompt templates are classified before PostgreSQL migration preview uses them.
-* [ ] Implementation context includes the refreshed `.trellis/spec/frontend/state-management.md` storage contract so future agents see `browser` + `postgres`, not the superseded SQLite/local-database direction.
+* [x] Implementation context includes the refreshed `.trellis/spec/frontend/state-management.md` storage contract so future agents see `browser` + `postgres`, not the superseded SQLite/local-database direction.
 * [ ] PostgreSQL migrations create versioned tables and indexes deterministically.
 * [ ] Future schema changes can be applied through ordered migrations; the app reports current/required schema version and refuses unsupported newer schemas.
 * [ ] Migrations cover relational tables and payload-ref/media metadata changes when storage structure changes.

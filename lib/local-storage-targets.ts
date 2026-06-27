@@ -63,7 +63,7 @@ export const POSTGRES_STORAGE_ADAPTER: WorkspaceStorageAdapterContract = {
     queryTimeoutMillisEnv: "IMAGINE_POSTGRES_QUERY_TIMEOUT_MS",
     requiredDatabaseUrlEnv: "DATABASE_URL",
   },
-  status: "planned",
+  status: "active",
 };
 
 export const WORKSPACE_STORAGE_ADAPTERS = [

@@ -12,9 +12,14 @@ test("workspace storage adapters expose only IndexedDB and PostgreSQL targets", 
 
   assert.equal(adapters.length, 2);
   assert.equal(INDEXED_DB_STORAGE_ADAPTER.status, "active");
+  assert.equal(POSTGRES_STORAGE_ADAPTER.status, "active");
+  assert.deepEqual(
+    adapters.map(adapter => adapter.kind),
+    ["indexeddb", "postgres"],
+  );
   assert.deepEqual(
     adapters.filter(adapter => adapter.status === "planned").map(adapter => adapter.kind),
-    ["postgres"],
+    [],
   );
   assert.deepEqual(POSTGRES_STORAGE_ADAPTER.postgres, {
     connectionTimeoutMillisEnv: "IMAGINE_POSTGRES_CONNECTION_TIMEOUT_MS",
