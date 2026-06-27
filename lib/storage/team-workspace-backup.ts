@@ -62,6 +62,19 @@ import type { VoiceProfile } from "@/lib/voice-profiles";
 
 const BACKUP_PAGE_SIZE = 500;
 
+type TeamWorkspaceStorageContext = Awaited<ReturnType<typeof createTeamWorkspaceStorageContext>>;
+
+interface TeamWorkspaceBackupSnapshot {
+  assetCount: number;
+  boardCount: number;
+  body: ArrayBuffer;
+  fileName: string;
+  generationTaskCount: number;
+  libraryAssetCount: number;
+  settingsKeyCount: number;
+  voiceProfileCount: number;
+}
+
 interface BrowserLocalStorageRestorePlan {
   promptTemplates: CustomPromptTemplate[];
   providerTargets: BrowserRunningHubSavedTarget[];
@@ -86,6 +99,54 @@ export async function exportTeamWorkspaceBackup(
   includeCredentials: boolean,
 ): Promise<TeamWorkspaceBackupExport> {
   const context = await createTeamWorkspaceStorageContext(queryable, config, request, { minimumRole: "admin" });
+  const snapshot = await exportTeamWorkspaceBackupSnapshot(context, includeCredentials);
+  await recordTeamAuditEvent(context.queryable, {
+    eventType: "team_backup.export",
+    metadata: {
+      assetCount: snapshot.assetCount,
+      boardCount: snapshot.boardCount,
+      generationTaskCount: snapshot.generationTaskCount,
+      includeCredentials,
+      libraryAssetCount: snapshot.libraryAssetCount,
+      settingsKeyCount: snapshot.settingsKeyCount,
+      voiceProfileCount: snapshot.voiceProfileCount,
+    },
+    userId: context.session.userId,
+    workspaceId: context.session.workspaceId,
+  });
+  return {
+    assetCount: snapshot.assetCount,
+    boardCount: snapshot.boardCount,
+    body: snapshot.body,
+    fileName: snapshot.fileName,
+    generationTaskCount: snapshot.generationTaskCount,
+    libraryAssetCount: snapshot.libraryAssetCount,
+    settingsKeyCount: snapshot.settingsKeyCount,
+    targetKind: "postgres",
+    voiceProfileCount: snapshot.voiceProfileCount,
+    workspaceId: context.session.workspaceId,
+  };
+}
+
+async function exportTeamWorkspaceBackupSnapshot(
+  context: TeamWorkspaceStorageContext,
+  includeCredentials: boolean,
+): Promise<TeamWorkspaceBackupSnapshot> {
+  await context.queryable.query("begin transaction isolation level repeatable read read only");
+  try {
+    const snapshot = await buildTeamWorkspaceBackupSnapshot(context, includeCredentials);
+    await context.queryable.query("commit");
+    return snapshot;
+  } catch (error) {
+    await context.queryable.query("rollback");
+    throw error;
+  }
+}
+
+async function buildTeamWorkspaceBackupSnapshot(
+  context: TeamWorkspaceStorageContext,
+  includeCredentials: boolean,
+): Promise<TeamWorkspaceBackupSnapshot> {
   const zip = new JSZip();
   const assets = await listAll(offset => context.repository.assets.list({ limit: BACKUP_PAGE_SIZE, offset }));
   const boards = await listAll(offset => context.repository.boards.list({ limit: BACKUP_PAGE_SIZE, offset }));
@@ -126,20 +187,6 @@ export async function exportTeamWorkspaceBackup(
   zip.file(SETTINGS_FILE, JSON.stringify(settings, null, 2));
   const body = await zip.generateAsync({ type: "arraybuffer" });
   const fileName = `Imagine_Team_Backup_${compactTimestamp(exportedAt)}.zip`;
-  await recordTeamAuditEvent(context.queryable, {
-    eventType: "team_backup.export",
-    metadata: {
-      assetCount: assetRecords.length,
-      boardCount: boards.length,
-      generationTaskCount: generationTasks.length,
-      includeCredentials,
-      libraryAssetCount: libraryRecords.length,
-      settingsKeyCount: countBackupSettings(settings),
-      voiceProfileCount: voiceProfiles.length,
-    },
-    userId: context.session.userId,
-    workspaceId: context.session.workspaceId,
-  });
   return {
     assetCount: assetRecords.length,
     boardCount: boards.length,
@@ -148,9 +195,7 @@ export async function exportTeamWorkspaceBackup(
     generationTaskCount: generationTasks.length,
     libraryAssetCount: libraryRecords.length,
     settingsKeyCount: countBackupSettings(settings),
-    targetKind: "postgres",
     voiceProfileCount: voiceProfiles.length,
-    workspaceId: context.session.workspaceId,
   };
 }
 

@@ -57,6 +57,8 @@ The route creates the first workspace, team, owner user, server session, and CSR
 
 Back up PostgreSQL and the media volume together. They describe one logical workspace snapshot: PostgreSQL rows contain relative payload refs, while media bytes live in the media volume.
 
+The in-app Settings -> Data full ZIP export reads PostgreSQL rows in a `repeatable read read only` transaction and then packages the referenced media bytes. If any referenced media file is missing or unreadable, export fails instead of producing a partial backup.
+
 Minimal local backup commands:
 
 ```bash
@@ -64,7 +66,7 @@ docker compose --env-file .env.team -f docker-compose.team.yml exec db sh -c 'pg
 docker run --rm -v imagine-workbench_imagine-media:/media -v "$PWD:/backup" alpine tar -czf /backup/imagine-media.tgz -C /media .
 ```
 
-For destructive migrations or restore operations, stop writes first by taking the app offline or otherwise ensuring users are not generating, importing, deleting, or editing workspace data.
+For manual `pg_dump` plus media-volume archive, and for destructive migrations or restore operations, stop writes first by taking the app offline or otherwise ensuring users are not generating, importing, deleting, or editing workspace data.
 
 ## Restore
 

@@ -101,6 +101,13 @@ test("exportTeamWorkspaceBackup writes a redacted portable workspace zip and aud
       queries.find(query => query.text.startsWith("insert into audit_events"))?.values?.slice(0, 3),
       [WORKSPACE_ID, "user_1", "team_backup.export"],
     );
+    const transactionStartIndex = queries.findIndex(query => query.text === "begin transaction isolation level repeatable read read only");
+    const commitIndex = queries.findIndex(query => query.text === "commit");
+    const auditIndex = queries.findIndex(query => query.text.startsWith("insert into audit_events"));
+    assert.ok(transactionStartIndex >= 0);
+    assert.ok(commitIndex > transactionStartIndex);
+    assert.ok(auditIndex > commitIndex);
+    assert.equal(queries.some(query => query.text === "rollback"), false);
   });
 });
 

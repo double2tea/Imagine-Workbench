@@ -112,6 +112,7 @@ Completed in the latest continuation:
 * Added optimistic concurrency for PostgreSQL non-secret team settings. Provider Settings now stores each loaded setting `updatedAt` token, sends it on saves/deletes, and team setting services reject missing or stale tokens with `409` instead of silently overwriting another admin's changes.
 * Added explicit PostgreSQL pool and timeout configuration. Team mode now parses `IMAGINE_POSTGRES_POOL_MAX`, `IMAGINE_POSTGRES_CONNECTION_TIMEOUT_MS`, `IMAGINE_POSTGRES_IDLE_TIMEOUT_MS`, and `IMAGINE_POSTGRES_QUERY_TIMEOUT_MS`, uses a shared bounded `pg` pool instead of per-request pools, documents the defaults, and tests the resulting Pool config.
 * Hardened PostgreSQL health checks for media-volume access. `/api/storage/team/health` now verifies `IMAGINE_MEDIA_DIR` exists, is a directory, and is readable/writable before reporting `reachable: true`, while keeping absolute media paths out of error responses.
+* Added a consistent snapshot boundary for PostgreSQL team ZIP export. `/api/storage/team/backup` now builds the export inside a `repeatable read read only` transaction, records `team_backup.export` only after the snapshot commits, and deployment docs distinguish this in-app snapshot from manual `pg_dump` + media archive backups that still require a quiet point.
 
 Still remaining before the full PRD can be considered complete:
 
@@ -206,7 +207,7 @@ Still remaining before the full PRD can be considered complete:
 * [x] IndexedDB -> PostgreSQL migration is explicit, refuses unsafe/ambiguous targets, leaves source IndexedDB unchanged, and cleans up staged media files on failure.
 * [x] Import refuses to proceed if it detects an unknown persisted data source that is not classified as migrate/optional/exclude.
 * [x] Backup/export/restore uses the active storage target and preserves provider credential opt-in semantics.
-* [ ] PostgreSQL/media backups use a documented consistent snapshot mechanism so database refs and media files match after restore.
+* [x] PostgreSQL/media backups use a documented consistent snapshot mechanism so database refs and media files match after restore.
 * [x] Team deployment docs include backup/restore for PostgreSQL and media volume together, plus restore verification steps.
 * [x] Upgrade docs explain when migrations run, how to back up before upgrade, and how to roll back app/database/media when migration fails.
 * [ ] Audit events are stored for login, logout, bootstrap, member/role changes, provider credential changes, destructive cleanup/delete, backup/export, restore/import, and migration.
