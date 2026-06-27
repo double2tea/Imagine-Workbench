@@ -42,6 +42,7 @@
     "check:model-capabilities": "tsc -p scripts/tsconfig.model-catalog.json && IMAGINE_COMPILED_ALIAS_ROOT=.tmp/model-catalog-generator node -r ./scripts/register-compiled-alias.cjs .tmp/model-catalog-generator/scripts/generate-model-capabilities.js --check",
     "check:light-contrast": "node scripts/check-light-contrast.mjs",
     "check:theme-colors": "node scripts/check-light-contrast.mjs",
+    "db:migrate": "node scripts/team-migrate.mjs",
     "test:e2e:audio": "node scripts/e2e-audio-workflow.mjs",
     "pages:build": "node scripts/build-cloudflare-pages.mjs",
     "pages:preview": "pnpm run pages:build && pnpm dlx wrangler pages dev .vercel/output/static",

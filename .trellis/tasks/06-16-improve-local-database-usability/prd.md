@@ -115,6 +115,7 @@ Completed in the latest continuation:
 * Added a consistent snapshot boundary for PostgreSQL team ZIP export. `/api/storage/team/backup` now builds the export inside a `repeatable read read only` transaction, records `team_backup.export` only after the snapshot commits, and deployment docs distinguish this in-app snapshot from manual `pg_dump` + media archive backups that still require a quiet point.
 * Extended setup-token brute-force protection to PostgreSQL migrations. `/api/storage/team/migrations` now rate-limits invalid `x-imagine-setup-token` attempts with generic errors before database access, using a separate migrations scope from first-owner bootstrap.
 * Hardened the PostgreSQL migration request boundary. `/api/storage/team/migrations` now rejects untrusted origins before setup-token validation, matching the rest of the team-mode mutating route surface.
+* Added a scripted PostgreSQL migration entrypoint. `pnpm db:migrate` calls the existing setup-token-protected migration API with `Origin: APP_URL`, prints non-secret schema/migration counts, and is documented for Docker Compose upgrade flows.
 
 Still remaining before the full PRD can be considered complete:
 

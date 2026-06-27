@@ -37,6 +37,14 @@ After the app starts, open Settings -> Data and check Storage Target. In Postgre
 
 Run pending migrations from the same panel using the setup token from `.env.team`. The token is sent as the `x-imagine-setup-token` request header and is not returned by status APIs.
 
+For scripted upgrades, run the same setup-token-protected migration API from the app container:
+
+```bash
+docker compose --env-file .env.team -f docker-compose.team.yml exec app pnpm db:migrate
+```
+
+The command requires `APP_URL` and `IMAGINE_TEAM_SETUP_TOKEN`, sends `Origin: $APP_URL`, and prints only app/schema/migration counts.
+
 ## Bootstrap First Owner
 
 After migrations are applied, create the first owner account from Settings -> Data. Enter the same setup token used for migrations, then use the team session card's Create First Owner form.
@@ -90,7 +98,7 @@ docker compose --env-file .env.team -f docker-compose.team.yml pull
 docker compose --env-file .env.team -f docker-compose.team.yml up --build -d
 ```
 
-If Settings -> Data reports pending migrations after the new app starts, run them from the same panel with the setup token. If migrations fail, stop the stack, restore the previous database dump and media archive, then restart the previous app image or checkout.
+If Settings -> Data reports pending migrations after the new app starts, run them from the same panel with the setup token or run `docker compose --env-file .env.team -f docker-compose.team.yml exec app pnpm db:migrate`. If migrations fail, stop the stack, restore the previous database dump and media archive, then restart the previous app image or checkout.
 
 Rollback flow:
 
