@@ -133,8 +133,10 @@ import {
   type WorkspaceCleanupKind,
 } from "@/lib/data-management";
 import {
+  deleteTeamAsset,
   fetchTeamWorkspaceGalleryItems,
   fetchWorkspaceStorageRuntimeStatus,
+  readTeamCsrfToken,
 } from "@/lib/storage/team-client";
 import { useTranslations, t as translate } from "@/lib/i18n";
 import { readFetchError, toErrorMessage } from "@/lib/client-fetch-error";
@@ -440,6 +442,16 @@ export default function Home() {
     }
     return { ...storedItem, url: originalUrl };
   }, [items]);
+
+  const deleteWorkspaceAssetById = useCallback(async (id: string): Promise<void> => {
+    if (workspaceStorageTarget === "postgres") {
+      const csrfToken = readTeamCsrfToken();
+      if (!csrfToken) throw new Error("CSRF token is required");
+      await deleteTeamAsset(id, csrfToken);
+      return;
+    }
+    await deleteFromDB(id);
+  }, [workspaceStorageTarget]);
 
   const openOriginalItem = useCallback((
     item: StorageItem,
@@ -858,6 +870,7 @@ export default function Home() {
   } = useAssetActions({
     buildProviderHeaders,
     compareItemIds,
+    deleteAssetById: deleteWorkspaceAssetById,
     filteredItems,
     generationAbortControllersRef,
     items,
@@ -949,14 +962,14 @@ export default function Home() {
       delete pollingFailuresRef.current[task.id];
     }
     for (const id of assetIds) {
-      await deleteFromDB(id);
+      await deleteWorkspaceAssetById(id);
     }
 
     setGenerationTasks(prev => prev.filter(task => !taskIds.has(task.id)));
     setItems(prev => prev.filter(item => !assetIds.includes(item.id)));
     setSelectedItemIds(prev => prev.filter(id => !idSet.has(id)));
     setCompareItemIds(prev => prev.filter(id => !idSet.has(id)));
-  }, [generationTasks, setCompareItemIds, setGenerationTasks, setItems, setSelectedItemIds]);
+  }, [deleteWorkspaceAssetById, generationTasks, setCompareItemIds, setGenerationTasks, setItems, setSelectedItemIds]);
 
   const handleGalleryBatchDelete = async () => {
     if (selectedItemIds.length === 0) return;

@@ -221,6 +221,25 @@ export async function deleteTeamMember(
   }
 }
 
+export async function deleteTeamAsset(
+  assetId: string,
+  csrfToken: string,
+  fetcher: Fetcher = fetch,
+): Promise<void> {
+  const token = csrfToken.trim();
+  if (!token) throw new Error("CSRF token is required");
+  const response = await fetcher(API_ROUTES.storage.teamAsset(assetId), {
+    cache: "no-store",
+    headers: { "x-imagine-csrf-token": token },
+    method: "DELETE",
+  });
+  const body: unknown = await response.json();
+  if (!response.ok) {
+    const error = readStringField(body, "error") ?? "Team asset delete failed";
+    throw new Error(error);
+  }
+}
+
 export async function fetchTeamAssets(
   options: TeamAssetListOptions = {},
   fetcher: Fetcher = fetch,

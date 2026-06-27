@@ -37,6 +37,7 @@ export const API_ROUTES = {
       const url = `/api/storage/team/assets/${encodeURIComponent(assetId)}/media`;
       return options.download ? `${url}?download=1` : url;
     },
+    teamAsset: (assetId: string) => `/api/storage/team/assets/${encodeURIComponent(assetId)}`,
     teamHealth: "/api/storage/team/health",
     teamMigrations: "/api/storage/team/migrations",
     teamSession: "/api/storage/team/session",

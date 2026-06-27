@@ -5,6 +5,7 @@ import type { BoardDocument, BoardSummary } from "../lib/board/types";
 import {
   bootstrapTeamOwner,
   createTeamMember,
+  deleteTeamAsset,
   deleteTeamMember,
   createTeamBoardDocument,
   deleteTeamBoardDocument,
@@ -183,6 +184,24 @@ test("fetchTeamWorkspaceGalleryItems reads workspace-global team assets", async 
   assert.equal(requestedUrl, "/api/storage/team/assets?boardId=&limit=200");
   assert.deepEqual(result.map(item => item.id), ["workspace_asset"]);
   assert.equal(result[0]?.url, "/api/storage/team/assets/workspace_asset/media");
+});
+
+test("deleteTeamAsset sends CSRF header to encoded asset route", async () => {
+  let requestedUrl = "";
+  let deleteCsrfHeader: string | null = null;
+  await deleteTeamAsset("asset/with spaces", "csrf-token", async (input, init) => {
+    requestedUrl = String(input);
+    assert.equal(init?.method, "DELETE");
+    deleteCsrfHeader = new Headers(init?.headers).get("x-imagine-csrf-token");
+    return jsonResponse({ ok: true });
+  });
+
+  assert.equal(requestedUrl, "/api/storage/team/assets/asset%2Fwith%20spaces");
+  assert.equal(deleteCsrfHeader, "csrf-token");
+  await assert.rejects(
+    deleteTeamAsset("asset_1", " "),
+    /CSRF token is required/,
+  );
 });
 
 test("fetchTeamBoardSummaries sends list filters and validates summaries", async () => {

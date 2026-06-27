@@ -1,4 +1,5 @@
 import { API_ROUTES } from "@/lib/api/routes";
+import { ApiError } from "@/lib/api/errors";
 import type { StorageItemMeta } from "@/lib/db";
 import type { PublicTeamAssetPayload, PublicTeamAssetRecord, TeamAssetListResult } from "@/lib/storage/team-asset-types";
 import type { PostgresStorageConfig } from "@/lib/storage/postgres/config";
@@ -22,6 +23,18 @@ export async function listTeamAssets(
     targetKind: "postgres",
     workspaceId: context.session.workspaceId,
   };
+}
+
+export async function deleteTeamAsset(
+  queryable: PostgresQueryable,
+  config: PostgresStorageConfig,
+  request: Request,
+  assetId: string,
+): Promise<void> {
+  const context = await createTeamWorkspaceStorageContext(queryable, config, request, { minimumRole: "editor" });
+  const record = await context.repository.assets.get(assetId);
+  if (!record) throw new ApiError(404, "team_asset_not_found", "Team asset was not found");
+  await context.repository.assets.delete(assetId);
 }
 
 function publicTeamAssetRecord(record: {

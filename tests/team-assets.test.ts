@@ -5,8 +5,9 @@ import type { QueryResult, QueryResultRow } from "pg";
 import type { StorageItemMeta } from "../lib/db";
 import type { PostgresQueryable } from "../lib/storage/postgres/connection";
 import { hashTeamSessionToken } from "../lib/storage/team-auth";
-import { listTeamAssets } from "../lib/storage/team-assets";
+import { deleteTeamAsset, listTeamAssets } from "../lib/storage/team-assets";
 import { GET as getTeamAssets } from "../app/api/storage/team/assets/route";
+import { DELETE as deleteTeamAssetRoute } from "../app/api/storage/team/assets/[assetId]/route";
 
 const RAW_SESSION_TOKEN = "raw-session-token";
 const WORKSPACE_ID = "workspace_1";
@@ -80,6 +81,25 @@ test("listTeamAssets preserves empty board id for workspace gallery queries", as
   );
 });
 
+test("deleteTeamAsset removes an editor-scoped asset record", async () => {
+  const queries: Array<{ text: string; values?: readonly unknown[] }> = [];
+  await deleteTeamAsset(
+    createTeamAssetsQueryable(queries, { role: "editor" }),
+    { databaseUrl: "postgres://localhost/imagine", mediaDir: "/srv/imagine/media" },
+    requestWithSession(),
+    ASSET_ID,
+  );
+
+  assert.deepEqual(
+    queries.find(query => query.text.startsWith("select meta from assets"))?.values,
+    [WORKSPACE_ID, ASSET_ID],
+  );
+  assert.deepEqual(
+    queries.find(query => query.text.startsWith("delete from assets"))?.values,
+    [WORKSPACE_ID, ASSET_ID],
+  );
+});
+
 test("team assets route rejects invalid query params before opening a database client", async () => {
   const originalEnv = {
     DATABASE_URL: process.env.DATABASE_URL,
@@ -104,6 +124,36 @@ test("team assets route rejects invalid query params before opening a database c
   }
 });
 
+test("team asset delete route rejects missing CSRF before opening a database client", async () => {
+  const originalEnv = {
+    APP_URL: process.env.APP_URL,
+    DATABASE_URL: process.env.DATABASE_URL,
+    IMAGINE_MEDIA_DIR: process.env.IMAGINE_MEDIA_DIR,
+    IMAGINE_STORAGE_TARGET: process.env.IMAGINE_STORAGE_TARGET,
+  };
+  try {
+    process.env.APP_URL = "http://localhost:3000";
+    process.env.DATABASE_URL = "postgres://localhost/imagine";
+    process.env.IMAGINE_MEDIA_DIR = "/srv/imagine/media";
+    process.env.IMAGINE_STORAGE_TARGET = "postgres";
+
+    const response = await deleteTeamAssetRoute(new Request("http://localhost:3000/api/storage/team/assets/asset_1", {
+      headers: { origin: "http://localhost:3000" },
+      method: "DELETE",
+    }), assetRouteContext());
+    assert.equal(response.status, 403);
+    assert.deepEqual(await response.json(), {
+      code: "invalid_csrf",
+      error: "Valid CSRF token is required",
+    });
+  } finally {
+    restoreEnv("APP_URL", originalEnv.APP_URL);
+    restoreEnv("DATABASE_URL", originalEnv.DATABASE_URL);
+    restoreEnv("IMAGINE_MEDIA_DIR", originalEnv.IMAGINE_MEDIA_DIR);
+    restoreEnv("IMAGINE_STORAGE_TARGET", originalEnv.IMAGINE_STORAGE_TARGET);
+  }
+});
+
 function requestWithSession(): Request {
   return new Request("http://localhost:3000/api/storage/team/assets", {
     headers: { cookie: `imagine_team_session=${RAW_SESSION_TOKEN}` },
@@ -112,6 +162,7 @@ function requestWithSession(): Request {
 
 function createTeamAssetsQueryable(
   queries: Array<{ text: string; values?: readonly unknown[] }> = [],
+  options: { role?: "owner" | "admin" | "editor" | "viewer" } = {},
 ): PostgresQueryable {
   return {
     query: async <T extends QueryResultRow = QueryResultRow>(text: string, values?: readonly unknown[]) => {
@@ -120,7 +171,7 @@ function createTeamAssetsQueryable(
         return typedQueryResult<T>([{
           email: "viewer@example.com",
           expires_at: "2026-07-03T00:00:00.000Z",
-          role: "viewer",
+          role: options.role ?? "viewer",
           session_id: hashTeamSessionToken(RAW_SESSION_TOKEN),
           team_id: "team_1",
           user_id: "user_1",
@@ -142,6 +193,10 @@ function createTeamAssetsQueryable(
       return typedQueryResult<T>([]);
     },
   };
+}
+
+function assetRouteContext(assetId = ASSET_ID): { params: Promise<{ assetId: string }> } {
+  return { params: Promise.resolve({ assetId }) };
 }
 
 function createAssetMeta(): StorageItemMeta {

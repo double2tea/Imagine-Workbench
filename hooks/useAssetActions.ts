@@ -8,7 +8,6 @@ import { readFetchError, toErrorMessage } from "@/lib/client-fetch-error";
 import { readImageGenerationPayload } from "@/lib/client-image-response";
 import {
   clearAllDB,
-  deleteFromDB,
   getAssetMeta,
   getGenerationReferenceMedia,
   saveToDB,
@@ -47,6 +46,7 @@ interface RetryRequestBody {
 interface UseAssetActionsParams {
   buildProviderHeaders: (target?: string) => Record<string, string>;
   compareItemIds: string[];
+  deleteAssetById: (id: string) => Promise<void>;
   filteredItems: StorageItem[];
   generationAbortControllersRef: MutableRefObject<Record<string, AbortController>>;
   items: StorageItem[];
@@ -174,6 +174,7 @@ async function saveItemOrWarn(
 export function useAssetActions({
   buildProviderHeaders,
   compareItemIds,
+  deleteAssetById,
   filteredItems,
   generationAbortControllersRef,
   items,
@@ -228,7 +229,7 @@ export function useAssetActions({
       confirmLabel: t("delete"),
     })) {
       for (const id of selectedItemIds) {
-        await deleteFromDB(id);
+        await deleteAssetById(id);
       }
       setItems(prev => prev.filter(item => !selectedItemIds.includes(item.id)));
       setSelectedItemIds([]);
@@ -245,7 +246,7 @@ export function useAssetActions({
       confirmLabel: t("delete"),
     })) {
       for (const id of ids) {
-        await deleteFromDB(id);
+        await deleteAssetById(id);
       }
       setItems(prev => prev.filter(item => !ids.includes(item.id)));
       setSelectedItemIds(prev => prev.filter(id => !ids.includes(id)));
@@ -284,7 +285,7 @@ export function useAssetActions({
         }
       }
 
-      await deleteFromDB(item.id);
+      await deleteAssetById(item.id);
       delete pollingFailuresRef.current[item.id];
       setItems(prev => prev.filter(current => current.id !== item.id));
       setSelectedItemIds(prev => prev.filter(id => id !== item.id));
@@ -299,7 +300,7 @@ export function useAssetActions({
 
   const handleDeleteItem = async (item: StorageItem) => {
     if (await confirmAction({ message: t("common.confirmDialogs.deleteSingleItem"), tone: "danger", confirmLabel: t("delete") })) {
-      await deleteFromDB(item.id);
+      await deleteAssetById(item.id);
       setItems(prev => prev.filter(current => current.id !== item.id));
       setSelectedItemIds(prev => prev.filter(id => id !== item.id));
       setCompareItemIds(prev => prev.filter(id => id !== item.id));
