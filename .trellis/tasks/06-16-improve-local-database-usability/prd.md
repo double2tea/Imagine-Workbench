@@ -106,6 +106,7 @@ Completed in the latest continuation:
 * Added `team_voice_profile.save` audit coverage for team voice-profile saves. The service now wraps the workspace-scoped upsert plus non-secret profile/source/reference-count metadata in one transaction.
 * Added `team_prompt_template.save` audit coverage for team prompt-template saves. The service now wraps the workspace-scoped upsert plus non-secret template-id/category metadata in one transaction.
 * Hardened team setting and secret mutation audit consistency. Team setting/secret saves and deletes now wrap the settings table mutation plus non-secret audit metadata in one transaction, without auditing plaintext secret values.
+* Hardened RunningHub provider target audit consistency. Provider target saves and deletes now wrap the saved target mutation plus non-secret audit metadata in one transaction, without auditing plaintext or encrypted access passwords.
 
 Still remaining before the full PRD can be considered complete:
 

@@ -85,34 +85,41 @@ export async function saveTeamProviderTarget(
     ...normalized,
     ...(accessPasswordEncrypted ? { accessPasswordEncrypted } : {}),
   };
-  const result = await context.queryable.query<TeamProviderTargetRow>(
-    `insert into saved_provider_targets (id, workspace_id, provider, target, is_secret, updated_at)
-     values ($1, $2, $3, $4::jsonb, true, now())
-     on conflict (id) do update set
-       provider = excluded.provider,
-       target = excluded.target,
-       is_secret = true,
-       updated_at = now()
-     returning id, provider, target, updated_at`,
-    [storageId, context.session.workspaceId, "runninghub", JSON.stringify(target)],
-  );
-  const row = result.rows[0];
-  if (!row) throw new Error("Team provider target save failed");
-  await recordTeamAuditEvent(context.queryable, {
-    eventType: "team_provider_target.save",
-    metadata: {
-      provider: "runninghub",
-      targetId: normalized.targetId,
-      targetType: normalized.targetType,
-    },
-    userId: context.session.userId,
-    workspaceId: context.session.workspaceId,
-  });
-  return {
-    target: publicTargetFromRow(row),
-    targetKind: "postgres",
-    workspaceId: context.session.workspaceId,
-  };
+  await context.queryable.query("begin");
+  try {
+    const result = await context.queryable.query<TeamProviderTargetRow>(
+      `insert into saved_provider_targets (id, workspace_id, provider, target, is_secret, updated_at)
+       values ($1, $2, $3, $4::jsonb, true, now())
+       on conflict (id) do update set
+         provider = excluded.provider,
+         target = excluded.target,
+         is_secret = true,
+         updated_at = now()
+       returning id, provider, target, updated_at`,
+      [storageId, context.session.workspaceId, "runninghub", JSON.stringify(target)],
+    );
+    const row = result.rows[0];
+    if (!row) throw new Error("Team provider target save failed");
+    await recordTeamAuditEvent(context.queryable, {
+      eventType: "team_provider_target.save",
+      metadata: {
+        provider: "runninghub",
+        targetId: normalized.targetId,
+        targetType: normalized.targetType,
+      },
+      userId: context.session.userId,
+      workspaceId: context.session.workspaceId,
+    });
+    await context.queryable.query("commit");
+    return {
+      target: publicTargetFromRow(row),
+      targetKind: "postgres",
+      workspaceId: context.session.workspaceId,
+    };
+  } catch (error) {
+    await context.queryable.query("rollback");
+    throw error;
+  }
 }
 
 export async function readTeamProviderTargetAccessPassword(
@@ -143,16 +150,23 @@ export async function deleteTeamProviderTarget(
   const context = await createTeamWorkspaceStorageContext(queryable, config, request, { minimumRole: "admin" });
   const publicId = normalizeText(targetId, "Team provider target id is required", "invalid_team_provider_target_id");
   const storageId = storageProviderTargetId(context.session.workspaceId, publicId);
-  await context.queryable.query(
-    "delete from saved_provider_targets where workspace_id = $1 and id = $2",
-    [context.session.workspaceId, storageId],
-  );
-  await recordTeamAuditEvent(context.queryable, {
-    eventType: "team_provider_target.delete",
-    metadata: { provider: "runninghub", targetId: publicId },
-    userId: context.session.userId,
-    workspaceId: context.session.workspaceId,
-  });
+  await context.queryable.query("begin");
+  try {
+    await context.queryable.query(
+      "delete from saved_provider_targets where workspace_id = $1 and id = $2",
+      [context.session.workspaceId, storageId],
+    );
+    await recordTeamAuditEvent(context.queryable, {
+      eventType: "team_provider_target.delete",
+      metadata: { provider: "runninghub", targetId: publicId },
+      userId: context.session.userId,
+      workspaceId: context.session.workspaceId,
+    });
+    await context.queryable.query("commit");
+  } catch (error) {
+    await context.queryable.query("rollback");
+    throw error;
+  }
 }
 
 function publicTargetFromRow(row: TeamProviderTargetRow): PublicTeamProviderTarget {

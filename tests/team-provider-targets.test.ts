@@ -93,6 +93,9 @@ test("saveTeamProviderTarget encrypts access passwords before writing", async ()
   assert.equal(isEncryptedWorkspaceSecret(storedTarget.accessPasswordEncrypted ?? ""), true);
   assert.equal(decryptWorkspaceSecret(storedTarget.accessPasswordEncrypted ?? "", ENCRYPTION_KEY), "app-password");
   assert.deepEqual(write?.values?.slice(0, 3), [`${WORKSPACE_ID}:runninghub:${result.target.id}`, WORKSPACE_ID, "runninghub"]);
+  assert.ok(queries.some(query => query.text === "begin"));
+  assert.ok(queries.some(query => query.text === "commit"));
+  assert.equal(queries.some(query => query.text === "rollback"), false);
   const audit = queries.find(query => query.text.includes("insert into audit_events"));
   assert.deepEqual(audit?.values?.slice(0, 3), [WORKSPACE_ID, "user_1", "team_provider_target.save"]);
   assert.deepEqual(JSON.parse(String(audit?.values?.[3])) as unknown, {
@@ -171,6 +174,9 @@ test("deleteTeamProviderTarget removes an admin-scoped saved target", async () =
     queries.find(query => query.text.startsWith("delete from saved_provider_targets"))?.values,
     [WORKSPACE_ID, `${WORKSPACE_ID}:runninghub:ai-app:1937084622758465538`],
   );
+  assert.ok(queries.some(query => query.text === "begin"));
+  assert.ok(queries.some(query => query.text === "commit"));
+  assert.equal(queries.some(query => query.text === "rollback"), false);
   const audit = queries.find(query => query.text.includes("insert into audit_events"));
   assert.deepEqual(audit?.values?.slice(0, 3), [WORKSPACE_ID, "user_1", "team_provider_target.delete"]);
   assert.deepEqual(JSON.parse(String(audit?.values?.[3])) as unknown, {
