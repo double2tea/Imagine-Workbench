@@ -70,6 +70,9 @@ import {
   type VoiceProfile,
   type VoiceProfileSource,
 } from "@/lib/voice-profiles";
+import type { WorkspaceSafetySnapshotReason } from "@/lib/storage/schema";
+
+export type { WorkspaceSafetySnapshotReason };
 
 export const WORKSPACE_BACKUP_SCHEMA_VERSION = 3;
 const SUPPORTED_WORKSPACE_BACKUP_SCHEMA_VERSIONS = new Set([1, 2, WORKSPACE_BACKUP_SCHEMA_VERSION]);
@@ -171,12 +174,6 @@ export interface LocalStorageInventoryEntry {
   kind: LocalStorageCleanupKind;
   migrationPolicy: LocalStorageMigrationPolicy;
 }
-
-export type WorkspaceSafetySnapshotReason =
-  | "clear-assets"
-  | "restore-workspace"
-  | "reset-boards"
-  | "cleanup-assets";
 
 export interface WorkspaceBackupManifest {
   app: typeof BACKUP_APP_NAME;

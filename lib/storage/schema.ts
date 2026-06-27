@@ -34,6 +34,7 @@ export const WORKSPACE_STORAGE_TABLE_NAMES = [
 export type WorkspaceStorageTableName = (typeof WORKSPACE_STORAGE_TABLE_NAMES)[number];
 export type WorkspaceAssetPayloadLocationKind = "indexeddb" | "inline" | "local-file" | "object-storage";
 export type WorkspaceSettingGroup = "agent" | "model-cache" | "provider" | "ui" | "other";
+export type WorkspaceSafetySnapshotReason = "clear-assets" | "restore-workspace" | "reset-boards" | "cleanup-assets";
 
 export interface WorkspaceAssetPayloadRef {
   contentHash?: string;
@@ -85,11 +86,15 @@ export interface WorkspaceSafetySnapshotRecord {
   boardCount: number;
   createdAt: string;
   fileName: string;
+  generationTaskCount: number;
   id: string;
+  libraryAssetCount: number;
   origin: string;
   payload: WorkspaceAssetPayloadRef;
+  reason: WorkspaceSafetySnapshotReason;
   settingsKeyCount: number;
   sizeBytes: number;
+  voiceProfileCount: number;
 }
 
 export interface WorkspaceVoiceProfileRecord {

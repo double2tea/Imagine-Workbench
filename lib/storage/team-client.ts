@@ -39,6 +39,10 @@ import type {
   TeamPromptTemplateMutationResult,
 } from "@/lib/storage/team-prompt-template-types";
 import type {
+  PublicTeamSafetySnapshot,
+  TeamSafetySnapshotResult,
+} from "@/lib/storage/team-safety-snapshot-types";
+import type {
   TeamVoiceProfileListResult,
   TeamVoiceProfileMutationResult,
 } from "@/lib/storage/team-voice-profile-types";
@@ -331,6 +335,16 @@ export async function fetchTeamVoiceProfiles(fetcher: Fetcher = fetch): Promise<
     throw new Error(error);
   }
   return parseTeamVoiceProfileListResult(body);
+}
+
+export async function fetchTeamSafetySnapshot(fetcher: Fetcher = fetch): Promise<TeamSafetySnapshotResult> {
+  const response = await fetcher(API_ROUTES.storage.teamSafetySnapshot, { cache: "no-store" });
+  const body: unknown = await response.json();
+  if (!response.ok) {
+    const error = readStringField(body, "error") ?? "Team safety snapshot lookup failed";
+    throw new Error(error);
+  }
+  return parseTeamSafetySnapshotResult(body);
 }
 
 export async function saveTeamPromptTemplate(
@@ -968,6 +982,16 @@ function parseTeamVoiceProfileMutationResult(value: unknown): TeamVoiceProfileMu
   return value as unknown as TeamVoiceProfileMutationResult;
 }
 
+function parseTeamSafetySnapshotResult(value: unknown): TeamSafetySnapshotResult {
+  if (!isRecord(value) || value.targetKind !== "postgres" || typeof value.workspaceId !== "string") {
+    throw new Error("Team safety snapshot response is invalid");
+  }
+  if (value.snapshot !== null && !isPublicTeamSafetySnapshot(value.snapshot)) {
+    throw new Error("Team safety snapshot response is invalid");
+  }
+  return value as unknown as TeamSafetySnapshotResult;
+}
+
 function parseTeamAssetListResult(value: unknown): TeamAssetListResult {
   if (!isTeamAssetListResult(value)) throw new Error("Team asset list response is invalid");
   return value;
@@ -1273,6 +1297,25 @@ function isPublicTeamSetting(value: unknown): value is PublicTeamSetting {
   );
 }
 
+function isPublicTeamSafetySnapshot(value: unknown): value is PublicTeamSafetySnapshot {
+  if (!isRecord(value)) return false;
+  return (
+    typeof value.assetCount === "number" &&
+    typeof value.boardCount === "number" &&
+    typeof value.createdAt === "string" &&
+    typeof value.fileName === "string" &&
+    typeof value.generationTaskCount === "number" &&
+    typeof value.id === "string" &&
+    typeof value.libraryAssetCount === "number" &&
+    typeof value.origin === "string" &&
+    isWorkspaceSafetySnapshotReason(value.reason) &&
+    typeof value.settingsKeyCount === "number" &&
+    typeof value.sizeBytes === "number" &&
+    typeof value.voiceProfileCount === "number" &&
+    !("payload" in value)
+  );
+}
+
 function isPublicTeamProviderTarget(value: unknown): value is PublicTeamProviderTarget {
   if (!isRecord(value)) return false;
   return (
@@ -1362,6 +1405,10 @@ function isTeamRole(value: unknown): value is TeamSessionContext["role"] {
 
 function isWorkspaceSettingGroup(value: unknown): value is WorkspaceSettingGroup {
   return value === "agent" || value === "model-cache" || value === "provider" || value === "ui" || value === "other";
+}
+
+function isWorkspaceSafetySnapshotReason(value: unknown): boolean {
+  return value === "clear-assets" || value === "restore-workspace" || value === "reset-boards" || value === "cleanup-assets";
 }
 
 function isStorageItemStatus(value: unknown): value is StorageItemMeta["status"] {

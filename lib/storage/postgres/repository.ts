@@ -65,11 +65,15 @@ interface SafetySnapshotRow extends QueryResultRow {
   board_count: number;
   created_at: Date | string;
   file_name: string;
+  generation_task_count: number;
   id: string;
+  library_asset_count: number;
   origin: string;
   payload: WorkspaceAssetPayloadRef;
+  reason: WorkspaceSafetySnapshotRecord["reason"];
   settings_key_count: number;
   size_bytes: string | number;
+  voice_profile_count: number;
 }
 
 interface VoiceProfileRow extends QueryResultRow {
@@ -367,8 +371,12 @@ class PostgresSafetySnapshotRepository implements WorkspaceSafetySnapshotReposit
       `select id, snapshot->>'fileName' as file_name, snapshot->>'origin' as origin,
         (snapshot->>'assetCount')::integer as asset_count,
         (snapshot->>'boardCount')::integer as board_count,
+        (snapshot->>'generationTaskCount')::integer as generation_task_count,
+        (snapshot->>'libraryAssetCount')::integer as library_asset_count,
+        snapshot->>'reason' as reason,
         (snapshot->>'settingsKeyCount')::integer as settings_key_count,
         (snapshot->>'sizeBytes')::bigint as size_bytes,
+        (snapshot->>'voiceProfileCount')::integer as voice_profile_count,
         snapshot->'payload' as payload,
         created_at
        from safety_snapshots where workspace_id = $1 order by created_at desc limit 1`,
@@ -497,10 +505,14 @@ function safetySnapshotFromRow(row: SafetySnapshotRow | undefined): WorkspaceSaf
     boardCount: row.board_count,
     createdAt: new Date(row.created_at).toISOString(),
     fileName: row.file_name,
+    generationTaskCount: row.generation_task_count,
     id: row.id,
+    libraryAssetCount: row.library_asset_count,
     origin: row.origin,
     payload: row.payload,
+    reason: row.reason,
     settingsKeyCount: row.settings_key_count,
     sizeBytes: Number(row.size_bytes),
+    voiceProfileCount: row.voice_profile_count,
   };
 }
