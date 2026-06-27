@@ -3,15 +3,15 @@ import { apiErrorResponse, badRequest } from "@/lib/api/errors";
 import type { AiProvider } from "@/lib/providers/model-catalog";
 import { isProviderKey } from "@/lib/providers/registry";
 import { listProviderModels, type ModelKindFilter } from "@/lib/providers/models";
-import { resolveProviderConfig } from "@/lib/providers/utils";
+import { resolveProviderConfigForRequest } from "@/lib/providers/team-config";
 
-export const runtime = "edge";
+export const runtime = "nodejs";
 
 export async function GET(req: NextRequest) {
   try {
     const provider = readProvider(req);
     const kind = readKind(req);
-    const config = resolveProviderConfig(req, provider);
+    const config = await resolveProviderConfigForRequest(req, provider);
     const models = await listProviderModels(config, kind);
     return NextResponse.json({ models, kind, source: "provider" });
   } catch (err) {

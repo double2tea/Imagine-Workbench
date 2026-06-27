@@ -9,12 +9,13 @@ import {
   resolveRunningHubNodeInfoListForModel,
   runningHubResolvedNodeInfoAllowsEmptyPrompt,
 } from "@/lib/providers/runninghub-node-info";
-import { optionalText, resolveProviderConfig } from "@/lib/providers/utils";
+import { resolveProviderConfigForRequest } from "@/lib/providers/team-config";
+import { optionalText } from "@/lib/providers/utils";
 import { mediaReferenceTypeFromBase64DataUri } from "@/lib/media-references";
 import { REFERENCE_IMAGE_REQUEST_BODY_MAX_BYTES, getReferenceMediaPayloadError } from "@/lib/reference-images";
 import type { ReferenceMedia } from "@/lib/providers/types";
 
-export const runtime = "edge";
+export const runtime = "nodejs";
 
 interface GenerateVideoBody {
   prompt?: unknown;
@@ -40,7 +41,7 @@ export async function POST(req: NextRequest) {
     const body = (await req.json()) as GenerateVideoBody;
     const modelValue = optionalText(body.model) ?? DEFAULT_VIDEO_MODEL;
     const parsed = parseProviderModel(modelValue, "12ai");
-    const config = resolveProviderConfig(req, parsed.provider);
+    const config = await resolveProviderConfigForRequest(req, parsed.provider);
     const isRunningHubVideoTask = parsed.provider === "runninghub" && isRunningHubTaskTarget(parsed.model, "video");
     const modelCapability = isRunningHubVideoTask ? null : getModelCapability(modelValue, "video");
     const referenceMedia = readReferenceMedia(body.referenceMedia, body.images, body.image, body.lastFrame);

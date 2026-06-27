@@ -3,9 +3,10 @@ import { apiErrorResponse, badRequest, requireApiText } from "@/lib/api/errors";
 import { getAudioStatus } from "@/lib/providers/audio";
 import { getAsyncImageStatus } from "@/lib/providers/image";
 import { getVideoStatus } from "@/lib/providers/video";
-import { optionalText, parseMediaOperationName, resolveProviderConfig } from "@/lib/providers/utils";
+import { resolveProviderConfigForRequest } from "@/lib/providers/team-config";
+import { optionalText, parseMediaOperationName } from "@/lib/providers/utils";
 
-export const runtime = "edge";
+export const runtime = "nodejs";
 
 interface StatusBody {
   operationName?: unknown;
@@ -17,7 +18,7 @@ export async function POST(req: NextRequest) {
     const body = (await req.json()) as StatusBody;
     const operationName = requireApiText(body.operationName, "operationName");
     const operation = parseMediaOperationNameValue(operationName);
-    const config = resolveProviderConfig(req, operation.provider);
+    const config = await resolveProviderConfigForRequest(req, operation.provider);
     const result = operation.mediaType === "image"
       ? await getAsyncImageStatus(config, operation.id)
       : operation.mediaType === "audio"

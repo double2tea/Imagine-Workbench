@@ -1,9 +1,10 @@
 import { NextRequest, NextResponse } from "next/server";
 import { apiErrorResponse, badRequest, requireApiText } from "@/lib/api/errors";
 import { downloadAudio } from "@/lib/providers/audio";
-import { parseMediaOperationName, resolveProviderConfig } from "@/lib/providers/utils";
+import { resolveProviderConfigForRequest } from "@/lib/providers/team-config";
+import { parseMediaOperationName } from "@/lib/providers/utils";
 
-export const runtime = "edge";
+export const runtime = "nodejs";
 
 interface DownloadBody {
   operationName?: unknown;
@@ -18,7 +19,7 @@ export async function POST(req: NextRequest) {
       throw badRequest("Only audio operations can be downloaded", "invalid_media_type");
     }
 
-    const config = resolveProviderConfig(req, operation.provider);
+    const config = await resolveProviderConfigForRequest(req, operation.provider);
     return await downloadAudio(config, operation.id, optionalOutputIndex(body.outputIndex));
   } catch (err) {
     const response = apiErrorResponse(err, "Failed to download audio file");

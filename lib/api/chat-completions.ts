@@ -2,7 +2,8 @@ import { NextResponse } from "next/server";
 import { z } from "zod";
 import { providerChatCompletionsUrl, providerChatRequestDefaults } from "../providers/chat";
 import { parseProviderModel, ProviderModelParseError } from "../providers/model-catalog";
-import { authHeaders, resolveProviderConfig } from "../providers/utils";
+import { resolveProviderConfigForRequest } from "../providers/team-config";
+import { authHeaders } from "../providers/utils";
 import { apiErrorResponse } from "./errors";
 import { assertOpenAiCompatibleGatewayAccess } from "./openai-auth";
 
@@ -17,7 +18,7 @@ export async function POST(req: Request) {
     const gatewayKey = isV1Request(req) ? assertOpenAiCompatibleGatewayAccess(req) : undefined;
     const body = chatCompletionsBodySchema.parse(await req.json());
     const parsed = parseProviderModel(body.model, "12ai");
-    const config = resolveProviderConfig(req, parsed.provider, { ignoredBearerToken: gatewayKey });
+    const config = await resolveProviderConfigForRequest(req, parsed.provider, { ignoredBearerToken: gatewayKey });
     const upstream = await fetch(providerChatCompletionsUrl(config), {
       method: "POST",
       headers: {

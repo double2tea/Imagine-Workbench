@@ -78,6 +78,24 @@ test("resolveProviderConfig accepts OpenAI-compatible bearer auth", () => {
   assert.equal(config.apiKey, "bearer_key");
 });
 
+test("resolveProviderConfig uses request credentials before injected team credentials", () => {
+  const teamConfig = resolveProviderConfig(
+    new Request("https://local.test"),
+    "mimo",
+    { apiKeyOverride: " tp-team-key " },
+  );
+  assert.equal(teamConfig.apiKey, "tp-team-key");
+  assert.equal(teamConfig.baseUrl, "https://token-plan-cn.xiaomimimo.com/v1");
+
+  const requestConfig = resolveProviderConfig(
+    new Request("https://local.test", { headers: { "x-ai-api-key": " sk-request-key " } }),
+    "mimo",
+    { apiKeyOverride: "tp-team-key" },
+  );
+  assert.equal(requestConfig.apiKey, "sk-request-key");
+  assert.equal(requestConfig.baseUrl, "https://api.xiaomimimo.com");
+});
+
 test("openAiCompatibleUrl supports root and v1 base URLs", () => {
   assert.equal(
     openAiCompatibleUrl("https://api.xiaomimimo.com", "/v1/chat/completions"),

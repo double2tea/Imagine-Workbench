@@ -3,11 +3,12 @@ import { ApiError, apiErrorResponse, badRequest, requireApiText } from "@/lib/ap
 import { assertPublicHttpUrl } from "@/lib/api/url-safety";
 import { editImage } from "@/lib/providers/image";
 import { parseProviderModel, ProviderModelParseError } from "@/lib/providers/model-catalog";
-import { dataUriToBlob, optionalText, resolveProviderConfig } from "@/lib/providers/utils";
+import { resolveProviderConfigForRequest } from "@/lib/providers/team-config";
+import { dataUriToBlob, optionalText } from "@/lib/providers/utils";
 import { REFERENCE_IMAGE_REQUEST_BODY_MAX_BYTES, getReferenceImagePayloadError } from "@/lib/reference-images";
 import type { ImageEditOperation } from "@/lib/providers/types";
 
-export const runtime = "edge";
+export const runtime = "nodejs";
 
 interface EditImageBody {
   operation?: unknown;
@@ -49,7 +50,7 @@ export async function POST(req: NextRequest) {
         "unsupported_image_edit_provider",
       );
     }
-    const config = resolveProviderConfig(req, parsed.provider);
+    const config = await resolveProviderConfigForRequest(req, parsed.provider);
     const result = await editImage(config, {
       operation,
       prompt,

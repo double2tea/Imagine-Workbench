@@ -1,9 +1,10 @@
 import { NextRequest, NextResponse } from "next/server";
 import { apiErrorResponse, badRequest, requireApiText } from "@/lib/api/errors";
 import { cancelVideo } from "@/lib/providers/video";
-import { parseMediaOperationName, resolveProviderConfig } from "@/lib/providers/utils";
+import { resolveProviderConfigForRequest } from "@/lib/providers/team-config";
+import { parseMediaOperationName } from "@/lib/providers/utils";
 
-export const runtime = "edge";
+export const runtime = "nodejs";
 
 interface CancelBody {
   operationName?: unknown;
@@ -17,7 +18,7 @@ export async function POST(req: NextRequest) {
       throw badRequest("Only 12AI video tasks can be canceled", "unsupported_cancel_operation");
     }
 
-    const config = resolveProviderConfig(req, operation.provider);
+    const config = await resolveProviderConfigForRequest(req, operation.provider);
     await cancelVideo(config, operation.id);
     return NextResponse.json({ success: true });
   } catch (err) {

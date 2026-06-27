@@ -15,12 +15,12 @@ import {
   parseProviderModel,
   ProviderModelParseError,
 } from "@/lib/providers/model-catalog";
-import type { ChatContentPart, ChatMessageInput } from "@/lib/providers/types";
-import { resolveProviderConfig } from "@/lib/providers/utils";
+import { resolveProviderConfigForRequest } from "@/lib/providers/team-config";
+import type { ChatContentPart, ChatMessageInput, ProviderConfig } from "@/lib/providers/types";
 import { SKILL_REGISTRY } from "./skills";
 import { executeToolCall, getAgentTools, type ToolContext } from "./tools";
 
-export const runtime = "edge";
+export const runtime = "nodejs";
 
 // -- Zod schemas --
 
@@ -339,7 +339,7 @@ export async function POST(req: NextRequest) {
     );
     const modelValue = body.model ?? req.headers.get("x-ai-chat-model") ?? DEFAULT_CHAT_MODEL;
     const parsed = parseProviderModel(modelValue, "12ai");
-    const config = resolveProviderConfig(req, parsed.provider);
+    const config = await resolveProviderConfigForRequest(req, parsed.provider);
 
     const referenceMsg =
       sendableAgentRefs.length > 0
@@ -552,7 +552,7 @@ function countValues(values: string[]): Record<string, number> {
 }
 
 async function runAgentLoop(
-  config: ReturnType<typeof resolveProviderConfig>,
+  config: ProviderConfig,
   model: string,
   systemInstruction: string,
   userMessages: ChatMessageInput[],

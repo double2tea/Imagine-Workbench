@@ -7,9 +7,10 @@ import { generateAudio } from "@/lib/providers/audio";
 import { parseProviderModel, ProviderModelParseError } from "@/lib/providers/model-catalog";
 import { readRunningHubNodeInfoList } from "@/lib/providers/runninghub-node-info";
 import type { ReferenceMedia } from "@/lib/providers/types";
-import { optionalText, resolveProviderConfig } from "@/lib/providers/utils";
+import { resolveProviderConfigForRequest } from "@/lib/providers/team-config";
+import { optionalText } from "@/lib/providers/utils";
 
-export const runtime = "edge";
+export const runtime = "nodejs";
 
 interface GenerateAudioBody {
   model?: unknown;
@@ -47,7 +48,7 @@ export async function POST(req: NextRequest) {
       );
     }
 
-    const config = resolveProviderConfig(req, parsed.provider);
+    const config = await resolveProviderConfigForRequest(req, parsed.provider);
     const result = await generateAudio(config, {
       prompt: runningHubNodeInfoList.length > 0 ? optionalText(body.prompt) ?? "" : requireApiText(body.prompt, "Prompt"),
       model: parsed.model,

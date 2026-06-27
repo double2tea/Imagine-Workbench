@@ -65,6 +65,7 @@
     "./team-generation-tasks.test.ts",
     "./team-members.test.ts",
     "./team-prompt-templates.test.ts",
+    "./team-provider-config.test.ts",
     "./team-provider-targets.test.ts",
     "./team-media.test.ts",
     "./team-session.test.ts",
@@ -173,6 +174,7 @@
     "../app/api/agent/respond/skills.ts",
     "../app/api/agent/respond/tools.ts",
     "../lib/providers/runninghub-node-info.ts",
+    "../lib/providers/team-config.ts",
     "../lib/providers/utils.ts",
     "../lib/reference-images.ts",
     "../lib/transcripts.ts"

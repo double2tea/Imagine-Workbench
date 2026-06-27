@@ -10,10 +10,11 @@ import { generateAudioOperation } from "@/lib/providers/audio";
 import { getOptionalModelCapability, parseProviderModel, ProviderModelParseError } from "@/lib/providers/model-catalog";
 import { readRunningHubNodeInfoList } from "@/lib/providers/runninghub-node-info";
 import type { ReferenceMedia } from "@/lib/providers/types";
-import { optionalText, resolveProviderConfig } from "@/lib/providers/utils";
+import { resolveProviderConfigForRequest } from "@/lib/providers/team-config";
+import { optionalText } from "@/lib/providers/utils";
 import { getReferenceMediaPayloadError, REFERENCE_IMAGE_REQUEST_BODY_MAX_BYTES } from "@/lib/reference-images";
 
-export const runtime = "edge";
+export const runtime = "nodejs";
 
 const audioGenerateBodySchema = z.object({
   asrLanguage: z.enum(["auto", "zh", "en"]).optional(),
@@ -64,7 +65,7 @@ export async function POST(req: NextRequest) {
     const payloadError = getReferenceMediaPayloadError(referenceMedia.map(reference => reference.dataUri));
     if (payloadError) return NextResponse.json({ error: payloadError, code: "payload_too_large" }, { status: 413 });
 
-    const config = resolveProviderConfig(req, parsed.provider);
+    const config = await resolveProviderConfigForRequest(req, parsed.provider);
     const result = await generateAudioOperation(config, {
       mode: body.mode,
       prompt: body.mode === "asr" ? optionalText(body.prompt) ?? "" : requireApiText(body.prompt, "Prompt"),

@@ -2,9 +2,10 @@ import { NextRequest, NextResponse } from "next/server";
 import { apiErrorResponse, requireApiText } from "@/lib/api/errors";
 import { createChatCompletionText } from "@/lib/providers/chat";
 import { DEFAULT_CHAT_MODEL, parseProviderModel, ProviderModelParseError } from "@/lib/providers/model-catalog";
-import { optionalText, resolveProviderConfig } from "@/lib/providers/utils";
+import { resolveProviderConfigForRequest } from "@/lib/providers/team-config";
+import { optionalText } from "@/lib/providers/utils";
 
-export const runtime = "edge";
+export const runtime = "nodejs";
 
 interface OptimizeBody {
   prompt?: unknown;
@@ -17,7 +18,7 @@ export async function POST(req: NextRequest) {
     const prompt = requireApiText(body.prompt, "Prompt");
     const modelValue = optionalText(body.model) ?? req.headers.get("x-ai-chat-model") ?? DEFAULT_CHAT_MODEL;
     const parsed = parseProviderModel(modelValue, "12ai");
-    const config = resolveProviderConfig(req, parsed.provider);
+    const config = await resolveProviderConfigForRequest(req, parsed.provider);
 
     const optimized = await createChatCompletionText(
       config,

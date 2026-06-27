@@ -10,13 +10,14 @@ import {
   resolveRunningHubNodeInfoListForModel,
   runningHubResolvedNodeInfoAllowsEmptyPrompt,
 } from "@/lib/providers/runninghub-node-info";
-import { dataUriToBlob, optionalText, resolveProviderConfig } from "@/lib/providers/utils";
+import { resolveProviderConfigForRequest } from "@/lib/providers/team-config";
+import { dataUriToBlob, optionalText } from "@/lib/providers/utils";
 import { getRunningHubYouchuanCatalog } from "@/lib/providers/runninghub";
 import { mediaReferenceTypeFromBase64DataUri } from "@/lib/media-references";
 import type { ReferenceMedia, RunningHubYouchuanAdvancedSettings } from "@/lib/providers/types";
 import { REFERENCE_IMAGE_REQUEST_BODY_MAX_BYTES, getReferenceImagePayloadError, getReferenceMediaPayloadError } from "@/lib/reference-images";
 
-export const runtime = "edge";
+export const runtime = "nodejs";
 
 interface GenerateImageBody {
   prompt?: unknown;
@@ -45,7 +46,7 @@ export async function POST(req: NextRequest) {
     const parsed = parseProviderModel(modelValue, "12ai");
     const isRunningHubImageTask = parsed.provider === "runninghub" && isRunningHubTaskTarget(parsed.model, "image");
     const modelCapability = isRunningHubImageTask ? null : getModelCapability(modelValue, "image");
-    const config = resolveProviderConfig(req, parsed.provider);
+    const config = await resolveProviderConfigForRequest(req, parsed.provider);
     const requestImageResolution = optionalText(body.imageResolution);
     const aspectRatio = customImageSizeAspectRatio(requestImageResolution) ?? optionalText(body.aspectRatio) ?? "1:1";
     const imageResolution = isRunningHubImageTask ? requestImageResolution ?? "auto" : resolveImageResolution(modelValue, aspectRatio, requestImageResolution);

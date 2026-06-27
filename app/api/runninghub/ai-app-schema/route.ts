@@ -1,8 +1,8 @@
 import { NextRequest, NextResponse } from "next/server";
 import { fetchRunningHubAiAppSchema } from "@/lib/providers/runninghub-app";
-import { resolveProviderConfig } from "@/lib/providers/utils";
+import { resolveProviderConfigForRequest } from "@/lib/providers/team-config";
 
-export const runtime = "edge";
+export const runtime = "nodejs";
 
 interface RunningHubAiAppSchemaBody {
   webappId?: unknown;
@@ -14,7 +14,7 @@ export async function POST(req: NextRequest) {
   try {
     const body = (await req.json()) as RunningHubAiAppSchemaBody;
     const webappId = requireWebappId(body.webappId);
-    const config = resolveProviderConfig(req, "runninghub");
+    const config = await resolveProviderConfigForRequest(req, "runninghub");
     const schema = await fetchRunningHubAiAppSchema(config, webappId);
     return NextResponse.json(schema);
   } catch (error) {

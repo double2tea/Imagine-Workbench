@@ -23,6 +23,7 @@ export function optionalText(value: unknown): string | undefined {
 }
 
 export interface ResolveProviderConfigOptions {
+  apiKeyOverride?: string;
   ignoredBearerToken?: string;
 }
 
@@ -31,16 +32,15 @@ export function resolveProviderConfig(
   provider: AiProvider,
   options: ResolveProviderConfigOptions = {},
 ): ProviderConfig {
-  const headerKey = trimCredential(req.headers.get("x-ai-api-key") ?? "");
-  const rawBearerKey = readBearerToken(req.headers.get("authorization"));
-  const bearerKey = rawBearerKey && rawBearerKey !== options.ignoredBearerToken ? trimCredential(rawBearerKey) : "";
+  const requestKey = readProviderRequestApiKey(req, options);
   const headerBaseUrl = trimCredential(req.headers.get("x-ai-base-url") ?? "");
   const providerLabel = optionalText(req.headers.get("x-ai-provider-label"));
   const envKey = trimCredential(resolveProviderApiKey(provider));
+  const overrideKey = trimCredential(options.apiKeyOverride ?? "");
   const configuredBaseUrl = headerBaseUrl || trimCredential(resolveProviderBaseUrl(provider));
   const videoBaseUrl = resolveProviderVideoBaseUrl(provider) || configuredBaseUrl;
 
-  const apiKey = headerKey || bearerKey || envKey;
+  const apiKey = requestKey || overrideKey || envKey;
   if (!isKnownProvider(provider) && !apiKey) {
     throw new Error(`${providerLabel ?? provider} API key is required.`);
   }
@@ -60,6 +60,13 @@ export function resolveProviderConfig(
     baseUrl: resolvedBaseUrl,
     videoBaseUrl: trimTrailingSlash(videoBaseUrl),
   };
+}
+
+export function readProviderRequestApiKey(req: Request, options: ResolveProviderConfigOptions = {}): string {
+  const headerKey = trimCredential(req.headers.get("x-ai-api-key") ?? "");
+  if (headerKey) return headerKey;
+  const rawBearerKey = readBearerToken(req.headers.get("authorization"));
+  return rawBearerKey && rawBearerKey !== options.ignoredBearerToken ? trimCredential(rawBearerKey) : "";
 }
 
 export function authHeaders(config: ProviderConfig): HeadersInit {

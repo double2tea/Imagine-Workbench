@@ -1,9 +1,10 @@
 import { NextRequest, NextResponse } from "next/server";
 import { apiErrorResponse, badRequest, requireApiText } from "@/lib/api/errors";
 import { downloadVideo } from "@/lib/providers/video";
-import { optionalText, parseMediaOperationName, resolveProviderConfig } from "@/lib/providers/utils";
+import { resolveProviderConfigForRequest } from "@/lib/providers/team-config";
+import { optionalText, parseMediaOperationName } from "@/lib/providers/utils";
 
-export const runtime = "edge";
+export const runtime = "nodejs";
 
 interface DownloadBody {
   operationName?: unknown;
@@ -19,7 +20,7 @@ export async function POST(req: NextRequest) {
       throw badRequest("Only video operations can be downloaded", "invalid_media_type");
     }
 
-    const config = resolveProviderConfig(req, operation.provider);
+    const config = await resolveProviderConfigForRequest(req, operation.provider);
     return await downloadVideo(config, operation.id, optionalText(body.model), optionalOutputIndex(body.outputIndex));
   } catch (err) {
     const response = apiErrorResponse(err, "Failed to download video file");
