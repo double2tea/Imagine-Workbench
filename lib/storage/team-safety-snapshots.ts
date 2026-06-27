@@ -33,19 +33,26 @@ export async function saveTeamSafetySnapshot(
   input: TeamSafetySnapshotSaveInput,
 ): Promise<TeamSafetySnapshotResult> {
   const context = await createTeamWorkspaceStorageContext(queryable, config, request, { minimumRole: "editor" });
-  await context.repository.safetySnapshots.put(input.snapshot);
-  await recordTeamAuditEvent(context.queryable, {
-    eventType: "safety_snapshot.save",
-    metadata: {
-      assetCount: input.snapshot.assetCount,
-      boardCount: input.snapshot.boardCount,
-      id: input.snapshot.id,
-      reason: input.snapshot.reason,
-      sizeBytes: input.snapshot.sizeBytes,
-    },
-    userId: context.session.userId,
-    workspaceId: context.session.workspaceId,
-  });
+  await context.queryable.query("begin");
+  try {
+    await context.repository.safetySnapshots.put(input.snapshot);
+    await recordTeamAuditEvent(context.queryable, {
+      eventType: "safety_snapshot.save",
+      metadata: {
+        assetCount: input.snapshot.assetCount,
+        boardCount: input.snapshot.boardCount,
+        id: input.snapshot.id,
+        reason: input.snapshot.reason,
+        sizeBytes: input.snapshot.sizeBytes,
+      },
+      userId: context.session.userId,
+      workspaceId: context.session.workspaceId,
+    });
+    await context.queryable.query("commit");
+  } catch (error) {
+    await context.queryable.query("rollback");
+    throw error;
+  }
   return {
     snapshot: toPublicTeamSafetySnapshot(input.snapshot),
     targetKind: "postgres",

@@ -128,7 +128,7 @@ saveTeamSecret({ group: "provider", key: "provider:grok2api:apiKey", value: apiK
 - `PublicTeamSafetySnapshot` must include counts and metadata: `assetCount`, `boardCount`, `generationTaskCount`, `libraryAssetCount`, `voiceProfileCount`, `settingsKeyCount`, `reason`, `origin`, `fileName`, `sizeBytes`, and timestamps.
 - Public responses must not include `payload`, `payload.uri`, media directory paths, or any raw storage key.
 - `WorkspaceSafetySnapshotRecord.payload` remains internal to server-side repository/service code.
-- `saveTeamSafetySnapshot` requires at least editor access and records an audit event; `getLatestTeamSafetySnapshot` requires viewer access.
+- `saveTeamSafetySnapshot` requires at least editor access and records `safety_snapshot.save` in the same transaction as the `safety_snapshots` write; `getLatestTeamSafetySnapshot` requires viewer access.
 - Browser mode keeps using IndexedDB safety snapshots in `lib/data-management.ts` until active-storage backup/restore routes are implemented.
 
 #### 4. Validation & Error Matrix
@@ -148,7 +148,7 @@ saveTeamSecret({ group: "provider", key: "provider:grok2api:apiKey", value: apiK
 #### 6. Tests Required
 
 - Service: get latest snapshot is workspace-scoped and omits payload from the public result.
-- Service: save snapshot writes `safety_snapshots` and an audit event.
+- Service: save snapshot writes `safety_snapshots` and `safety_snapshot.save` in one transaction.
 - Client: `fetchTeamSafetySnapshot()` uses `/api/storage/team/safety-snapshot` and rejects leaked `payload` fields.
 - Quality gates: `pnpm run typecheck`, `pnpm run lint`, and `pnpm run test:providers`.
 

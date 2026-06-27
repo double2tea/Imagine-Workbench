@@ -71,6 +71,9 @@ test("saveTeamSafetySnapshot stores an editor-scoped snapshot and audit event", 
   assert.equal(result.snapshot?.id, "latest");
   assert.equal("payload" in (result.snapshot ?? {}), false);
   assert.deepEqual(insert?.values, [SNAPSHOT.id, WORKSPACE_ID, SNAPSHOT, SNAPSHOT.createdAt]);
+  assert.ok(queries.some(query => query.text === "begin"));
+  assert.ok(queries.some(query => query.text === "commit"));
+  assert.equal(queries.some(query => query.text === "rollback"), false);
   assert.deepEqual(audit?.values, [
     WORKSPACE_ID,
     "user_1",
