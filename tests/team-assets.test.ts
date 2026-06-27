@@ -8,8 +8,8 @@ import type { QueryResult, QueryResultRow } from "pg";
 import type { StorageItem, StorageItemMeta } from "../lib/db";
 import type { PostgresQueryable } from "../lib/storage/postgres/connection";
 import { hashTeamSessionToken } from "../lib/storage/team-auth";
-import { deleteTeamAsset, listTeamAssets, saveTeamAsset } from "../lib/storage/team-assets";
-import { GET as getTeamAssets, POST as postTeamAsset } from "../app/api/storage/team/assets/route";
+import { clearTeamAssets, deleteTeamAsset, listTeamAssets, saveTeamAsset } from "../lib/storage/team-assets";
+import { DELETE as clearTeamAssetsRoute, GET as getTeamAssets, POST as postTeamAsset } from "../app/api/storage/team/assets/route";
 import { DELETE as deleteTeamAssetRoute } from "../app/api/storage/team/assets/[assetId]/route";
 
 const RAW_SESSION_TOKEN = "raw-session-token";
@@ -101,6 +101,53 @@ test("deleteTeamAsset removes an editor-scoped asset record", async () => {
     queries.find(query => query.text.startsWith("delete from assets"))?.values,
     [WORKSPACE_ID, ASSET_ID],
   );
+});
+
+test("clearTeamAssets removes workspace assets and generation tasks with audit", async () => {
+  const queries: Array<{ text: string; values?: readonly unknown[] }> = [];
+  const result = await clearTeamAssets(
+    createTeamAssetsQueryable(queries, { role: "admin" }),
+    { databaseUrl: "postgres://localhost/imagine", mediaDir: "/srv/imagine/media" },
+    requestWithSession(),
+  );
+
+  assert.deepEqual(result, {
+    deletedAssetCount: 3,
+    deletedGenerationTaskCount: 2,
+    deletedLibraryAssetCount: 1,
+    targetKind: "postgres",
+    workspaceId: WORKSPACE_ID,
+  });
+  assert.ok(queries.some(query => query.text === "begin"));
+  assert.ok(queries.some(query => query.text === "commit"));
+  assert.equal(queries.some(query => query.text === "rollback"), false);
+  assert.deepEqual(
+    queries.filter(query => query.text.startsWith("delete from")).map(query => [query.text, query.values]),
+    [
+      ["delete from generation_tasks where workspace_id = $1", [WORKSPACE_ID]],
+      ["delete from assets where workspace_id = $1", [WORKSPACE_ID]],
+    ],
+  );
+  const audit = queries.find(query => query.text.startsWith("insert into audit_events"));
+  assert.deepEqual(audit?.values?.slice(0, 3), [WORKSPACE_ID, "user_1", "team_assets.clear"]);
+  assert.deepEqual(JSON.parse(String(audit?.values?.[3])) as unknown, {
+    deletedAssetCount: 3,
+    deletedGenerationTaskCount: 2,
+    deletedLibraryAssetCount: 1,
+  });
+});
+
+test("clearTeamAssets rejects viewers before deleting workspace data", async () => {
+  const queries: Array<{ text: string; values?: readonly unknown[] }> = [];
+  await assert.rejects(
+    clearTeamAssets(
+      createTeamAssetsQueryable(queries, { role: "viewer" }),
+      { databaseUrl: "postgres://localhost/imagine", mediaDir: "/srv/imagine/media" },
+      requestWithSession(),
+    ),
+    /admin role is required/,
+  );
+  assert.equal(queries.some(query => query.text.startsWith("delete from")), false);
 });
 
 test("saveTeamAsset writes an editor-scoped asset payload and metadata", async () => {
@@ -237,6 +284,36 @@ test("team asset delete route rejects missing CSRF before opening a database cli
   }
 });
 
+test("team assets clear route rejects missing CSRF before opening a database client", async () => {
+  const originalEnv = {
+    APP_URL: process.env.APP_URL,
+    DATABASE_URL: process.env.DATABASE_URL,
+    IMAGINE_MEDIA_DIR: process.env.IMAGINE_MEDIA_DIR,
+    IMAGINE_STORAGE_TARGET: process.env.IMAGINE_STORAGE_TARGET,
+  };
+  try {
+    process.env.APP_URL = "http://localhost:3000";
+    process.env.DATABASE_URL = "postgres://localhost/imagine";
+    process.env.IMAGINE_MEDIA_DIR = "/srv/imagine/media";
+    process.env.IMAGINE_STORAGE_TARGET = "postgres";
+
+    const response = await clearTeamAssetsRoute(new Request("http://localhost:3000/api/storage/team/assets", {
+      headers: { origin: "http://localhost:3000" },
+      method: "DELETE",
+    }));
+    assert.equal(response.status, 403);
+    assert.deepEqual(await response.json(), {
+      code: "invalid_csrf",
+      error: "Valid CSRF token is required",
+    });
+  } finally {
+    restoreEnv("APP_URL", originalEnv.APP_URL);
+    restoreEnv("DATABASE_URL", originalEnv.DATABASE_URL);
+    restoreEnv("IMAGINE_MEDIA_DIR", originalEnv.IMAGINE_MEDIA_DIR);
+    restoreEnv("IMAGINE_STORAGE_TARGET", originalEnv.IMAGINE_STORAGE_TARGET);
+  }
+});
+
 function requestWithSession(): Request {
   return new Request("http://localhost:3000/api/storage/team/assets", {
     headers: { cookie: `imagine_team_session=${RAW_SESSION_TOKEN}` },
@@ -259,6 +336,13 @@ function createTeamAssetsQueryable(
           team_id: "team_1",
           user_id: "user_1",
           workspace_id: WORKSPACE_ID,
+        }]);
+      }
+      if (text.includes("select count(*) from assets")) {
+        return typedQueryResult<T>([{
+          asset_count: 3,
+          generation_task_count: 2,
+          library_asset_count: 1,
         }]);
       }
       if (text.startsWith("select meta from assets")) {

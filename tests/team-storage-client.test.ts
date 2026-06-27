@@ -7,6 +7,7 @@ import type { GenerationTask } from "../lib/generation-tasks";
 import {
   bootstrapTeamOwner,
   cancelTeamGenerationTask,
+  clearTeamAssets,
   cleanupTeamMediaMaintenance,
   createTeamMember,
   deleteTeamAsset,
@@ -586,6 +587,33 @@ test("deleteTeamAsset sends CSRF header to encoded asset route", async () => {
   assert.equal(deleteCsrfHeader, "csrf-token");
   await assert.rejects(
     deleteTeamAsset("asset_1", " "),
+    /CSRF token is required/,
+  );
+});
+
+test("clearTeamAssets sends CSRF header to team asset collection route", async () => {
+  let requestedUrl = "";
+  let csrfHeader: string | null = null;
+  const result = await clearTeamAssets("csrf-token", async (input, init) => {
+    requestedUrl = String(input);
+    assert.equal(init?.method, "DELETE");
+    csrfHeader = new Headers(init?.headers).get("x-imagine-csrf-token");
+    return jsonResponse({
+      deletedAssetCount: 3,
+      deletedGenerationTaskCount: 2,
+      deletedLibraryAssetCount: 1,
+      targetKind: "postgres",
+      workspaceId: "workspace_1",
+    });
+  });
+
+  assert.equal(requestedUrl, "/api/storage/team/assets");
+  assert.equal(csrfHeader, "csrf-token");
+  assert.equal(result.deletedAssetCount, 3);
+  assert.equal(result.deletedGenerationTaskCount, 2);
+  assert.equal(result.deletedLibraryAssetCount, 1);
+  await assert.rejects(
+    clearTeamAssets(" "),
     /CSRF token is required/,
   );
 });

@@ -15,6 +15,7 @@ import type { WORKSPACE_STORAGE_SCHEMA_VERSION } from "@/lib/storage/schema";
 import type {
   PublicTeamAssetPayload,
   PublicTeamAssetRecord,
+  TeamAssetClearResult,
   TeamAssetListResult,
   TeamAssetMutationResult,
 } from "@/lib/storage/team-asset-types";
@@ -678,6 +679,25 @@ export async function deleteTeamAsset(
   }
 }
 
+export async function clearTeamAssets(
+  csrfToken: string,
+  fetcher: Fetcher = fetch,
+): Promise<TeamAssetClearResult> {
+  const token = csrfToken.trim();
+  if (!token) throw new Error("CSRF token is required");
+  const response = await fetcher(API_ROUTES.storage.teamAssets, {
+    cache: "no-store",
+    headers: { "x-imagine-csrf-token": token },
+    method: "DELETE",
+  });
+  const body: unknown = await response.json();
+  if (!response.ok) {
+    const error = readStringField(body, "error") ?? "Team assets clear failed";
+    throw new Error(error);
+  }
+  return parseTeamAssetClearResult(body);
+}
+
 export async function saveTeamAsset(
   item: StorageItem,
   csrfToken: string,
@@ -1098,6 +1118,11 @@ function parseTeamSettingMutationResult(value: unknown): TeamSettingMutationResu
   return value;
 }
 
+function parseTeamAssetClearResult(value: unknown): TeamAssetClearResult {
+  if (!isTeamAssetClearResult(value)) throw new Error("Team asset clear response is invalid");
+  return value;
+}
+
 function parseTeamProviderTargetListResult(value: unknown): TeamProviderTargetListResult {
   if (!isTeamProviderTargetListResult(value)) throw new Error("Team provider target list response is invalid");
   return value;
@@ -1481,6 +1506,17 @@ function isTeamAssetMutationResult(value: unknown): value is TeamAssetMutationRe
     value.targetKind === "postgres" &&
     typeof value.workspaceId === "string" &&
     isPublicTeamAssetRecord(value.asset)
+  );
+}
+
+function isTeamAssetClearResult(value: unknown): value is TeamAssetClearResult {
+  if (!isRecord(value)) return false;
+  return (
+    value.targetKind === "postgres" &&
+    typeof value.workspaceId === "string" &&
+    Number.isInteger(value.deletedAssetCount) &&
+    Number.isInteger(value.deletedGenerationTaskCount) &&
+    Number.isInteger(value.deletedLibraryAssetCount)
   );
 }
 

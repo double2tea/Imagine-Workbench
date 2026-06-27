@@ -20,6 +20,7 @@ import {
 } from "@/lib/data-management";
 import {
   bootstrapTeamOwner,
+  clearTeamAssets,
   cleanupTeamMediaMaintenance,
   createTeamMember,
   deleteTeamMember,
@@ -385,6 +386,18 @@ export default function SettingsModal({
     await refreshDataSummary();
   }, [refreshDataSummary, t, teamSession]);
 
+  const runClearAssets = useCallback(async () => {
+    if (storageStatus?.mode !== "postgres") {
+      await onClearAssets();
+      return;
+    }
+    if (!teamSession) throw new Error(t("dataManagement.teamSessionRequired"));
+    const csrfToken = readTeamCsrfToken();
+    if (!csrfToken) throw new Error(t("dataManagement.teamSessionCsrfMissing"));
+    await clearTeamAssets(csrfToken);
+    await refreshDataSummary();
+  }, [onClearAssets, refreshDataSummary, storageStatus?.mode, t, teamSession]);
+
   const runExportWorkspace = useCallback(async (includeCredentials: boolean) => {
     if (storageStatus?.mode !== "postgres") {
       await onExportWorkspace(includeCredentials);
@@ -618,7 +631,7 @@ export default function SettingsModal({
                   teamBootstrapEmail={teamBootstrapEmail}
                   teamBootstrapPassword={teamBootstrapPassword}
                   onCleanupAssets={onCleanupAssets}
-                  onClearAssets={onClearAssets}
+                  onClearAssets={runClearAssets}
                   onClearLocalStorage={onClearLocalStorage}
                   onDownloadSafetySnapshot={runDownloadSafetySnapshot}
                   onDuplicateCurrentBoard={onDuplicateCurrentBoard}

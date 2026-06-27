@@ -1,10 +1,12 @@
 import { API_ROUTES } from "@/lib/api/routes";
 import { ApiError } from "@/lib/api/errors";
+import type { QueryResultRow } from "pg";
 import type { StorageItem, StorageItemMeta, StorageItemType } from "@/lib/db";
 import { dataUriToBlob, parseDataUri } from "@/lib/providers/utils";
 import type {
   PublicTeamAssetPayload,
   PublicTeamAssetRecord,
+  TeamAssetClearResult,
   TeamAssetListResult,
   TeamAssetMutationResult,
 } from "@/lib/storage/team-asset-types";
@@ -12,6 +14,7 @@ import type { PostgresStorageConfig } from "@/lib/storage/postgres/config";
 import type { PostgresQueryable } from "@/lib/storage/postgres/connection";
 import type { WorkspaceAssetListOptions } from "@/lib/storage/repository";
 import type { WorkspaceAssetPayloadRef } from "@/lib/storage/schema";
+import { recordTeamAuditEvent } from "@/lib/storage/team-audit";
 import { createTeamWorkspaceStorageContext } from "@/lib/storage/team-context";
 
 export interface TeamAssetSaveInput {
@@ -45,6 +48,35 @@ export async function deleteTeamAsset(
   const record = await context.repository.assets.get(assetId);
   if (!record) throw new ApiError(404, "team_asset_not_found", "Team asset was not found");
   await context.repository.assets.delete(assetId);
+}
+
+export async function clearTeamAssets(
+  queryable: PostgresQueryable,
+  config: PostgresStorageConfig,
+  request: Request,
+): Promise<TeamAssetClearResult> {
+  const context = await createTeamWorkspaceStorageContext(queryable, config, request, { minimumRole: "admin" });
+  await context.queryable.query("begin");
+  try {
+    const counts = await readTeamAssetClearCounts(context.queryable, context.session.workspaceId);
+    await context.queryable.query("delete from generation_tasks where workspace_id = $1", [context.session.workspaceId]);
+    await context.queryable.query("delete from assets where workspace_id = $1", [context.session.workspaceId]);
+    await recordTeamAuditEvent(context.queryable, {
+      eventType: "team_assets.clear",
+      metadata: counts,
+      userId: context.session.userId,
+      workspaceId: context.session.workspaceId,
+    });
+    await context.queryable.query("commit");
+    return {
+      ...counts,
+      targetKind: "postgres",
+      workspaceId: context.session.workspaceId,
+    };
+  } catch (error) {
+    await context.queryable.query("rollback");
+    throw error;
+  }
 }
 
 export async function saveTeamAsset(
@@ -87,6 +119,37 @@ export function publicTeamAssetRecord(record: {
     payload: record.payload ? publicPayload(record.payload) : undefined,
     preview: record.preview ? publicPayload(record.preview) : undefined,
   };
+}
+
+interface TeamAssetClearCountsRow extends QueryResultRow {
+  asset_count: string | number;
+  generation_task_count: string | number;
+  library_asset_count: string | number;
+}
+
+async function readTeamAssetClearCounts(
+  queryable: PostgresQueryable,
+  workspaceId: string,
+): Promise<Pick<TeamAssetClearResult, "deletedAssetCount" | "deletedGenerationTaskCount" | "deletedLibraryAssetCount">> {
+  const result = await queryable.query<TeamAssetClearCountsRow>(
+    `select
+       (select count(*) from assets where workspace_id = $1) as asset_count,
+       (select count(*) from generation_tasks where workspace_id = $1) as generation_task_count,
+       (select count(*) from asset_library where workspace_id = $1) as library_asset_count`,
+    [workspaceId],
+  );
+  const row = result.rows[0];
+  return {
+    deletedAssetCount: numberFromDatabase(row?.asset_count),
+    deletedGenerationTaskCount: numberFromDatabase(row?.generation_task_count),
+    deletedLibraryAssetCount: numberFromDatabase(row?.library_asset_count),
+  };
+}
+
+function numberFromDatabase(value: string | number | undefined): number {
+  if (typeof value === "number") return value;
+  if (typeof value === "string") return Number(value);
+  return 0;
 }
 
 function publicPayload(ref: WorkspaceAssetPayloadRef): PublicTeamAssetPayload {

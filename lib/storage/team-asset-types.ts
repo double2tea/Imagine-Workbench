@@ -29,3 +29,11 @@ export interface TeamAssetMutationResult {
   targetKind: "postgres";
   workspaceId: string;
 }
+
+export interface TeamAssetClearResult {
+  deletedAssetCount: number;
+  deletedGenerationTaskCount: number;
+  deletedLibraryAssetCount: number;
+  targetKind: "postgres";
+  workspaceId: string;
+}

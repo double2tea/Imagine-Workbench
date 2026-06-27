@@ -6,7 +6,7 @@ import {
   assertTeamCsrf,
   assertTrustedTeamRequestOrigin,
 } from "@/lib/storage/team-auth";
-import { listTeamAssets, saveTeamAsset, type TeamAssetSaveInput } from "@/lib/storage/team-assets";
+import { clearTeamAssets, listTeamAssets, saveTeamAsset, type TeamAssetSaveInput } from "@/lib/storage/team-assets";
 import type { WorkspaceAssetListOptions } from "@/lib/storage/repository";
 
 export const runtime = "nodejs";
@@ -41,6 +41,24 @@ export async function POST(request: Request): Promise<Response> {
     return Response.json(result);
   } catch (error) {
     const response = apiErrorResponse(error, "Team asset save failed");
+    return Response.json(response.body, {
+      status: error instanceof PostgresStorageConfigError ? 400 : response.status,
+    });
+  }
+}
+
+export async function DELETE(request: Request): Promise<Response> {
+  try {
+    assertTrustedTeamRequestOrigin(request, {
+      APP_URL: process.env.APP_URL,
+      IMAGINE_TRUSTED_ORIGINS: process.env.IMAGINE_TRUSTED_ORIGINS,
+    });
+    assertTeamCsrf(request);
+    const config = resolvePostgresStorageConfig(process.env);
+    const result = await withPostgresClient(config, client => clearTeamAssets(client, config, request));
+    return Response.json(result);
+  } catch (error) {
+    const response = apiErrorResponse(error, "Team assets clear failed");
     return Response.json(response.body, {
       status: error instanceof PostgresStorageConfigError ? 400 : response.status,
     });
