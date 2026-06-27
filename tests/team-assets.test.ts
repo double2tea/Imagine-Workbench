@@ -243,6 +243,105 @@ test("saveTeamAsset writes an editor-scoped asset payload and metadata", async (
   }
 });
 
+test("saveTeamAsset preserves rich generation metadata and transcript assets", async () => {
+  const mediaDir = await mkdtemp(path.join(tmpdir(), "imagine-team-assets-rich-"));
+  const queries: Array<{ text: string; values?: readonly unknown[] }> = [];
+  try {
+    const richItem = createStorageItem({
+      cropDerivative: {
+        cropRect: { height: 120, width: 160, x: 10, y: 20 },
+        sourceAssetId: "source_asset_1",
+        sourceHeight: 720,
+        sourceWidth: 1280,
+        splitCount: 4,
+        splitIndex: 2,
+      },
+      generationRequest: {
+        aspectRatio: "16:9",
+        audioFormat: "wav",
+        audioMode: "asr",
+        cinematicProfile: {
+          aperture: "f2",
+          camera: "arri-alexa-35",
+          effect: "film-grain",
+          enabled: true,
+          focalLength: "50mm",
+          lens: "anamorphic",
+          lighting: "low-key",
+          movement: "slow-dolly",
+          palette: "neon-noir",
+        },
+        model: "test-model",
+        prompt: "rich prompt",
+        referenceMedia: [{
+          height: 720,
+          role: "start",
+          sourceAssetId: "reference_asset_1",
+          type: "image",
+          url: "/api/storage/team/assets/reference_asset_1/media",
+          width: 1280,
+        }],
+        videoReferenceMode: "firstLast",
+        voiceProfileId: "voice_profile_1",
+      },
+      libraryItemId: "library_1",
+      previewStatus: "ready",
+      previewUpdatedAt: "2026-06-27T01:00:00.000Z",
+      sourceBoardNodeId: "node_1",
+      sourceBoardResultStackKey: "stack_1",
+      url: "data:image/png;base64,aW1hZ2U=",
+    });
+
+    await saveTeamAsset(
+      createTeamAssetsQueryable(queries, { role: "editor" }),
+      { databaseUrl: "postgres://localhost/imagine", mediaDir },
+      requestWithSession(),
+      { item: richItem },
+    );
+
+    const savedMeta = queries.find(query => query.text.includes("insert into assets"))?.values?.[2] as StorageItemMeta | undefined;
+    assert.equal(savedMeta?.url, undefined);
+    assert.equal(savedMeta?.hasBlob, true);
+    assert.equal(savedMeta?.sourceBoardNodeId, "node_1");
+    assert.equal(savedMeta?.sourceBoardResultStackKey, "stack_1");
+    assert.equal(savedMeta?.libraryItemId, "library_1");
+    assert.deepEqual(savedMeta?.cropDerivative, richItem.cropDerivative);
+    assert.deepEqual(savedMeta?.generationRequest, richItem.generationRequest);
+    assert.equal(savedMeta?.previewStatus, "ready");
+    assert.equal(savedMeta?.previewUpdatedAt, "2026-06-27T01:00:00.000Z");
+
+    const transcriptQueries: Array<{ text: string; values?: readonly unknown[] }> = [];
+    await saveTeamAsset(
+      createTeamAssetsQueryable(transcriptQueries, { role: "editor" }),
+      { databaseUrl: "postgres://localhost/imagine", mediaDir },
+      requestWithSession(),
+      {
+        item: createStorageItem({
+          aspectRatio: "transcript",
+          generationRequest: {
+            aspectRatio: "transcript",
+            audioMode: "asr",
+            model: "mimo-asr",
+            prompt: "transcribe",
+            referenceMedia: [{ sourceAssetId: "audio_asset_1", type: "audio", url: "/api/storage/team/assets/audio_asset_1/media" }],
+          },
+          model: "mimo-asr",
+          prompt: "transcribe",
+          type: "transcript",
+          url: "data:text/plain;base64,5paH5a2X",
+        }),
+      },
+    );
+    const transcriptMeta = transcriptQueries.find(query => query.text.includes("insert into assets"))?.values?.[2] as StorageItemMeta | undefined;
+    const transcriptPayload = transcriptQueries.find(query => query.text.includes("insert into asset_payloads"));
+    assert.equal(transcriptMeta?.type, "transcript");
+    assert.equal(transcriptMeta?.generationRequest?.referenceMedia?.[0]?.type, "audio");
+    assert.equal(transcriptPayload?.values?.[2], "text/plain");
+  } finally {
+    await rm(mediaDir, { force: true, recursive: true });
+  }
+});
+
 test("saveTeamAsset cleans staged payload files when metadata commit fails", async () => {
   const mediaDir = await mkdtemp(path.join(tmpdir(), "imagine-team-assets-fail-"));
   const queries: Array<{ text: string; values?: readonly unknown[] }> = [];

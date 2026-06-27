@@ -67,10 +67,15 @@ test("saveTeamAssetLibraryRecord writes an editor-scoped library record with aud
 
   const insert = queries.find(query => query.text.includes("insert into asset_library"));
   assert.equal(result.entry.record.title, "Updated character");
+  assert.equal(result.entry.asset?.mediaUrl, "/api/storage/team/assets/asset_1/media");
+  assert.equal(result.entry.asset?.payload?.kind, "local-file");
   assert.equal(insert?.values?.[0], LIBRARY_ITEM_ID);
   assert.equal(insert?.values?.[1], WORKSPACE_ID);
   assert.equal(insert?.values?.[2], ASSET_ID);
   assert.deepEqual(insert?.values?.[3], record);
+  assert.equal(Object.hasOwn(insert?.values?.[3] as object, "mediaFile"), false);
+  assert.equal(Object.hasOwn(insert?.values?.[3] as object, "storageKey"), false);
+  assert.equal(queries.some(query => query.text.includes("insert into asset_payloads")), false);
   assert.ok(queries.some(query => query.text === "begin"));
   assert.ok(queries.some(query => query.text === "commit"));
   assert.equal(queries.some(query => query.text === "rollback"), false);
