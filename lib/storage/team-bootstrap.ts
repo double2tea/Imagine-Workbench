@@ -1,6 +1,7 @@
 import type { QueryResultRow } from "pg";
 import { ApiError } from "@/lib/api/errors";
 import type { PostgresQueryable } from "@/lib/storage/postgres/connection";
+import { recordTeamAuditEvent } from "@/lib/storage/team-audit";
 import {
   createTeamCsrfToken,
   createTeamSessionToken,
@@ -89,6 +90,12 @@ export async function bootstrapFirstTeamOwner(
       "insert into csrf_tokens (token_hash, session_id, expires_at) values ($1, $2, $3)",
       [hashTeamCsrfToken(csrfToken), hashTeamSessionToken(sessionToken), csrfTokenExpiresAt],
     );
+    await recordTeamAuditEvent(queryable, {
+      eventType: "team_bootstrap.owner",
+      metadata: { email, teamId, workspaceId },
+      userId,
+      workspaceId,
+    });
     await queryable.query("commit");
 
     return {

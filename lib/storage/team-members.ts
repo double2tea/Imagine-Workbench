@@ -2,6 +2,7 @@ import type { QueryResultRow } from "pg";
 import { ApiError, badRequest } from "@/lib/api/errors";
 import type { PostgresStorageConfig } from "@/lib/storage/postgres/config";
 import type { PostgresQueryable } from "@/lib/storage/postgres/connection";
+import { recordTeamAuditEvent } from "@/lib/storage/team-audit";
 import {
   hashTeamPassword,
   type TeamRole,
@@ -87,6 +88,16 @@ export async function createTeamMember(
     );
     const member = membershipResult.rows[0];
     if (!member) throw new Error("Team member insert did not return a membership");
+    await recordTeamAuditEvent(queryable, {
+      eventType: "team_member.create",
+      metadata: {
+        email,
+        role,
+        targetUserId: userId,
+      },
+      userId: context.session.userId,
+      workspaceId: context.session.workspaceId,
+    });
     await queryable.query("commit");
     return {
       member: toPublicTeamMember(member),
@@ -111,23 +122,40 @@ export async function updateTeamMemberRole(
   if (userId === context.session.userId) throw badRequest("Cannot change your own team role", "team_member_self_update_unsupported");
   const current = await readTeamMember(queryable, context.session.teamId, userId);
   if (current.role === "owner") throw badRequest("Owner role cannot be changed here", "team_owner_role_immutable");
-  const result = await queryable.query<TeamMemberRow>(
-    `update team_memberships
-     set role = $3
-     from users
-     where team_memberships.team_id = $1
-       and team_memberships.user_id = $2
-       and users.id = team_memberships.user_id
-     returning users.id as user_id, users.email, team_memberships.role, team_memberships.created_at`,
-    [context.session.teamId, userId, role],
-  );
-  const member = result.rows[0];
-  if (!member) throw new Error("Team member update did not return a membership");
-  return {
-    member: toPublicTeamMember(member),
-    targetKind: "postgres",
-    workspaceId: context.session.workspaceId,
-  };
+  await queryable.query("begin");
+  try {
+    const result = await queryable.query<TeamMemberRow>(
+      `update team_memberships
+       set role = $3
+       from users
+       where team_memberships.team_id = $1
+         and team_memberships.user_id = $2
+         and users.id = team_memberships.user_id
+       returning users.id as user_id, users.email, team_memberships.role, team_memberships.created_at`,
+      [context.session.teamId, userId, role],
+    );
+    const member = result.rows[0];
+    if (!member) throw new Error("Team member update did not return a membership");
+    await recordTeamAuditEvent(queryable, {
+      eventType: "team_member.update_role",
+      metadata: {
+        previousRole: current.role,
+        role,
+        targetUserId: userId,
+      },
+      userId: context.session.userId,
+      workspaceId: context.session.workspaceId,
+    });
+    await queryable.query("commit");
+    return {
+      member: toPublicTeamMember(member),
+      targetKind: "postgres",
+      workspaceId: context.session.workspaceId,
+    };
+  } catch (error) {
+    await queryable.query("rollback");
+    throw error;
+  }
 }
 
 export async function deleteTeamMember(
@@ -144,6 +172,15 @@ export async function deleteTeamMember(
   try {
     await queryable.query("delete from team_memberships where team_id = $1 and user_id = $2", [context.session.teamId, userId]);
     await queryable.query("delete from sessions where user_id = $1", [userId]);
+    await recordTeamAuditEvent(queryable, {
+      eventType: "team_member.delete",
+      metadata: {
+        previousRole: current.role,
+        targetUserId: userId,
+      },
+      userId: context.session.userId,
+      workspaceId: context.session.workspaceId,
+    });
     await queryable.query("commit");
   } catch (error) {
     await queryable.query("rollback");

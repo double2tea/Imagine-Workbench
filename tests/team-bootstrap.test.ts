@@ -58,6 +58,13 @@ test("bootstrapFirstTeamOwner creates the first workspace team owner session and
   const csrfInsert = queries.find(query => query.text.startsWith("insert into csrf_tokens"));
   assert.equal(csrfInsert?.values?.[0], hashTeamCsrfToken(result.csrfToken));
   assert.equal(csrfInsert?.values?.[1], hashTeamSessionToken(result.sessionToken));
+  const audit = queries.find(query => query.text.includes("insert into audit_events"));
+  assert.deepEqual(audit?.values?.slice(0, 3), ["workspace_1", "user_1", "team_bootstrap.owner"]);
+  assert.deepEqual(JSON.parse(String(audit?.values?.[3])) as unknown, {
+    email: "owner@example.com",
+    teamId: "team_1",
+    workspaceId: "workspace_1",
+  });
 });
 
 test("bootstrapFirstTeamOwner fails closed when an owner already exists", async () => {

@@ -63,6 +63,12 @@ test("createTeamSession verifies credentials and stores hashed session and CSRF 
   const csrfInsert = queries.find(query => query.text.startsWith("insert into csrf_tokens"));
   assert.equal(csrfInsert?.values?.[0], hashTeamCsrfToken(result.csrfToken));
   assert.equal(csrfInsert?.values?.[1], hashTeamSessionToken(result.sessionToken));
+  const audit = queries.find(query => query.text.includes("insert into audit_events"));
+  assert.deepEqual(audit?.values?.slice(0, 3), ["workspace_1", "user_1", "team_session.login"]);
+  assert.deepEqual(JSON.parse(String(audit?.values?.[3])) as unknown, {
+    email: "owner@example.com",
+    role: "owner",
+  });
 });
 
 test("createTeamSession rejects invalid credentials before inserting session rows", async () => {
@@ -97,6 +103,17 @@ test("deleteTeamSession removes the hashed current session token", async () => {
   const queryable: PostgresQueryable = {
     query: async <T extends QueryResultRow = QueryResultRow>(text: string, values?: readonly unknown[]) => {
       queries.push({ text, values });
+      if (text.includes("from sessions")) {
+        return typedQueryResult<T>([{
+          email: "owner@example.com",
+          expires_at: "2026-07-03T00:00:00.000Z",
+          role: "owner",
+          session_id: hashTeamSessionToken("raw-session-token"),
+          team_id: "team_1",
+          user_id: "user_1",
+          workspace_id: "workspace_1",
+        }]);
+      }
       return typedQueryResult<T>([]);
     },
   };
@@ -105,10 +122,18 @@ test("deleteTeamSession removes the hashed current session token", async () => {
     headers: { cookie: "imagine_team_session=raw-session-token" },
   }));
 
-  assert.deepEqual(queries[0], {
+  const deleteQuery = queries.find(query => query.text.startsWith("delete from sessions"));
+  assert.deepEqual(deleteQuery, {
     text: "delete from sessions where id = $1",
     values: [hashTeamSessionToken("raw-session-token")],
   });
+  const audit = queries.find(query => query.text.includes("insert into audit_events"));
+  assert.deepEqual(audit?.values?.slice(0, 3), ["workspace_1", "user_1", "team_session.logout"]);
+  assert.deepEqual(JSON.parse(String(audit?.values?.[3])) as unknown, {
+    email: "owner@example.com",
+    role: "owner",
+  });
+  assert.equal(queries.at(-1)?.text, "commit");
   await assert.rejects(
     () => deleteTeamSession(queryable, new Request("http://localhost:3000/api/storage/team/session")),
     (error: unknown) => error instanceof ApiError && error.status === 401 && error.code === "unauthorized",

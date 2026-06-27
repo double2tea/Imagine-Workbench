@@ -1,12 +1,14 @@
 import type { QueryResultRow } from "pg";
 import { ApiError } from "@/lib/api/errors";
 import type { PostgresQueryable } from "@/lib/storage/postgres/connection";
+import { recordTeamAuditEvent } from "@/lib/storage/team-audit";
 import {
   createTeamCsrfToken,
   createTeamSessionToken,
   hashTeamCsrfToken,
   hashTeamSessionToken,
   readTeamSessionToken,
+  requireTeamSession,
   TEAM_SESSION_TTL_MS,
   type TeamRole,
   verifyTeamPassword,
@@ -74,6 +76,12 @@ export async function createTeamSession(
       "insert into csrf_tokens (token_hash, session_id, expires_at) values ($1, $2, $3)",
       [hashTeamCsrfToken(csrfToken), sessionId, sessionTokenExpiresAt],
     );
+    await recordTeamAuditEvent(queryable, {
+      eventType: "team_session.login",
+      metadata: { email: user.email, role: user.role },
+      userId: user.user_id,
+      workspaceId: user.workspace_id,
+    });
     await queryable.query("commit");
   } catch (error) {
     await queryable.query("rollback");
@@ -94,9 +102,23 @@ export async function createTeamSession(
 }
 
 export async function deleteTeamSession(queryable: PostgresQueryable, request: Request): Promise<void> {
+  const session = await requireTeamSession(queryable, request);
   const token = readTeamSessionToken(request);
   if (!token) throw new ApiError(401, "unauthorized", "Team session is required");
-  await queryable.query("delete from sessions where id = $1", [hashTeamSessionToken(token)]);
+  await queryable.query("begin");
+  try {
+    await recordTeamAuditEvent(queryable, {
+      eventType: "team_session.logout",
+      metadata: { email: session.email, role: session.role },
+      userId: session.userId,
+      workspaceId: session.workspaceId,
+    });
+    await queryable.query("delete from sessions where id = $1", [hashTeamSessionToken(token)]);
+    await queryable.query("commit");
+  } catch (error) {
+    await queryable.query("rollback");
+    throw error;
+  }
 }
 
 function normalizeTeamSessionEmail(value: string): string {

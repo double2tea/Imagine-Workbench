@@ -68,6 +68,13 @@ test("createTeamMember hashes the password and creates a manageable role members
   assert.equal(await verifyTeamPassword("a long member password", String(userInsert?.values?.[1])), true);
   const membershipInsert = queries.find(query => query.text.startsWith("insert into team_memberships"));
   assert.deepEqual(membershipInsert?.values, [TEAM_ID, TARGET_USER_ID, "editor", "editor@example.com"]);
+  const audit = queries.find(query => query.text.includes("insert into audit_events"));
+  assert.deepEqual(audit?.values?.slice(0, 3), [WORKSPACE_ID, CURRENT_USER_ID, "team_member.create"]);
+  assert.deepEqual(JSON.parse(String(audit?.values?.[3])) as unknown, {
+    email: "editor@example.com",
+    role: "editor",
+    targetUserId: TARGET_USER_ID,
+  });
   assert.equal(queries.at(-1)?.text, "commit");
 });
 
@@ -101,6 +108,14 @@ test("updateTeamMemberRole updates non-owner members and rejects self or owner c
     queries.find(query => query.text.startsWith("update team_memberships"))?.values,
     [TEAM_ID, TARGET_USER_ID, "viewer"],
   );
+  const audit = queries.find(query => query.text.includes("insert into audit_events"));
+  assert.deepEqual(audit?.values?.slice(0, 3), [WORKSPACE_ID, CURRENT_USER_ID, "team_member.update_role"]);
+  assert.deepEqual(JSON.parse(String(audit?.values?.[3])) as unknown, {
+    previousRole: "editor",
+    role: "viewer",
+    targetUserId: TARGET_USER_ID,
+  });
+  assert.equal(queries.at(-1)?.text, "commit");
 
   await assert.rejects(
     () => updateTeamMemberRole(
@@ -141,6 +156,12 @@ test("deleteTeamMember removes membership and sessions for non-owner members", a
     queries.find(query => query.text.startsWith("delete from sessions"))?.values,
     [TARGET_USER_ID],
   );
+  const audit = queries.find(query => query.text.includes("insert into audit_events"));
+  assert.deepEqual(audit?.values?.slice(0, 3), [WORKSPACE_ID, CURRENT_USER_ID, "team_member.delete"]);
+  assert.deepEqual(JSON.parse(String(audit?.values?.[3])) as unknown, {
+    previousRole: "editor",
+    targetUserId: TARGET_USER_ID,
+  });
   assert.equal(queries.at(-1)?.text, "commit");
 });
 
