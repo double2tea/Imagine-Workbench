@@ -753,22 +753,9 @@ export function useProviderSettings({
           filterFn?: (option: ModelOption) => boolean,
         ): Record<AiProvider, ModelOption[]> => {
           const stored = storageTarget === "postgres" ? teamSettingsByKey.get(settingKey) ?? null : localStorage.getItem(key);
-          const base = ensureProviderOptions(defaults, restoredProviderKeys);
-          if (!stored) {
-            setter(base);
-            return base;
-          }
-          try {
-            const parsed = JSON.parse(stored) as unknown;
-            const restored = Array.isArray(parsed)
-              ? restoreFlatModelOptions(base, parsed, restoredProviderKeys, filterFn)
-              : mergeRecordModelOptions(base, parsed, restoredProviderKeys, filterFn);
-            setter(restored);
-            return restored;
-          } catch (err) {
-            console.warn(`Failed to restore model list (${key}):`, err);
-            return base;
-          }
+          const restored = restoreProviderModelOptionsFromStored(stored, defaults, restoredProviderKeys, filterFn, key);
+          setter(restored);
+          return restored;
         };
 
         const restoredChatOptions = restoreModelOptions(providerModelOptionsSettingKey("chat"), "imagine_chat_model_options", setChatModelOptions, CHAT_MODEL_OPTIONS, isSelectableChatModel);
@@ -841,6 +828,26 @@ export function useProviderSettings({
     testProviderConnection,
     videoModelOptions,
   };
+}
+
+export function restoreProviderModelOptionsFromStored(
+  stored: string | null,
+  defaults: Record<AiProvider, ModelOption[]>,
+  providerKeys: readonly AiProvider[],
+  filterFn?: (option: ModelOption) => boolean,
+  warningLabel?: string,
+): Record<AiProvider, ModelOption[]> {
+  const base = ensureProviderOptions(defaults, providerKeys);
+  if (!stored) return base;
+  try {
+    const parsed = JSON.parse(stored) as unknown;
+    return Array.isArray(parsed)
+      ? restoreFlatModelOptions(base, parsed, providerKeys, filterFn)
+      : mergeRecordModelOptions(base, parsed, providerKeys, filterFn);
+  } catch (err) {
+    if (warningLabel) console.warn(`Failed to restore model list (${warningLabel}):`, err);
+    return base;
+  }
 }
 
 function restoreFlatModelOptions(
