@@ -89,6 +89,7 @@ export interface TeamStorageHealth {
   appVersion?: string;
   databaseConfigured?: boolean;
   error?: string;
+  maxMediaPayloadBytes?: number;
   mediaDirectoryConfigured?: boolean;
   migrationStatus?: TeamStorageMigrationStatus;
   mode: "postgres";

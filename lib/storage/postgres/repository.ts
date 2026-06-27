@@ -96,7 +96,10 @@ export function createPostgresWorkspaceStorageRepository(
     assets: new PostgresAssetRepository(queryable, workspaceId),
     boards: new PostgresBoardRepository(queryable, workspaceId),
     generationTasks: new PostgresGenerationTaskRepository(queryable, workspaceId),
-    payloads: new PostgresAssetPayloadRepository(queryable, new LocalFilePayloadStore(config.mediaDir)),
+    payloads: new PostgresAssetPayloadRepository(
+      queryable,
+      new LocalFilePayloadStore(config.mediaDir, { maxPayloadBytes: config.maxMediaPayloadBytes }),
+    ),
     safetySnapshots: new PostgresSafetySnapshotRepository(queryable, workspaceId),
     schemaVersion: WORKSPACE_STORAGE_SCHEMA_VERSION,
     settings: new PostgresSettingsRepository(queryable, workspaceId),

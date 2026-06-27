@@ -75,3 +75,15 @@ test("LocalFilePayloadStore validates MIME type and provided content hash", asyn
     );
   });
 });
+
+test("LocalFilePayloadStore rejects payloads above the configured byte limit before writing", async () => {
+  await withTempMediaDir(async mediaDir => {
+    const store = new LocalFilePayloadStore(mediaDir, { maxPayloadBytes: 3 });
+
+    await assert.rejects(
+      () => store.write({ blob: new Blob(["data"], { type: "text/plain" }), mimeType: "text/plain" }),
+      /Payload exceeds configured max size of 3 bytes/,
+    );
+    await assert.rejects(() => readFile(path.join(mediaDir, "originals", "transcript")), /ENOENT/);
+  });
+});

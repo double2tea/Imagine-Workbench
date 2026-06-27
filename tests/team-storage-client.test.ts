@@ -1118,6 +1118,19 @@ test("fetchTeamStorageHealth surfaces server errors without exposing config valu
   );
 });
 
+test("fetchTeamStorageHealth parses the configured media payload limit", async () => {
+  const health = await fetchTeamStorageHealth(async () => jsonResponse({
+    databaseConfigured: true,
+    maxMediaPayloadBytes: 1048576,
+    mediaDirectoryConfigured: true,
+    mode: "postgres",
+    reachable: true,
+    targetKind: "postgres",
+  }));
+
+  assert.equal(health.maxMediaPayloadBytes, 1048576);
+});
+
 function createBoardSummary(): BoardSummary {
   return {
     createdAt: "2026-06-26T00:00:00.000Z",

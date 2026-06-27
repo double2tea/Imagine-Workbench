@@ -4,6 +4,7 @@ export type WorkspaceTeamDatabaseEngine = "postgres";
 
 export interface WorkspacePostgresStorageConfig {
   engine: WorkspaceTeamDatabaseEngine;
+  maxMediaPayloadBytesEnv: "IMAGINE_MAX_MEDIA_PAYLOAD_BYTES";
   mediaDirectoryEnv: "IMAGINE_MEDIA_DIR";
   previewDirectoryName: string;
   payloadDirectoryName: string;
@@ -48,6 +49,7 @@ export const POSTGRES_STORAGE_ADAPTER: WorkspaceStorageAdapterContract = {
   label: "PostgreSQL 团队工作区",
   postgres: {
     engine: "postgres",
+    maxMediaPayloadBytesEnv: "IMAGINE_MAX_MEDIA_PAYLOAD_BYTES",
     mediaDirectoryEnv: "IMAGINE_MEDIA_DIR",
     previewDirectoryName: "previews",
     payloadDirectoryName: "originals",

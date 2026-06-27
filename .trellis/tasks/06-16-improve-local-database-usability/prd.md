@@ -90,11 +90,14 @@ Completed in the latest continuation:
 * Extended `POST /api/storage/team/media-maintenance` with a `"missing-preview-refs"` target that deletes PostgreSQL `asset_previews` rows whose local-file preview files are missing, while leaving assets and original payload refs untouched.
 * Updated Settings -> Data so PostgreSQL missing-preview diagnostics can trigger an explicit owner/admin repair action when no missing-payload action takes priority.
 * Added service/client tests covering missing-preview ref cleanup, workspace-scoped delete SQL, transaction behavior, non-secret audit metadata, target response validation, and preservation of asset rows.
+* Added required `IMAGINE_MAX_MEDIA_PAYLOAD_BYTES` configuration for PostgreSQL team mode, wired it into `LocalFilePayloadStore` writes, team backup/restore payload imports, Docker Compose, Settings -> Data health display, public runtime status, and deployment docs.
+* Media payloads larger than the configured byte limit now fail visibly before a local-file payload is written, and config/status APIs expose only the non-secret byte limit without returning `DATABASE_URL` or `IMAGINE_MEDIA_DIR`.
+* Added config/runtime/payload-store tests covering missing/invalid byte limits, public redaction, and over-limit payload rejection.
 
 Still remaining before the full PRD can be considered complete:
 
-* Remaining PostgreSQL/media repair mutation APIs for DB-row-level maintenance beyond missing-payload asset deletion, stale source-link repair, and missing-preview ref cleanup.
 * Broader operational hardening beyond basic login/bootstrap rate limiting.
+* Disk usage threshold warnings and deeper monitoring for media/database growth.
 * Residual team settings surfaces outside Provider Settings, audit coverage for all sensitive operations, and deployment/upgrade/rollback automation depth.
 
 ## Requirements
@@ -189,7 +192,7 @@ Still remaining before the full PRD can be considered complete:
 * [x] Team deployment docs include backup/restore for PostgreSQL and media volume together, plus restore verification steps.
 * [x] Upgrade docs explain when migrations run, how to back up before upgrade, and how to roll back app/database/media when migration fails.
 * [ ] Audit events are stored for login, logout, bootstrap, member/role changes, provider credential changes, destructive cleanup/delete, backup/export, restore/import, and migration.
-* [ ] Configurable media/upload limits protect local disk usage and produce visible errors when exceeded.
+* [x] Configurable media/upload limits protect local disk usage and produce visible errors when exceeded.
 * [ ] Data health detects PostgreSQL/media consistency issues: DB ref without file, file without DB ref, stale tmp, stale trash, stale preview, and failed task records.
 * [ ] Settings -> Data reports PostgreSQL mode health, storage counts, and actionable maintenance states.
 * [ ] PostgreSQL routes and driver imports are Node-only and do not break Cloudflare Pages/public builds.
@@ -589,9 +592,9 @@ Security and audit:
 
 Limits:
 
-* Team mode should expose configurable upload/media limits, such as max file size and accepted media types.
+* Team mode should expose configurable upload/media limits, such as max file size and accepted media types. Current implementation enforces accepted MIME categories and requires `IMAGINE_MAX_MEDIA_PAYLOAD_BYTES` for the per-payload byte limit.
 * Exceeding limits should fail visibly before consuming large disk space.
-* Disk usage warnings should be visible in Settings -> Data when usage approaches configured thresholds.
+* Disk usage warnings should be visible in Settings -> Data when usage approaches configured thresholds. This remains operational hardening beyond the per-payload limit.
 
 ### Migration
 

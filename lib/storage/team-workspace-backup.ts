@@ -610,7 +610,7 @@ async function createTeamRestoreSafetySnapshot(
   const snapshotExport = await exportTeamWorkspaceBackup(queryable, config, request, false);
   const createdAt = new Date().toISOString();
   const id = randomUUID();
-  const payload = await new LocalFilePayloadStore(config.mediaDir).write({
+  const payload = await new LocalFilePayloadStore(config.mediaDir, { maxPayloadBytes: config.maxMediaPayloadBytes }).write({
     blob: new Blob([snapshotExport.body], { type: "application/zip" }),
     mimeType: "application/zip",
   });

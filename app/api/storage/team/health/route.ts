@@ -17,6 +17,7 @@ export async function GET(): Promise<Response> {
     return Response.json({
       appVersion: APP_VERSION,
       databaseConfigured: true,
+      maxMediaPayloadBytes: config.maxMediaPayloadBytes,
       mediaDirectoryConfigured: true,
       migrationStatus,
       mode: "postgres",

@@ -1,5 +1,6 @@
 import {
   DATABASE_URL_ENV,
+  IMAGINE_MAX_MEDIA_PAYLOAD_BYTES_ENV,
   IMAGINE_MEDIA_DIR_ENV,
   IMAGINE_STORAGE_TARGET_ENV,
   isHostedDeploymentEnvironment,
@@ -52,6 +53,9 @@ export function resolveLocalStorageRuntimeStatus(
   }
   if (!env[DATABASE_URL_ENV]?.trim()) throw new Error(`${DATABASE_URL_ENV} is required when ${IMAGINE_STORAGE_TARGET_ENV}=postgres`);
   if (!env[IMAGINE_MEDIA_DIR_ENV]?.trim()) throw new Error(`${IMAGINE_MEDIA_DIR_ENV} is required when ${IMAGINE_STORAGE_TARGET_ENV}=postgres`);
+  if (!isPositiveIntegerByteCount(env[IMAGINE_MAX_MEDIA_PAYLOAD_BYTES_ENV])) {
+    throw new Error(`${IMAGINE_MAX_MEDIA_PAYLOAD_BYTES_ENV} must be a positive integer byte count`);
+  }
   return {
     cleanupPolicy: LOCAL_WORKSPACE_CLEANUP_POLICY,
     enabled: true,
@@ -61,6 +65,13 @@ export function resolveLocalStorageRuntimeStatus(
     syncPolicy: LOCAL_WORKSPACE_SYNC_POLICY,
     targetKind,
   };
+}
+
+function isPositiveIntegerByteCount(value: string | undefined): boolean {
+  const trimmed = value?.trim();
+  if (!trimmed || !/^\d+$/.test(trimmed)) return false;
+  const parsed = Number(trimmed);
+  return Number.isSafeInteger(parsed) && parsed > 0;
 }
 
 export function toPublicLocalStorageRuntimeStatus(

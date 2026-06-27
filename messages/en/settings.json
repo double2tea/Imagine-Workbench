@@ -58,6 +58,7 @@
     "teamStorageChecking": "Waiting for health check",
     "teamStorageDatabase": "Database",
     "teamStorageMedia": "Media dir",
+    "teamStorageMaxMedia": "Max upload",
     "configured": "Configured",
     "teamStorageMigrations": "Migrations",
     "teamStorageNoMigrationStatus": "No migration status yet",

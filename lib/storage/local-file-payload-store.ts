@@ -9,10 +9,16 @@ export interface LocalFilePayloadWriteInput {
   mimeType: string;
 }
 
+export interface LocalFilePayloadStoreOptions {
+  maxPayloadBytes?: number;
+}
+
 export class LocalFilePayloadStore {
+  private readonly maxPayloadBytes: number | undefined;
   private readonly mediaDir: string;
 
-  constructor(mediaDir: string) {
+  constructor(mediaDir: string, options: LocalFilePayloadStoreOptions = {}) {
+    this.maxPayloadBytes = options.maxPayloadBytes;
     this.mediaDir = path.resolve(mediaDir);
   }
 
@@ -29,7 +35,7 @@ export class LocalFilePayloadStore {
 
   async write(input: LocalFilePayloadWriteInput): Promise<WorkspaceAssetPayloadRef> {
     const data = Buffer.from(await input.blob.arrayBuffer());
-    validatePayloadData(data, input.blob, input.mimeType);
+    validatePayloadData(data, input.blob, input.mimeType, this.maxPayloadBytes);
     const contentHash = `sha256:${createHash("sha256").update(data).digest("hex")}`;
     if (input.contentHash !== undefined && input.contentHash !== contentHash) {
       throw new Error("Payload content hash does not match bytes");
@@ -73,9 +79,12 @@ function assertLocalFileRef(ref: WorkspaceAssetPayloadRef): void {
   if (ref.kind !== "local-file") throw new Error(`Unsupported payload location: ${ref.kind}`);
 }
 
-function validatePayloadData(data: Buffer, blob: Blob, mimeType: string): void {
+function validatePayloadData(data: Buffer, blob: Blob, mimeType: string, maxPayloadBytes: number | undefined): void {
   if (data.byteLength <= 0) throw new Error("Payload is empty");
   if (blob.size !== data.byteLength) throw new Error("Payload size does not match bytes");
+  if (maxPayloadBytes !== undefined && data.byteLength > maxPayloadBytes) {
+    throw new Error(`Payload exceeds configured max size of ${maxPayloadBytes} bytes`);
+  }
   if (blob.type && blob.type !== mimeType) throw new Error("Payload MIME type does not match blob type");
   mimeExtensionFor(mimeType);
 }

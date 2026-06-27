@@ -57,11 +57,13 @@ test("team boards route rejects invalid query params before opening a database c
   const originalEnv = {
     DATABASE_URL: process.env.DATABASE_URL,
     IMAGINE_MEDIA_DIR: process.env.IMAGINE_MEDIA_DIR,
+    IMAGINE_MAX_MEDIA_PAYLOAD_BYTES: process.env.IMAGINE_MAX_MEDIA_PAYLOAD_BYTES,
     IMAGINE_STORAGE_TARGET: process.env.IMAGINE_STORAGE_TARGET,
   };
   try {
     process.env.DATABASE_URL = "postgres://localhost/imagine";
     process.env.IMAGINE_MEDIA_DIR = "/srv/imagine/media";
+    process.env.IMAGINE_MAX_MEDIA_PAYLOAD_BYTES = "1048576";
     process.env.IMAGINE_STORAGE_TARGET = "postgres";
 
     const response = await getTeamBoards(new Request("http://localhost:3000/api/storage/team/boards?limit=0"));
@@ -73,6 +75,7 @@ test("team boards route rejects invalid query params before opening a database c
   } finally {
     restoreEnv("DATABASE_URL", originalEnv.DATABASE_URL);
     restoreEnv("IMAGINE_MEDIA_DIR", originalEnv.IMAGINE_MEDIA_DIR);
+    restoreEnv("IMAGINE_MAX_MEDIA_PAYLOAD_BYTES", originalEnv.IMAGINE_MAX_MEDIA_PAYLOAD_BYTES);
     restoreEnv("IMAGINE_STORAGE_TARGET", originalEnv.IMAGINE_STORAGE_TARGET);
   }
 });
@@ -226,12 +229,14 @@ test("team board route rejects missing write versions before opening a database 
     APP_URL: process.env.APP_URL,
     DATABASE_URL: process.env.DATABASE_URL,
     IMAGINE_MEDIA_DIR: process.env.IMAGINE_MEDIA_DIR,
+    IMAGINE_MAX_MEDIA_PAYLOAD_BYTES: process.env.IMAGINE_MAX_MEDIA_PAYLOAD_BYTES,
     IMAGINE_STORAGE_TARGET: process.env.IMAGINE_STORAGE_TARGET,
   };
   try {
     process.env.APP_URL = "http://localhost:3000";
     process.env.DATABASE_URL = "postgres://localhost/imagine";
     process.env.IMAGINE_MEDIA_DIR = "/srv/imagine/media";
+    process.env.IMAGINE_MAX_MEDIA_PAYLOAD_BYTES = "1048576";
     process.env.IMAGINE_STORAGE_TARGET = "postgres";
 
     const response = await putTeamBoard(new Request("http://localhost:3000/api/storage/team/boards/board_1", {
@@ -252,6 +257,7 @@ test("team board route rejects missing write versions before opening a database 
     restoreEnv("APP_URL", originalEnv.APP_URL);
     restoreEnv("DATABASE_URL", originalEnv.DATABASE_URL);
     restoreEnv("IMAGINE_MEDIA_DIR", originalEnv.IMAGINE_MEDIA_DIR);
+    restoreEnv("IMAGINE_MAX_MEDIA_PAYLOAD_BYTES", originalEnv.IMAGINE_MAX_MEDIA_PAYLOAD_BYTES);
     restoreEnv("IMAGINE_STORAGE_TARGET", originalEnv.IMAGINE_STORAGE_TARGET);
   }
 });
@@ -261,12 +267,14 @@ test("team board create, reset, and delete routes reject missing CSRF before ope
     APP_URL: process.env.APP_URL,
     DATABASE_URL: process.env.DATABASE_URL,
     IMAGINE_MEDIA_DIR: process.env.IMAGINE_MEDIA_DIR,
+    IMAGINE_MAX_MEDIA_PAYLOAD_BYTES: process.env.IMAGINE_MAX_MEDIA_PAYLOAD_BYTES,
     IMAGINE_STORAGE_TARGET: process.env.IMAGINE_STORAGE_TARGET,
   };
   try {
     process.env.APP_URL = "http://localhost:3000";
     process.env.DATABASE_URL = "postgres://localhost/imagine";
     process.env.IMAGINE_MEDIA_DIR = "/srv/imagine/media";
+    process.env.IMAGINE_MAX_MEDIA_PAYLOAD_BYTES = "1048576";
     process.env.IMAGINE_STORAGE_TARGET = "postgres";
 
     const createResponse = await postTeamBoard(new Request("http://localhost:3000/api/storage/team/boards", {
@@ -303,6 +311,7 @@ test("team board create, reset, and delete routes reject missing CSRF before ope
     restoreEnv("APP_URL", originalEnv.APP_URL);
     restoreEnv("DATABASE_URL", originalEnv.DATABASE_URL);
     restoreEnv("IMAGINE_MEDIA_DIR", originalEnv.IMAGINE_MEDIA_DIR);
+    restoreEnv("IMAGINE_MAX_MEDIA_PAYLOAD_BYTES", originalEnv.IMAGINE_MAX_MEDIA_PAYLOAD_BYTES);
     restoreEnv("IMAGINE_STORAGE_TARGET", originalEnv.IMAGINE_STORAGE_TARGET);
   }
 });

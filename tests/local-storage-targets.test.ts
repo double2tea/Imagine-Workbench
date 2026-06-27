@@ -18,6 +18,7 @@ test("workspace storage adapters expose only IndexedDB and PostgreSQL targets", 
   );
   assert.deepEqual(POSTGRES_STORAGE_ADAPTER.postgres, {
     engine: "postgres",
+    maxMediaPayloadBytesEnv: "IMAGINE_MAX_MEDIA_PAYLOAD_BYTES",
     mediaDirectoryEnv: "IMAGINE_MEDIA_DIR",
     payloadDirectoryName: "originals",
     previewDirectoryName: "previews",

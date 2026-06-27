@@ -52,15 +52,34 @@ test("resolvePostgresStorageConfig requires explicit PostgreSQL mode and private
     }),
     /IMAGINE_MEDIA_DIR is required/,
   );
+  assert.throws(
+    () => resolvePostgresStorageConfig({
+      DATABASE_URL: "postgres://localhost/imagine",
+      IMAGINE_MEDIA_DIR: "/srv/imagine/media",
+      IMAGINE_STORAGE_TARGET: "postgres",
+    }),
+    /IMAGINE_MAX_MEDIA_PAYLOAD_BYTES is required/,
+  );
+  assert.throws(
+    () => resolvePostgresStorageConfig({
+      DATABASE_URL: "postgres://localhost/imagine",
+      IMAGINE_MAX_MEDIA_PAYLOAD_BYTES: "0",
+      IMAGINE_MEDIA_DIR: "/srv/imagine/media",
+      IMAGINE_STORAGE_TARGET: "postgres",
+    }),
+    /IMAGINE_MAX_MEDIA_PAYLOAD_BYTES must be a positive integer byte count/,
+  );
 
   assert.deepEqual(
     resolvePostgresStorageConfig({
       DATABASE_URL: "postgres://localhost/imagine",
+      IMAGINE_MAX_MEDIA_PAYLOAD_BYTES: "1048576",
       IMAGINE_MEDIA_DIR: "/srv/imagine/media",
       IMAGINE_STORAGE_TARGET: "postgres",
     }),
     {
       databaseUrl: "postgres://localhost/imagine",
+      maxMediaPayloadBytes: 1048576,
       mediaDir: "/srv/imagine/media",
     },
   );

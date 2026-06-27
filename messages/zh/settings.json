@@ -58,6 +58,7 @@
     "teamStorageChecking": "等待健康检查",
     "teamStorageDatabase": "数据库",
     "teamStorageMedia": "媒体目录",
+    "teamStorageMaxMedia": "上传上限",
     "configured": "已配置",
     "teamStorageMigrations": "迁移",
     "teamStorageNoMigrationStatus": "暂无迁移状态",

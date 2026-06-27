@@ -33,6 +33,7 @@ test("resolveLocalStorageRuntimeStatus keeps browser storage as the default", ()
 test("resolveLocalStorageRuntimeStatus enables PostgreSQL only when explicitly selected", () => {
   const status = resolveLocalStorageRuntimeStatus({
     DATABASE_URL: "postgres://localhost/imagine",
+    IMAGINE_MAX_MEDIA_PAYLOAD_BYTES: "1024",
     IMAGINE_MEDIA_DIR: "/srv/imagine/media",
     IMAGINE_STORAGE_TARGET: "postgres",
   }, { homeDir: "/Users/alice" });
@@ -48,6 +49,7 @@ test("resolveLocalStorageRuntimeStatus enables PostgreSQL only when explicitly s
 test("resolvePublicLocalStorageRuntimeStatus exposes only PostgreSQL config status", () => {
   const status = resolvePublicLocalStorageRuntimeStatus({
     DATABASE_URL: "postgres://localhost/imagine",
+    IMAGINE_MAX_MEDIA_PAYLOAD_BYTES: "1024",
     IMAGINE_MEDIA_DIR: "/srv/imagine/media",
     IMAGINE_STORAGE_TARGET: "postgres",
   });
@@ -56,6 +58,8 @@ test("resolvePublicLocalStorageRuntimeStatus exposes only PostgreSQL config stat
   assert.deepEqual(status.pathPlan, {
     databaseUrlConfigured: true,
     exportDirectoryName: "exports",
+    maxMediaPayloadBytes: 1024,
+    maxMediaPayloadBytesConfigured: true,
     mediaDirectoryConfigured: true,
     payloadDirectoryName: "originals",
     previewDirectoryName: "previews",
@@ -66,16 +70,19 @@ test("resolvePublicLocalStorageRuntimeStatus exposes only PostgreSQL config stat
 test("toPublicLocalStorageRuntimeStatus redacts private runtime paths", () => {
   const privateStatus = resolveLocalStorageRuntimeStatus({
     DATABASE_URL: "postgres://localhost/imagine",
+    IMAGINE_MAX_MEDIA_PAYLOAD_BYTES: "1024",
     IMAGINE_MEDIA_DIR: "/srv/imagine/media",
     IMAGINE_STORAGE_TARGET: "postgres",
   }, { homeDir: "/Users/alice" });
   const publicStatus = toPublicLocalStorageRuntimeStatus(privateStatus, {
     DATABASE_URL: "postgres://localhost/imagine",
+    IMAGINE_MAX_MEDIA_PAYLOAD_BYTES: "1024",
     IMAGINE_MEDIA_DIR: "/srv/imagine/media",
   });
 
   assert.equal(Object.hasOwn(publicStatus, "paths"), false);
   assert.equal(publicStatus.pathPlan?.databaseUrlConfigured, true);
+  assert.equal(publicStatus.pathPlan?.maxMediaPayloadBytes, 1024);
   assert.equal(publicStatus.pathPlan?.mediaDirectoryConfigured, true);
 });
 
@@ -84,6 +91,7 @@ test("resolveLocalStorageRuntimeStatus rejects PostgreSQL on hosted deployments"
     () => resolveLocalStorageRuntimeStatus({
       CF_PAGES: "1",
       DATABASE_URL: "postgres://localhost/imagine",
+      IMAGINE_MAX_MEDIA_PAYLOAD_BYTES: "1024",
       IMAGINE_MEDIA_DIR: "/srv/imagine/media",
       IMAGINE_STORAGE_TARGET: "postgres",
     }, { homeDir: "/Users/alice" }),
@@ -102,6 +110,14 @@ test("resolveLocalStorageRuntimeStatus rejects missing PostgreSQL config", () =>
       IMAGINE_STORAGE_TARGET: "postgres",
     }),
     /IMAGINE_MEDIA_DIR is required/,
+  );
+  assert.throws(
+    () => resolveLocalStorageRuntimeStatus({
+      DATABASE_URL: "postgres://localhost/imagine",
+      IMAGINE_MEDIA_DIR: "/srv/imagine/media",
+      IMAGINE_STORAGE_TARGET: "postgres",
+    }),
+    /IMAGINE_MAX_MEDIA_PAYLOAD_BYTES must be a positive integer byte count/,
   );
 });
 

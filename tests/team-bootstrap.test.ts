@@ -98,6 +98,7 @@ test("team bootstrap route fails before database access without setup token", as
     APP_URL: process.env.APP_URL,
     DATABASE_URL: process.env.DATABASE_URL,
     IMAGINE_MEDIA_DIR: process.env.IMAGINE_MEDIA_DIR,
+    IMAGINE_MAX_MEDIA_PAYLOAD_BYTES: process.env.IMAGINE_MAX_MEDIA_PAYLOAD_BYTES,
     IMAGINE_STORAGE_TARGET: process.env.IMAGINE_STORAGE_TARGET,
     IMAGINE_TEAM_SETUP_TOKEN: process.env.IMAGINE_TEAM_SETUP_TOKEN,
   };
@@ -105,6 +106,7 @@ test("team bootstrap route fails before database access without setup token", as
     process.env.APP_URL = "http://localhost:3000";
     process.env.DATABASE_URL = "postgres://localhost/imagine";
     process.env.IMAGINE_MEDIA_DIR = "/srv/imagine/media";
+    process.env.IMAGINE_MAX_MEDIA_PAYLOAD_BYTES = "1048576";
     process.env.IMAGINE_STORAGE_TARGET = "postgres";
     delete process.env.IMAGINE_TEAM_SETUP_TOKEN;
 
@@ -123,6 +125,7 @@ test("team bootstrap route fails before database access without setup token", as
     restoreEnv("APP_URL", originalEnv.APP_URL);
     restoreEnv("DATABASE_URL", originalEnv.DATABASE_URL);
     restoreEnv("IMAGINE_MEDIA_DIR", originalEnv.IMAGINE_MEDIA_DIR);
+    restoreEnv("IMAGINE_MAX_MEDIA_PAYLOAD_BYTES", originalEnv.IMAGINE_MAX_MEDIA_PAYLOAD_BYTES);
     restoreEnv("IMAGINE_STORAGE_TARGET", originalEnv.IMAGINE_STORAGE_TARGET);
     restoreEnv("IMAGINE_TEAM_SETUP_TOKEN", originalEnv.IMAGINE_TEAM_SETUP_TOKEN);
   }
@@ -133,6 +136,7 @@ test("team bootstrap route rejects malformed request JSON", async () => {
     APP_URL: process.env.APP_URL,
     DATABASE_URL: process.env.DATABASE_URL,
     IMAGINE_MEDIA_DIR: process.env.IMAGINE_MEDIA_DIR,
+    IMAGINE_MAX_MEDIA_PAYLOAD_BYTES: process.env.IMAGINE_MAX_MEDIA_PAYLOAD_BYTES,
     IMAGINE_STORAGE_TARGET: process.env.IMAGINE_STORAGE_TARGET,
     IMAGINE_TEAM_SETUP_TOKEN: process.env.IMAGINE_TEAM_SETUP_TOKEN,
   };
@@ -140,6 +144,7 @@ test("team bootstrap route rejects malformed request JSON", async () => {
     process.env.APP_URL = "http://localhost:3000";
     process.env.DATABASE_URL = "postgres://localhost/imagine";
     process.env.IMAGINE_MEDIA_DIR = "/srv/imagine/media";
+    process.env.IMAGINE_MAX_MEDIA_PAYLOAD_BYTES = "1048576";
     process.env.IMAGINE_STORAGE_TARGET = "postgres";
     process.env.IMAGINE_TEAM_SETUP_TOKEN = "setup-token";
 
@@ -161,6 +166,7 @@ test("team bootstrap route rejects malformed request JSON", async () => {
     restoreEnv("APP_URL", originalEnv.APP_URL);
     restoreEnv("DATABASE_URL", originalEnv.DATABASE_URL);
     restoreEnv("IMAGINE_MEDIA_DIR", originalEnv.IMAGINE_MEDIA_DIR);
+    restoreEnv("IMAGINE_MAX_MEDIA_PAYLOAD_BYTES", originalEnv.IMAGINE_MAX_MEDIA_PAYLOAD_BYTES);
     restoreEnv("IMAGINE_STORAGE_TARGET", originalEnv.IMAGINE_STORAGE_TARGET);
     restoreEnv("IMAGINE_TEAM_SETUP_TOKEN", originalEnv.IMAGINE_TEAM_SETUP_TOKEN);
   }
@@ -172,6 +178,7 @@ test("team bootstrap route rate-limits invalid setup token attempts with generic
     APP_URL: process.env.APP_URL,
     DATABASE_URL: process.env.DATABASE_URL,
     IMAGINE_MEDIA_DIR: process.env.IMAGINE_MEDIA_DIR,
+    IMAGINE_MAX_MEDIA_PAYLOAD_BYTES: process.env.IMAGINE_MAX_MEDIA_PAYLOAD_BYTES,
     IMAGINE_STORAGE_TARGET: process.env.IMAGINE_STORAGE_TARGET,
     IMAGINE_TEAM_SETUP_TOKEN: process.env.IMAGINE_TEAM_SETUP_TOKEN,
   };
@@ -179,6 +186,7 @@ test("team bootstrap route rate-limits invalid setup token attempts with generic
     process.env.APP_URL = "http://localhost:3000";
     process.env.DATABASE_URL = "postgres://localhost/imagine";
     process.env.IMAGINE_MEDIA_DIR = "/srv/imagine/media";
+    process.env.IMAGINE_MAX_MEDIA_PAYLOAD_BYTES = "1048576";
     process.env.IMAGINE_STORAGE_TARGET = "postgres";
     process.env.IMAGINE_TEAM_SETUP_TOKEN = "setup-token";
 
@@ -202,6 +210,7 @@ test("team bootstrap route rate-limits invalid setup token attempts with generic
     restoreEnv("APP_URL", originalEnv.APP_URL);
     restoreEnv("DATABASE_URL", originalEnv.DATABASE_URL);
     restoreEnv("IMAGINE_MEDIA_DIR", originalEnv.IMAGINE_MEDIA_DIR);
+    restoreEnv("IMAGINE_MAX_MEDIA_PAYLOAD_BYTES", originalEnv.IMAGINE_MAX_MEDIA_PAYLOAD_BYTES);
     restoreEnv("IMAGINE_STORAGE_TARGET", originalEnv.IMAGINE_STORAGE_TARGET);
     restoreEnv("IMAGINE_TEAM_SETUP_TOKEN", originalEnv.IMAGINE_TEAM_SETUP_TOKEN);
   }

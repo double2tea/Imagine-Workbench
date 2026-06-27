@@ -686,7 +686,7 @@ export default function DataManagementWorkspace({
                     ? t("dataManagement.teamStorageReachable")
                     : t("dataManagement.teamStorageChecking")}
               </p>
-              <div className="mt-2 grid grid-cols-2 gap-2">
+              <div className="mt-2 grid grid-cols-1 gap-2 sm:grid-cols-3">
                 <div className="rounded-md border border-[var(--iw-border)] px-2 py-1">
                   <p className="text-[10px] text-[var(--iw-faint)]">{t("dataManagement.teamStorageDatabase")}</p>
                   <p className="font-mono text-[11px] text-[var(--iw-text)]">
@@ -697,6 +697,12 @@ export default function DataManagementWorkspace({
                   <p className="text-[10px] text-[var(--iw-faint)]">{t("dataManagement.teamStorageMedia")}</p>
                   <p className="font-mono text-[11px] text-[var(--iw-text)]">
                     {teamHealth?.mediaDirectoryConfigured ? t("dataManagement.configured") : "--"}
+                  </p>
+                </div>
+                <div className="rounded-md border border-[var(--iw-border)] px-2 py-1">
+                  <p className="text-[10px] text-[var(--iw-faint)]">{t("dataManagement.teamStorageMaxMedia")}</p>
+                  <p className="font-mono text-[11px] text-[var(--iw-text)]">
+                    {teamHealth?.maxMediaPayloadBytes ? formatBytes(teamHealth.maxMediaPayloadBytes) : "--"}
                   </p>
                 </div>
               </div>

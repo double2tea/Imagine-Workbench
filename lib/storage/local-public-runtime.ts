@@ -1,6 +1,7 @@
 import { POSTGRES_STORAGE_ADAPTER } from "../local-storage-targets";
 import {
   DATABASE_URL_ENV,
+  IMAGINE_MAX_MEDIA_PAYLOAD_BYTES_ENV,
   IMAGINE_MEDIA_DIR_ENV,
   isHostedDeploymentEnvironment,
   parseWorkspaceStorageMode,
@@ -27,6 +28,8 @@ export interface LocalWorkspaceSyncPolicy {
 export interface PublicLocalWorkspacePathPlan {
   databaseUrlConfigured: boolean;
   exportDirectoryName: string;
+  maxMediaPayloadBytes?: number;
+  maxMediaPayloadBytesConfigured: boolean;
   mediaDirectoryConfigured: boolean;
   payloadDirectoryName: string;
   previewDirectoryName: string;
@@ -64,11 +67,21 @@ export function getPublicLocalWorkspacePathPlan(
   return {
     databaseUrlConfigured: Boolean(env[DATABASE_URL_ENV]?.trim()),
     exportDirectoryName: "exports",
+    maxMediaPayloadBytes: parsePublicMaxMediaPayloadBytes(env[IMAGINE_MAX_MEDIA_PAYLOAD_BYTES_ENV]),
+    maxMediaPayloadBytesConfigured: Boolean(env[IMAGINE_MAX_MEDIA_PAYLOAD_BYTES_ENV]?.trim()),
     mediaDirectoryConfigured: Boolean(env[IMAGINE_MEDIA_DIR_ENV]?.trim()),
     payloadDirectoryName: postgres.payloadDirectoryName,
     previewDirectoryName: postgres.previewDirectoryName,
     trashDirectoryName: "trash",
   };
+}
+
+function parsePublicMaxMediaPayloadBytes(value: string | undefined): number | undefined {
+  const trimmed = value?.trim();
+  if (!trimmed || !/^\d+$/.test(trimmed)) return undefined;
+  const parsed = Number(trimmed);
+  if (!Number.isSafeInteger(parsed) || parsed <= 0) return undefined;
+  return parsed;
 }
 
 export function resolvePublicLocalStorageRuntimeStatus(

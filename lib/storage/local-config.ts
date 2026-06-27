@@ -1,6 +1,7 @@
 export const IMAGINE_STORAGE_TARGET_ENV = "IMAGINE_STORAGE_TARGET";
 export const DATABASE_URL_ENV = "DATABASE_URL";
 export const IMAGINE_MEDIA_DIR_ENV = "IMAGINE_MEDIA_DIR";
+export const IMAGINE_MAX_MEDIA_PAYLOAD_BYTES_ENV = "IMAGINE_MAX_MEDIA_PAYLOAD_BYTES";
 
 export type WorkspaceStorageMode = "browser" | "postgres";
 export type WorkspaceRuntimeStorageTargetKind = "indexeddb" | "postgres";
@@ -11,6 +12,7 @@ export interface LocalStorageEnvironment {
   [key: string]: string | undefined;
   CF_PAGES?: string;
   DATABASE_URL?: string;
+  IMAGINE_MAX_MEDIA_PAYLOAD_BYTES?: string;
   IMAGINE_MEDIA_DIR?: string;
   IMAGINE_STORAGE_TARGET?: string;
   NETLIFY?: string;

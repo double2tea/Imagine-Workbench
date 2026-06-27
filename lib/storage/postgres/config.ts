@@ -1,5 +1,6 @@
 import {
   DATABASE_URL_ENV,
+  IMAGINE_MAX_MEDIA_PAYLOAD_BYTES_ENV,
   IMAGINE_MEDIA_DIR_ENV,
   IMAGINE_STORAGE_TARGET_ENV,
   isHostedDeploymentEnvironment,
@@ -19,6 +20,7 @@ export class PostgresStorageConfigError extends Error {
 
 export interface PostgresStorageConfig {
   databaseUrl: string;
+  maxMediaPayloadBytes?: number;
   mediaDir: string;
 }
 
@@ -37,7 +39,26 @@ export function resolvePostgresStorageConfig(env: LocalStorageEnvironment): Post
   const mediaDir = env[IMAGINE_MEDIA_DIR_ENV]?.trim();
   if (!mediaDir) throw new PostgresStorageConfigError(`${IMAGINE_MEDIA_DIR_ENV} is required when ${IMAGINE_STORAGE_TARGET_ENV}=postgres`);
 
-  return { databaseUrl, mediaDir };
+  return {
+    databaseUrl,
+    maxMediaPayloadBytes: parseMaxMediaPayloadBytes(env[IMAGINE_MAX_MEDIA_PAYLOAD_BYTES_ENV]),
+    mediaDir,
+  };
+}
+
+function parseMaxMediaPayloadBytes(value: string | undefined): number {
+  const trimmed = value?.trim();
+  if (!trimmed) {
+    throw new PostgresStorageConfigError(`${IMAGINE_MAX_MEDIA_PAYLOAD_BYTES_ENV} is required when ${IMAGINE_STORAGE_TARGET_ENV}=postgres`);
+  }
+  if (!/^\d+$/.test(trimmed)) {
+    throw new PostgresStorageConfigError(`${IMAGINE_MAX_MEDIA_PAYLOAD_BYTES_ENV} must be a positive integer byte count`);
+  }
+  const parsed = Number(trimmed);
+  if (!Number.isSafeInteger(parsed) || parsed <= 0) {
+    throw new PostgresStorageConfigError(`${IMAGINE_MAX_MEDIA_PAYLOAD_BYTES_ENV} must be a positive integer byte count`);
+  }
+  return parsed;
 }
 
 export function requireTeamSetupToken(env: LocalStorageEnvironment, requestToken: string | null): void {

@@ -257,11 +257,13 @@ test("team assets route rejects invalid query params before opening a database c
   const originalEnv = {
     DATABASE_URL: process.env.DATABASE_URL,
     IMAGINE_MEDIA_DIR: process.env.IMAGINE_MEDIA_DIR,
+    IMAGINE_MAX_MEDIA_PAYLOAD_BYTES: process.env.IMAGINE_MAX_MEDIA_PAYLOAD_BYTES,
     IMAGINE_STORAGE_TARGET: process.env.IMAGINE_STORAGE_TARGET,
   };
   try {
     process.env.DATABASE_URL = "postgres://localhost/imagine";
     process.env.IMAGINE_MEDIA_DIR = "/srv/imagine/media";
+    process.env.IMAGINE_MAX_MEDIA_PAYLOAD_BYTES = "1048576";
     process.env.IMAGINE_STORAGE_TARGET = "postgres";
 
     const response = await getTeamAssets(new Request("http://localhost:3000/api/storage/team/assets?status=bad"));
@@ -273,6 +275,7 @@ test("team assets route rejects invalid query params before opening a database c
   } finally {
     restoreEnv("DATABASE_URL", originalEnv.DATABASE_URL);
     restoreEnv("IMAGINE_MEDIA_DIR", originalEnv.IMAGINE_MEDIA_DIR);
+    restoreEnv("IMAGINE_MAX_MEDIA_PAYLOAD_BYTES", originalEnv.IMAGINE_MAX_MEDIA_PAYLOAD_BYTES);
     restoreEnv("IMAGINE_STORAGE_TARGET", originalEnv.IMAGINE_STORAGE_TARGET);
   }
 });
@@ -282,12 +285,14 @@ test("team asset save route rejects missing CSRF before opening a database clien
     APP_URL: process.env.APP_URL,
     DATABASE_URL: process.env.DATABASE_URL,
     IMAGINE_MEDIA_DIR: process.env.IMAGINE_MEDIA_DIR,
+    IMAGINE_MAX_MEDIA_PAYLOAD_BYTES: process.env.IMAGINE_MAX_MEDIA_PAYLOAD_BYTES,
     IMAGINE_STORAGE_TARGET: process.env.IMAGINE_STORAGE_TARGET,
   };
   try {
     process.env.APP_URL = "http://localhost:3000";
     process.env.DATABASE_URL = "postgres://localhost/imagine";
     process.env.IMAGINE_MEDIA_DIR = "/srv/imagine/media";
+    process.env.IMAGINE_MAX_MEDIA_PAYLOAD_BYTES = "1048576";
     process.env.IMAGINE_STORAGE_TARGET = "postgres";
 
     const response = await postTeamAsset(new Request("http://localhost:3000/api/storage/team/assets", {
@@ -307,6 +312,7 @@ test("team asset save route rejects missing CSRF before opening a database clien
     restoreEnv("APP_URL", originalEnv.APP_URL);
     restoreEnv("DATABASE_URL", originalEnv.DATABASE_URL);
     restoreEnv("IMAGINE_MEDIA_DIR", originalEnv.IMAGINE_MEDIA_DIR);
+    restoreEnv("IMAGINE_MAX_MEDIA_PAYLOAD_BYTES", originalEnv.IMAGINE_MAX_MEDIA_PAYLOAD_BYTES);
     restoreEnv("IMAGINE_STORAGE_TARGET", originalEnv.IMAGINE_STORAGE_TARGET);
   }
 });
@@ -316,12 +322,14 @@ test("team asset delete route rejects missing CSRF before opening a database cli
     APP_URL: process.env.APP_URL,
     DATABASE_URL: process.env.DATABASE_URL,
     IMAGINE_MEDIA_DIR: process.env.IMAGINE_MEDIA_DIR,
+    IMAGINE_MAX_MEDIA_PAYLOAD_BYTES: process.env.IMAGINE_MAX_MEDIA_PAYLOAD_BYTES,
     IMAGINE_STORAGE_TARGET: process.env.IMAGINE_STORAGE_TARGET,
   };
   try {
     process.env.APP_URL = "http://localhost:3000";
     process.env.DATABASE_URL = "postgres://localhost/imagine";
     process.env.IMAGINE_MEDIA_DIR = "/srv/imagine/media";
+    process.env.IMAGINE_MAX_MEDIA_PAYLOAD_BYTES = "1048576";
     process.env.IMAGINE_STORAGE_TARGET = "postgres";
 
     const response = await deleteTeamAssetRoute(new Request("http://localhost:3000/api/storage/team/assets/asset_1", {
@@ -337,6 +345,7 @@ test("team asset delete route rejects missing CSRF before opening a database cli
     restoreEnv("APP_URL", originalEnv.APP_URL);
     restoreEnv("DATABASE_URL", originalEnv.DATABASE_URL);
     restoreEnv("IMAGINE_MEDIA_DIR", originalEnv.IMAGINE_MEDIA_DIR);
+    restoreEnv("IMAGINE_MAX_MEDIA_PAYLOAD_BYTES", originalEnv.IMAGINE_MAX_MEDIA_PAYLOAD_BYTES);
     restoreEnv("IMAGINE_STORAGE_TARGET", originalEnv.IMAGINE_STORAGE_TARGET);
   }
 });
@@ -346,12 +355,14 @@ test("team assets clear route rejects missing CSRF before opening a database cli
     APP_URL: process.env.APP_URL,
     DATABASE_URL: process.env.DATABASE_URL,
     IMAGINE_MEDIA_DIR: process.env.IMAGINE_MEDIA_DIR,
+    IMAGINE_MAX_MEDIA_PAYLOAD_BYTES: process.env.IMAGINE_MAX_MEDIA_PAYLOAD_BYTES,
     IMAGINE_STORAGE_TARGET: process.env.IMAGINE_STORAGE_TARGET,
   };
   try {
     process.env.APP_URL = "http://localhost:3000";
     process.env.DATABASE_URL = "postgres://localhost/imagine";
     process.env.IMAGINE_MEDIA_DIR = "/srv/imagine/media";
+    process.env.IMAGINE_MAX_MEDIA_PAYLOAD_BYTES = "1048576";
     process.env.IMAGINE_STORAGE_TARGET = "postgres";
 
     const response = await clearTeamAssetsRoute(new Request("http://localhost:3000/api/storage/team/assets", {
@@ -367,6 +378,7 @@ test("team assets clear route rejects missing CSRF before opening a database cli
     restoreEnv("APP_URL", originalEnv.APP_URL);
     restoreEnv("DATABASE_URL", originalEnv.DATABASE_URL);
     restoreEnv("IMAGINE_MEDIA_DIR", originalEnv.IMAGINE_MEDIA_DIR);
+    restoreEnv("IMAGINE_MAX_MEDIA_PAYLOAD_BYTES", originalEnv.IMAGINE_MAX_MEDIA_PAYLOAD_BYTES);
     restoreEnv("IMAGINE_STORAGE_TARGET", originalEnv.IMAGINE_STORAGE_TARGET);
   }
 });
@@ -376,12 +388,14 @@ test("team asset patch route rejects missing CSRF before opening a database clie
     APP_URL: process.env.APP_URL,
     DATABASE_URL: process.env.DATABASE_URL,
     IMAGINE_MEDIA_DIR: process.env.IMAGINE_MEDIA_DIR,
+    IMAGINE_MAX_MEDIA_PAYLOAD_BYTES: process.env.IMAGINE_MAX_MEDIA_PAYLOAD_BYTES,
     IMAGINE_STORAGE_TARGET: process.env.IMAGINE_STORAGE_TARGET,
   };
   try {
     process.env.APP_URL = "http://localhost:3000";
     process.env.DATABASE_URL = "postgres://localhost/imagine";
     process.env.IMAGINE_MEDIA_DIR = "/srv/imagine/media";
+    process.env.IMAGINE_MAX_MEDIA_PAYLOAD_BYTES = "1048576";
     process.env.IMAGINE_STORAGE_TARGET = "postgres";
 
     const response = await patchTeamAssets(new Request("http://localhost:3000/api/storage/team/assets", {
@@ -401,6 +415,7 @@ test("team asset patch route rejects missing CSRF before opening a database clie
     restoreEnv("APP_URL", originalEnv.APP_URL);
     restoreEnv("DATABASE_URL", originalEnv.DATABASE_URL);
     restoreEnv("IMAGINE_MEDIA_DIR", originalEnv.IMAGINE_MEDIA_DIR);
+    restoreEnv("IMAGINE_MAX_MEDIA_PAYLOAD_BYTES", originalEnv.IMAGINE_MAX_MEDIA_PAYLOAD_BYTES);
     restoreEnv("IMAGINE_STORAGE_TARGET", originalEnv.IMAGINE_STORAGE_TARGET);
   }
 });
