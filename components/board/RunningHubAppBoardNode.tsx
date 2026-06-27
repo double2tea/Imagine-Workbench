@@ -38,7 +38,14 @@ import {
 } from "@/lib/board/runninghub-bindings";
 import type { BoardPromptReference } from "@/lib/board/prompt-references";
 import { useTranslations, type TFunction } from "@/lib/i18n";
-
+import {
+  deleteTeamProviderTarget,
+  fetchTeamProviderTargets,
+  fetchWorkspaceStorageRuntimeStatus,
+  readTeamCsrfToken,
+  saveTeamProviderTarget,
+} from "@/lib/storage/team-client";
+import type { PublicTeamProviderTarget } from "@/lib/storage/team-provider-target-types";
 
 interface RunningHubAppBoardNodeProps {
   hasResultConnection?: boolean;
@@ -55,6 +62,7 @@ interface RunningHubAppBoardNodeProps {
 
 interface RunningHubSavedTarget {
   accessPassword?: string;
+  accessPasswordConfigured?: boolean;
   bindings: BoardRunningHubNodeInfoBinding[];
   id: string;
   label: string;
@@ -63,6 +71,8 @@ interface RunningHubSavedTarget {
   targetType: BoardRunningHubTargetType;
   updatedAt: string;
 }
+
+type RunningHubSavedTargetStorageTarget = "indexeddb" | "postgres";
 
 const SAVED_TARGETS_STORAGE_KEY = "imagine_runninghub_saved_targets";
 
@@ -217,6 +227,23 @@ function savedTargetId(targetType: BoardRunningHubTargetType, targetId: string):
   return `${targetType}:${targetId.trim()}`;
 }
 
+function teamProviderTargetToSavedTarget(
+  target: PublicTeamProviderTarget,
+  accessPassword?: string,
+): RunningHubSavedTarget {
+  return {
+    accessPassword,
+    accessPasswordConfigured: target.accessPasswordConfigured,
+    bindings: target.bindings,
+    id: target.id,
+    label: target.label,
+    outputType: target.outputType,
+    targetId: target.targetId,
+    targetType: target.targetType,
+    updatedAt: target.updatedAt,
+  };
+}
+
 function bindingTitle(binding: BoardRunningHubNodeInfoBinding, t: TFunction): string {
   return binding.label?.trim() || binding.description || binding.fieldName || t("runninghub.targetUnnamedParam");
 }
@@ -230,6 +257,10 @@ function statusLabel(status: BoardRunningHubAppNode["status"], t: TFunction): st
   if (status === "complete") return t("node.statusLabels.complete");
   if (status === "failed") return t("node.statusLabels.failed");
   return t("node.statusLabels.idle");
+}
+
+function errorMessage(error: unknown, fallback: string): string {
+  return error instanceof Error ? error.message : fallback;
 }
 
 function statusTone(status: BoardRunningHubAppNode["status"]): string {
@@ -264,6 +295,7 @@ const RunningHubAppBoardNode = memo(function RunningHubAppBoardNode({
   const [isImportOpen, setIsImportOpen] = useState(false);
   const [isFetchingSchema, setIsFetchingSchema] = useState(false);
   const [savedTargets, setSavedTargets] = useState<RunningHubSavedTarget[]>([]);
+  const [savedTargetStorageTarget, setSavedTargetStorageTarget] = useState<RunningHubSavedTargetStorageTarget>("indexeddb");
   const promptPreview = inputSummary?.promptPreview ?? null;
   const referenceCount = inputSummary?.referenceCount ?? 0;
   const readiness = analyzeRunningHubBindings(node.bindings, promptPreview ?? node.prompt, referenceCount);
@@ -281,8 +313,35 @@ const RunningHubAppBoardNode = memo(function RunningHubAppBoardNode({
   };
 
   useEffect(() => {
-    setSavedTargets(readSavedTargets());
-  }, []);
+    let isActive = true;
+    void fetchWorkspaceStorageRuntimeStatus()
+      .then(async status => {
+        if (!isActive) return;
+        if (status.targetKind !== "postgres") {
+          setSavedTargetStorageTarget("indexeddb");
+          setSavedTargets(readSavedTargets());
+          return;
+        }
+        setSavedTargetStorageTarget("postgres");
+        try {
+          const result = await fetchTeamProviderTargets();
+          if (isActive) setSavedTargets(result.targets.map(target => teamProviderTargetToSavedTarget(target)));
+        } catch (error) {
+          if (isActive) {
+            setSavedTargets([]);
+            setImportError(error instanceof Error ? error.message : t("runninghub.importFailed"));
+          }
+        }
+      })
+      .catch(() => {
+        if (!isActive) return;
+        setSavedTargetStorageTarget("indexeddb");
+        setSavedTargets(readSavedTargets());
+      });
+    return () => {
+      isActive = false;
+    };
+  }, [t]);
 
   const updateBinding = (bindingId: string, patch: Partial<BoardRunningHubNodeInfoBinding>): void => {
     onUpdate({
@@ -304,7 +363,7 @@ const RunningHubAppBoardNode = memo(function RunningHubAppBoardNode({
     writeSavedTargets(next);
   };
 
-  const saveTargetSnapshot = (bindings: BoardRunningHubNodeInfoBinding[], name?: string, targetIdOverride?: string): void => {
+  const saveTargetSnapshot = async (bindings: BoardRunningHubNodeInfoBinding[], name?: string, targetIdOverride?: string): Promise<void> => {
     const targetId = (targetIdOverride ?? node.targetId).trim();
     if (!targetId) {
       setImportError(t("runninghub.targetRequired"));
@@ -322,19 +381,44 @@ const RunningHubAppBoardNode = memo(function RunningHubAppBoardNode({
       targetType: node.targetType,
       updatedAt: new Date().toISOString(),
     };
+    if (savedTargetStorageTarget === "postgres") {
+      const csrfToken = readTeamCsrfToken();
+      if (!csrfToken) {
+        setImportError("CSRF token is required");
+        return;
+      }
+      const password = node.accessPassword?.trim();
+      try {
+        const result = await saveTeamProviderTarget({
+          ...(password ? { accessPassword: password } : {}),
+          bindings,
+          label,
+          outputType: node.outputType,
+          provider: "runninghub",
+          targetId,
+          targetType: node.targetType,
+        }, csrfToken);
+        const savedTarget = teamProviderTargetToSavedTarget(result.target, password || undefined);
+        setSavedTargets([savedTarget, ...savedTargets.filter(item => item.id !== savedTarget.id)].slice(0, 50));
+        setImportError(null);
+      } catch (error) {
+        setImportError(errorMessage(error, t("runninghub.importFailed")));
+      }
+      return;
+    }
     persistSavedTargets([target, ...savedTargets.filter(item => item.id !== id)]);
     setImportError(null);
   };
 
-  const saveCurrentTarget = (): void => {
-    saveTargetSnapshot(node.bindings);
+  const saveCurrentTarget = async (): Promise<void> => {
+    await saveTargetSnapshot(node.bindings);
   };
 
   const applySavedTarget = (targetId: string): void => {
     const target = savedTargets.find(item => item.id === targetId);
     if (!target) return;
     onUpdate({
-      accessPassword: target.accessPassword ?? "",
+      accessPassword: target.accessPassword ?? (savedTargetStorageTarget === "postgres" ? node.accessPassword : ""),
       bindings: target.bindings,
       outputType: target.outputType,
       targetId: target.targetId,
@@ -343,8 +427,23 @@ const RunningHubAppBoardNode = memo(function RunningHubAppBoardNode({
     setImportError(null);
   };
 
-  const deleteCurrentSavedTarget = (): void => {
+  const deleteCurrentSavedTarget = async (): Promise<void> => {
     if (!currentSavedTarget) return;
+    if (savedTargetStorageTarget === "postgres") {
+      const csrfToken = readTeamCsrfToken();
+      if (!csrfToken) {
+        setImportError("CSRF token is required");
+        return;
+      }
+      try {
+        await deleteTeamProviderTarget(currentSavedTarget.id, csrfToken);
+        setSavedTargets(savedTargets.filter(target => target.id !== currentSavedTarget.id));
+        setImportError(null);
+      } catch (error) {
+        setImportError(errorMessage(error, t("runninghub.importFailed")));
+      }
+      return;
+    }
     persistSavedTargets(savedTargets.filter(target => target.id !== currentSavedTarget.id));
   };
 
@@ -391,7 +490,7 @@ const RunningHubAppBoardNode = memo(function RunningHubAppBoardNode({
     try {
       const schema = await onFetchAppSchema(webappId);
       onUpdate({ targetId: schema.webappId, bindings: schema.bindings });
-      saveTargetSnapshot(schema.bindings, schema.name, schema.webappId);
+      await saveTargetSnapshot(schema.bindings, schema.name, schema.webappId);
     } catch (error) {
       setImportError(error instanceof Error ? error.message : t("runninghub.fieldReadFailed"));
     } finally {
@@ -468,7 +567,7 @@ const RunningHubAppBoardNode = memo(function RunningHubAppBoardNode({
           </select>
           <button
             type="button"
-            onClick={saveCurrentTarget}
+            onClick={() => void saveCurrentTarget()}
             disabled={!hasTarget}
             className="nodrag flex h-8 items-center gap-1.5 rounded-md border border-[var(--iw-border)] bg-[var(--iw-panel)] px-2 text-[10px] font-semibold text-[var(--iw-text)] transition hover:border-emerald-400/50 disabled:text-[var(--iw-faint)]"
             title={t("runninghub.saveCurrentTarget")}
@@ -478,7 +577,7 @@ const RunningHubAppBoardNode = memo(function RunningHubAppBoardNode({
           </button>
           <button
             type="button"
-            onClick={deleteCurrentSavedTarget}
+            onClick={() => void deleteCurrentSavedTarget()}
             disabled={!currentSavedTarget}
             className={iconButtonClass}
             title={t("runninghub.deleteSavedTarget")}
