@@ -405,6 +405,21 @@ export async function exportCompleteWorkspaceBackup(includeCredentials: boolean)
   });
 }
 
+export async function createCompleteWorkspaceBackupFile(includeCredentials: boolean): Promise<File> {
+  const archive = await createWorkspaceBackupArchive({
+    assets: await getAllFromDB(),
+    boards: await listBoardsFromDB(),
+    filePrefix: "Imagine_Workbench_Backup",
+    includeCredentials,
+    includeAllWorkspaceData: true,
+    includeSettings: true,
+  });
+  return new File([archive.blob], archive.fileName, {
+    lastModified: Date.parse(archive.exportedAt),
+    type: "application/zip",
+  });
+}
+
 export async function exportBoardWorkspaceBackup(
   board: BoardDocument,
   includeCredentials: boolean,

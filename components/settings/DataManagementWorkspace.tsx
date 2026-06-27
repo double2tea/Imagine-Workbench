@@ -68,6 +68,7 @@ interface DataManagementWorkspaceProps {
   onExportWorkspace: (includeCredentials: boolean) => Promise<void>;
   onImportLocalAssets: (files: File[]) => Promise<void>;
   onImportWorkspace: (file: File, includeCredentials: boolean) => Promise<void>;
+  onImportBrowserWorkspaceToTeam: (includeCredentials: boolean) => Promise<void>;
   onRefreshSummary: () => Promise<void>;
   onRefreshStorageStatus: () => Promise<void>;
   onRepairAssetSources: () => Promise<void>;
@@ -233,6 +234,18 @@ function buildTeamMissingPayloadAssetsConfirmRequest(t: TranslateFn): ConfirmReq
   };
 }
 
+function buildBrowserMigrationImportConfirmRequest(preview: WorkspaceBrowserMigrationPreview, t: TranslateFn): ConfirmRequest {
+  return {
+    message: t("dataManagement.browserMigrationImportConfirm", {
+      assets: preview.assetCount,
+      boards: preview.boardCount,
+      settings: preview.managedLocalStorageKeyCount,
+    }),
+    tone: "danger",
+    confirmLabel: t("dataManagement.browserMigrationImportButton"),
+  };
+}
+
 function teamRoleLabel(role: PublicTeamMember["role"], t: TranslateFn): string {
   if (role === "owner") return t("dataManagement.teamMemberRoleOwner");
   if (role === "admin") return t("dataManagement.teamMemberRoleAdmin");
@@ -328,6 +341,7 @@ export default function DataManagementWorkspace({
   onExportWorkspace,
   onImportLocalAssets,
   onImportWorkspace,
+  onImportBrowserWorkspaceToTeam,
   onRefreshSummary,
   onRefreshStorageStatus,
   onRepairAssetSources,
@@ -968,11 +982,28 @@ export default function DataManagementWorkspace({
                         : t("dataManagement.browserMigrationPreviewWaiting")}
                   </p>
                 </div>
-                {migrationPreview ? (
-                  <div className="rounded-md border border-[var(--iw-border)] px-2 py-1 font-mono text-[11px] text-[var(--iw-muted)]">
-                    {t("dataManagement.browserMigrationPreviewBlockingCount", { count: migrationPreview.blockingIssueCount })}
-                  </div>
-                ) : null}
+                <div className="flex flex-wrap items-center gap-2">
+                  {migrationPreview ? (
+                    <div className="rounded-md border border-[var(--iw-border)] px-2 py-1 font-mono text-[11px] text-[var(--iw-muted)]">
+                      {t("dataManagement.browserMigrationPreviewBlockingCount", { count: migrationPreview.blockingIssueCount })}
+                    </div>
+                  ) : null}
+                  {migrationPreview ? (
+                    <button
+                      type="button"
+                      disabled={actionDisabled || !migrationPreview.canImport || !canManageTeamMembers}
+                      onClick={() => void runConfirmedAction(
+                        t("dataManagement.browserMigrationImportBusy"),
+                        buildBrowserMigrationImportConfirmRequest(migrationPreview, t),
+                        () => onImportBrowserWorkspaceToTeam(includeCredentials),
+                      )}
+                      className="imagine-secondary-action flex h-8 items-center gap-1.5 rounded-md border border-[var(--iw-border)] px-2 text-[10px] font-semibold text-[var(--iw-text)] disabled:opacity-50"
+                    >
+                      <Upload className="h-3.5 w-3.5" />
+                      {t("dataManagement.browserMigrationImportButton")}
+                    </button>
+                  ) : null}
+                </div>
               </div>
               {migrationPreview ? (
                 <>

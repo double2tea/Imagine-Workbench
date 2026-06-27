@@ -335,6 +335,32 @@ test("buildBrowserToPostgresMigrationPreview blocks unknown browser sources", ()
   assert.deepEqual(preview.unknownIndexedDbSources, [{ database: "ImagineWorkbenchDB", store: "future_store" }]);
 });
 
+test("buildBrowserToPostgresMigrationPreview allows fully classified browser sources", () => {
+  const preview = buildBrowserToPostgresMigrationPreview({
+    assetCount: 2,
+    assetPayloadRecordCount: 2,
+    assetPreviewRecordCount: 1,
+    boardCount: 1,
+    generationTaskCount: 1,
+    indexedDbIntrospectionAvailable: true,
+    libraryAssetCount: 1,
+    localStorageEntries: {
+      imagine_agent_chat: "[]",
+      imagine_ai_provider: "grok2api",
+    },
+    safetySnapshotCount: 1,
+    unknownIndexedDbSources: [],
+    unknownLocalStorageKeys: [],
+    voiceProfileCount: 1,
+  });
+
+  assert.equal(preview.canImport, true);
+  assert.equal(preview.blockingIssueCount, 0);
+  assert.equal(preview.requiredLocalStorageKeyCount, 1);
+  assert.equal(preview.optionalLocalStorageKeyCount, 1);
+  assert.equal(preview.localOnlyLocalStorageKeyCount, 0);
+});
+
 test("buildBrowserToPostgresMigrationPreview requires IndexedDB introspection", () => {
   const preview = buildBrowserToPostgresMigrationPreview({
     assetCount: 0,

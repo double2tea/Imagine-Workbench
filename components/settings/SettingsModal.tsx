@@ -13,6 +13,7 @@ import type { CustomProviderDefinition } from "@/lib/providers/registry";
 import type { ProviderCredentials } from "@/lib/providers/types";
 import { WORKBENCH_OVERLAY_TRANSITION, WORKBENCH_PANEL_TRANSITION } from "@/lib/workbench-motion";
 import {
+  createCompleteWorkspaceBackupFile,
   getWorkspaceDataSummary,
   previewBrowserToPostgresMigration,
   type LocalStorageCleanupKind,
@@ -449,6 +450,30 @@ export default function SettingsModal({
     await refreshDataSummary();
   }, [onImportWorkspace, refreshDataSummary, storageStatus?.mode, t, teamSession]);
 
+  const runImportBrowserWorkspaceToTeam = useCallback(async (includeCredentials: boolean) => {
+    if (storageStatus?.mode !== "postgres") throw new Error(t("dataManagement.teamRestoreUnsupported"));
+    if (!teamSession) throw new Error(t("dataManagement.teamSessionRequired"));
+    const csrfToken = readTeamCsrfToken();
+    if (!csrfToken) throw new Error(t("dataManagement.teamSessionCsrfMissing"));
+    let preview: WorkspaceBrowserMigrationPreview;
+    try {
+      preview = await previewBrowserToPostgresMigration();
+    } catch (error) {
+      const message = formatSettingsError(error, t);
+      setMigrationPreview(null);
+      setMigrationPreviewError(message);
+      throw new Error(message);
+    }
+    setMigrationPreview(preview);
+    setMigrationPreviewError(null);
+    if (!preview.canImport) {
+      throw new Error(t("dataManagement.browserMigrationPreviewBlocked", { count: preview.blockingIssueCount }));
+    }
+    const backupFile = await createCompleteWorkspaceBackupFile(includeCredentials);
+    await restoreTeamWorkspaceBackup(backupFile, includeCredentials, csrfToken);
+    await refreshDataSummary();
+  }, [refreshDataSummary, storageStatus?.mode, t, teamSession]);
+
   const runDownloadSafetySnapshot = useCallback(async () => {
     if (storageStatus?.mode !== "postgres") {
       await onDownloadSafetySnapshot();
@@ -670,6 +695,7 @@ export default function SettingsModal({
                   onExportWorkspace={runExportWorkspace}
                   onImportLocalAssets={onImportLocalAssets}
                   onImportWorkspace={runImportWorkspace}
+                  onImportBrowserWorkspaceToTeam={runImportBrowserWorkspaceToTeam}
                   onRefreshSummary={refreshDataSummary}
                   onRefreshStorageStatus={refreshStorageStatus}
                   onRepairAssetSources={onRepairAssetSources}
