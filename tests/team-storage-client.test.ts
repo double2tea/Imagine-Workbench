@@ -15,6 +15,7 @@ import {
   deleteTeamMember,
   deleteTeamSecret,
   downloadTeamWorkspaceBackup,
+  restoreTeamWorkspaceBackup,
   createTeamBoardDocument,
   deleteTeamBoardDocument,
   fetchTeamBoardDocument,
@@ -281,6 +282,61 @@ test("downloadTeamWorkspaceBackup downloads zip responses and parses counts", as
   } finally {
     restoreDom();
   }
+});
+
+test("restoreTeamWorkspaceBackup uploads zip backups with CSRF and parses restore results", async () => {
+  let requestedUrl = "";
+  let requestedInit: RequestInit | undefined;
+  const result = await restoreTeamWorkspaceBackup(
+    new File(["zip"], "backup.zip", { type: "application/zip" }),
+    false,
+    "csrf-token",
+    async (input, init) => {
+      requestedUrl = String(input);
+      requestedInit = init;
+      return jsonResponse({
+        assetCount: 1,
+        boardCount: 2,
+        fileName: "Team workspace restore",
+        generationTaskCount: 3,
+        libraryAssetCount: 4,
+        safetySnapshotId: "snapshot_1",
+        settingsKeyCount: 0,
+        targetKind: "postgres",
+        voiceProfileCount: 5,
+        workspaceId: "workspace_1",
+      });
+    },
+  );
+
+  assert.equal(requestedUrl, "/api/storage/team/backup");
+  assert.ok(requestedInit);
+  assert.equal(requestedInit.method, "POST");
+  assert.equal((requestedInit.headers as Record<string, string>)["x-imagine-csrf-token"], "csrf-token");
+  assert.ok(requestedInit.body instanceof FormData);
+  assert.deepEqual(result, {
+    assetCount: 1,
+    boardCount: 2,
+    fileName: "Team workspace restore",
+    generationTaskCount: 3,
+    libraryAssetCount: 4,
+    safetySnapshotId: "snapshot_1",
+    settingsKeyCount: 0,
+    targetKind: "postgres",
+    voiceProfileCount: 5,
+    workspaceId: "workspace_1",
+  });
+
+  await assert.rejects(
+    restoreTeamWorkspaceBackup(new File(["zip"], "backup.zip"), true, "", async () => jsonResponse({})),
+    /CSRF token is required/,
+  );
+  await assert.rejects(
+    restoreTeamWorkspaceBackup(new File(["zip"], "backup.zip"), true, "csrf-token", async () =>
+      jsonResponse({ error: "restore denied" }, { status: 400 }),
+    ),
+    /restore denied/,
+  );
 });
 
 test("teamAssetMediaUrl encodes asset ids and download intent", () => {

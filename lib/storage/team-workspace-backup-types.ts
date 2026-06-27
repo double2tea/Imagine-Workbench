@@ -5,3 +5,9 @@ export interface TeamWorkspaceBackupExport extends WorkspaceExportResult {
   targetKind: "postgres";
   workspaceId: string;
 }
+
+export interface TeamWorkspaceBackupRestoreResult extends WorkspaceExportResult {
+  safetySnapshotId: string;
+  targetKind: "postgres";
+  workspaceId: string;
+}

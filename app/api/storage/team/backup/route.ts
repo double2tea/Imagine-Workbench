@@ -1,7 +1,14 @@
-import { apiErrorResponse } from "@/lib/api/errors";
+import { apiErrorResponse, badRequest } from "@/lib/api/errors";
 import { PostgresStorageConfigError, resolvePostgresStorageConfig } from "@/lib/storage/postgres/config";
 import { withPostgresClient } from "@/lib/storage/postgres/connection";
-import { exportTeamWorkspaceBackup } from "@/lib/storage/team-workspace-backup";
+import {
+  assertTeamCsrf,
+  assertTrustedTeamRequestOrigin,
+} from "@/lib/storage/team-auth";
+import {
+  exportTeamWorkspaceBackup,
+  restoreTeamWorkspaceBackup,
+} from "@/lib/storage/team-workspace-backup";
 
 export const runtime = "nodejs";
 export const dynamic = "force-dynamic";
@@ -33,6 +40,34 @@ export async function GET(request: Request): Promise<Response> {
     });
   } catch (error) {
     const response = apiErrorResponse(error, "Team backup export failed");
+    return Response.json(response.body, {
+      status: error instanceof PostgresStorageConfigError ? 400 : response.status,
+    });
+  }
+}
+
+export async function POST(request: Request): Promise<Response> {
+  try {
+    assertTrustedTeamRequestOrigin(request, {
+      APP_URL: process.env.APP_URL,
+      IMAGINE_TRUSTED_ORIGINS: process.env.IMAGINE_TRUSTED_ORIGINS,
+    });
+    assertTeamCsrf(request);
+    const form = await request.formData();
+    const file = form.get("file");
+    if (!(file instanceof Blob)) throw badRequest("Backup file is required", "missing_team_backup_file");
+    const includeCredentials = form.get("includeCredentials") === "1";
+    const config = resolvePostgresStorageConfig(process.env);
+    const result = await withPostgresClient(config, client => restoreTeamWorkspaceBackup(
+      client,
+      config,
+      request,
+      file,
+      includeCredentials,
+    ));
+    return Response.json(result);
+  } catch (error) {
+    const response = apiErrorResponse(error, "Team backup restore failed");
     return Response.json(response.body, {
       status: error instanceof PostgresStorageConfigError ? 400 : response.status,
     });

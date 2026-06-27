@@ -89,6 +89,7 @@ function storageKeyForHash(contentHash: string, mimeType: string): string {
 }
 
 function payloadCategoryForMime(mimeType: string): string {
+  if (mimeType === "application/zip") return "backup";
   if (mimeType.startsWith("image/")) return "image";
   if (mimeType.startsWith("video/")) return "video";
   if (mimeType.startsWith("audio/")) return "audio";
@@ -97,6 +98,7 @@ function payloadCategoryForMime(mimeType: string): string {
 }
 
 function mimeExtensionFor(mimeType: string): string {
+  if (mimeType === "application/zip") return "zip";
   if (mimeType === "image/png") return "png";
   if (mimeType === "image/jpeg") return "jpg";
   if (mimeType === "image/webp") return "webp";

@@ -70,6 +70,7 @@ import type {
   TeamSettingSaveInput,
 } from "@/lib/storage/team-setting-types";
 import type { WorkspaceSettingGroup } from "@/lib/storage/schema";
+import type { TeamWorkspaceBackupRestoreResult } from "@/lib/storage/team-workspace-backup-types";
 import type { VoiceProfile } from "@/lib/voice-profiles";
 import type { WorkspaceExportResult } from "@/lib/workspace-backup-format";
 
@@ -414,6 +415,33 @@ export async function downloadTeamWorkspaceBackup(
     settingsKeyCount: readBackupCountHeader(response.headers, "x-imagine-settings-key-count"),
     voiceProfileCount: readBackupCountHeader(response.headers, "x-imagine-voice-profile-count"),
   };
+}
+
+export async function restoreTeamWorkspaceBackup(
+  file: File,
+  includeCredentials: boolean,
+  csrfToken: string,
+  fetcher: Fetcher = fetch,
+): Promise<TeamWorkspaceBackupRestoreResult> {
+  const token = csrfToken.trim();
+  if (!token) throw new Error("CSRF token is required");
+  const form = new FormData();
+  form.set("file", file);
+  if (includeCredentials) form.set("includeCredentials", "1");
+  const response = await fetcher(API_ROUTES.storage.teamBackup, {
+    body: form,
+    cache: "no-store",
+    headers: {
+      "x-imagine-csrf-token": token,
+    },
+    method: "POST",
+  });
+  const body: unknown = await response.json();
+  if (!response.ok) {
+    const error = readStringField(body, "error") ?? "Team backup restore failed";
+    throw new Error(error);
+  }
+  return parseTeamWorkspaceBackupRestoreResult(body);
 }
 
 export async function saveTeamPromptTemplate(
@@ -1127,6 +1155,25 @@ function parseTeamSafetySnapshotResult(value: unknown): TeamSafetySnapshotResult
   return value as unknown as TeamSafetySnapshotResult;
 }
 
+function parseTeamWorkspaceBackupRestoreResult(value: unknown): TeamWorkspaceBackupRestoreResult {
+  if (
+    !isRecord(value) ||
+    value.targetKind !== "postgres" ||
+    typeof value.workspaceId !== "string" ||
+    typeof value.safetySnapshotId !== "string" ||
+    !isNonNegativeInteger(value.assetCount) ||
+    !isNonNegativeInteger(value.boardCount) ||
+    typeof value.fileName !== "string" ||
+    !isNonNegativeInteger(value.generationTaskCount) ||
+    !isNonNegativeInteger(value.libraryAssetCount) ||
+    !isNonNegativeInteger(value.settingsKeyCount) ||
+    !isNonNegativeInteger(value.voiceProfileCount)
+  ) {
+    throw new Error("Team backup restore response is invalid");
+  }
+  return value as unknown as TeamWorkspaceBackupRestoreResult;
+}
+
 function parseTeamAssetListResult(value: unknown): TeamAssetListResult {
   if (!isTeamAssetListResult(value)) throw new Error("Team asset list response is invalid");
   return value;
@@ -1238,6 +1285,10 @@ function readBackupCountHeader(headers: Headers, key: string): number {
   const count = Number(value);
   if (!Number.isInteger(count) || count < 0) throw new Error("Team backup response is invalid");
   return count;
+}
+
+function isNonNegativeInteger(value: unknown): value is number {
+  return typeof value === "number" && Number.isInteger(value) && value >= 0;
 }
 
 function downloadBlob(blob: Blob, fileName: string): void {

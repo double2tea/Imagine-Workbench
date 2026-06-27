@@ -1,5 +1,5 @@
 import assert from "node:assert/strict";
-import { mkdir, mkdtemp, rm, writeFile } from "node:fs/promises";
+import { mkdir, mkdtemp, readFile, rm, writeFile } from "node:fs/promises";
 import os from "node:os";
 import path from "node:path";
 import test from "node:test";
@@ -11,7 +11,21 @@ import type { StorageItemMeta } from "../lib/db";
 import type { GenerationTask } from "../lib/generation-tasks";
 import type { PostgresQueryable } from "../lib/storage/postgres/connection";
 import { hashTeamSessionToken } from "../lib/storage/team-auth";
-import { exportTeamWorkspaceBackup } from "../lib/storage/team-workspace-backup";
+import {
+  exportTeamWorkspaceBackup,
+  restoreTeamWorkspaceBackup,
+} from "../lib/storage/team-workspace-backup";
+import {
+  ASSET_INDEX_FILE,
+  BACKUP_APP_NAME,
+  BOARD_INDEX_FILE,
+  GENERATION_TASK_INDEX_FILE,
+  LIBRARY_INDEX_FILE,
+  MANIFEST_FILE,
+  SETTINGS_FILE,
+  VOICE_PROFILE_INDEX_FILE,
+  WORKSPACE_BACKUP_SCHEMA_VERSION,
+} from "../lib/workspace-backup-format";
 import type { VoiceProfile } from "../lib/voice-profiles";
 
 const RAW_SESSION_TOKEN = "raw-session-token";
@@ -95,6 +109,55 @@ test("exportTeamWorkspaceBackup rejects credential-inclusive exports explicitly"
   });
 });
 
+test("restoreTeamWorkspaceBackup replaces team workspace records and stores a safety snapshot", async () => {
+  await withTempMediaDir(async mediaDir => {
+    const queries: Array<{ text: string; values?: readonly unknown[] }> = [];
+    const backup = await createPortableTeamBackup();
+    const result = await restoreTeamWorkspaceBackup(
+      createTeamBackupQueryable(queries, { existingRecords: false }),
+      { databaseUrl: "postgres://localhost/imagine", mediaDir },
+      requestWithSession(),
+      new Blob([backup], { type: "application/zip" }),
+      false,
+    );
+
+    assert.equal(result.targetKind, "postgres");
+    assert.equal(result.workspaceId, WORKSPACE_ID);
+    assert.equal(result.assetCount, 1);
+    assert.equal(result.boardCount, 1);
+    assert.equal(result.generationTaskCount, 1);
+    assert.equal(result.libraryAssetCount, 1);
+    assert.equal(result.settingsKeyCount, 0);
+    assert.equal(result.voiceProfileCount, 1);
+    assert.equal(typeof result.safetySnapshotId, "string");
+    assert.ok(queries.some(query => query.text === "begin"));
+    assert.ok(queries.some(query => query.text === "commit"));
+    assert.equal(queries.some(query => query.text === "rollback"), false);
+    assert.ok(queries.some(query => query.text.startsWith("insert into safety_snapshots")));
+    assert.ok(queries.some(query => query.values?.[2] === "team_backup.restore"));
+    const payloadInsert = queries.find(query => query.text.includes("insert into asset_payloads") && query.values?.[0] === "asset_1");
+    assert.ok(payloadInsert);
+    assert.equal(payloadInsert.values?.[2], "image/png");
+    assert.equal(await readFile(path.join(mediaDir, ...String(payloadInsert.values?.[5]).split("/")), "utf8"), "image-bytes");
+  });
+});
+
+test("restoreTeamWorkspaceBackup rejects credential-inclusive restores explicitly", async () => {
+  await withTempMediaDir(async mediaDir => {
+    const backup = await createPortableTeamBackup();
+    await assert.rejects(
+      restoreTeamWorkspaceBackup(
+        createTeamBackupQueryable([], { existingRecords: false }),
+        { databaseUrl: "postgres://localhost/imagine", mediaDir },
+        requestWithSession(),
+        new Blob([backup], { type: "application/zip" }),
+        true,
+      ),
+      /credential-inclusive backup restore is not available yet/,
+    );
+  });
+});
+
 async function withTempMediaDir<T>(run: (mediaDir: string) => Promise<T>): Promise<T> {
   const mediaDir = await mkdtemp(path.join(os.tmpdir(), "imagine-team-backup-"));
   try {
@@ -124,28 +187,66 @@ function requestWithSession(): Request {
 
 function createTeamBackupQueryable(
   queries: Array<{ text: string; values?: readonly unknown[] }> = [],
+  options: { existingRecords?: boolean } = {},
 ): PostgresQueryable {
+  const existingRecords = options.existingRecords ?? true;
   return {
     query: async <T extends QueryResultRow = QueryResultRow>(text: string, values?: readonly unknown[]) => {
       queries.push({ text, values });
+      if (text === "begin" || text === "commit" || text === "rollback") return typedQueryResult<T>([]);
       if (text.includes("from sessions")) return typedQueryResult<T>([SESSION_ROW]);
-      if (text.includes("select meta from assets")) return typedQueryResult<T>([{ meta: ASSET_META }]);
+      if (text.includes("select meta from assets")) return typedQueryResult<T>(existingRecords ? [{ meta: ASSET_META }] : []);
       if (text.includes("from asset_payloads where asset_id")) {
-        return typedQueryResult<T>([{
+        return typedQueryResult<T>(existingRecords ? [{
           content_hash: "hash",
           mime_type: "image/png",
           size_bytes: "11",
           storage_key: "originals/image/asset.png",
           storage_kind: "local-file",
-        }]);
+        }] : []);
       }
-      if (text.includes("select record from asset_library")) return typedQueryResult<T>([{ record: LIBRARY_RECORD }]);
-      if (text.includes("select boards.board")) return typedQueryResult<T>([{ board: BOARD, summary: null }]);
-      if (text.includes("select task from generation_tasks")) return typedQueryResult<T>([{ task: GENERATION_TASK }]);
-      if (text.includes("select profile from voice_profiles")) return typedQueryResult<T>([{ profile: VOICE_PROFILE }]);
+      if (text.includes("select record from asset_library")) return typedQueryResult<T>(existingRecords ? [{ record: LIBRARY_RECORD }] : []);
+      if (text.includes("select boards.board")) return typedQueryResult<T>(existingRecords ? [{ board: BOARD, summary: null }] : []);
+      if (text.includes("select task from generation_tasks")) return typedQueryResult<T>(existingRecords ? [{ task: GENERATION_TASK }] : []);
+      if (text.includes("select profile from voice_profiles")) return typedQueryResult<T>(existingRecords ? [{ profile: VOICE_PROFILE }] : []);
       return typedQueryResult<T>([]);
     },
   };
+}
+
+async function createPortableTeamBackup(): Promise<ArrayBuffer> {
+  const zip = new JSZip();
+  zip.file(MANIFEST_FILE, JSON.stringify({
+    app: BACKUP_APP_NAME,
+    assetsFile: ASSET_INDEX_FILE,
+    boardsFile: BOARD_INDEX_FILE,
+    counts: {
+      assets: 1,
+      boards: 1,
+      generationTasks: 1,
+      libraryAssets: 1,
+      settingsKeys: 0,
+      voiceProfiles: 1,
+    },
+    exportedAt: CREATED_AT,
+    generationTasksFile: GENERATION_TASK_INDEX_FILE,
+    libraryFile: LIBRARY_INDEX_FILE,
+    schemaVersion: WORKSPACE_BACKUP_SCHEMA_VERSION,
+    settingsFile: SETTINGS_FILE,
+    voiceProfilesFile: VOICE_PROFILE_INDEX_FILE,
+  }));
+  zip.file(ASSET_INDEX_FILE, JSON.stringify([{
+    ...ASSET_META,
+    mediaFile: "assets/media/asset_1.png",
+    mediaMimeType: "image/png",
+  }]));
+  zip.file("assets/media/asset_1.png", "image-bytes");
+  zip.file(LIBRARY_INDEX_FILE, JSON.stringify([LIBRARY_RECORD]));
+  zip.file(BOARD_INDEX_FILE, JSON.stringify([BOARD]));
+  zip.file(GENERATION_TASK_INDEX_FILE, JSON.stringify([GENERATION_TASK]));
+  zip.file(VOICE_PROFILE_INDEX_FILE, JSON.stringify([VOICE_PROFILE]));
+  zip.file(SETTINGS_FILE, JSON.stringify({ localStorage: {} }));
+  return zip.generateAsync({ type: "arraybuffer" });
 }
 
 const SESSION_ROW = {

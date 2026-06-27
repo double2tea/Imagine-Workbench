@@ -120,6 +120,7 @@ export async function getTeamWorkspaceDataSummary(
   const payloadStorageKeys = payloadsResult.rows
     .filter(row => row.storage_kind === "local-file")
     .map(row => row.storage_key);
+  if (latestSnapshot?.payload.kind === "local-file") payloadStorageKeys.push(latestSnapshot.payload.uri);
   const previewStorageKeys = previewsResult.rows
     .filter(row => row.storage_kind === "local-file" && row.storage_key)
     .map(row => row.storage_key ?? "");

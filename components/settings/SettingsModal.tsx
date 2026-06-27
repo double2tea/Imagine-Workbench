@@ -32,6 +32,7 @@ import {
   logoutTeamSession,
   readTeamCsrfToken,
   fetchWorkspaceStorageRuntimeStatus,
+  restoreTeamWorkspaceBackup,
   runTeamStorageMigrations,
   updateTeamMemberRole,
   type TeamSessionContext,
@@ -398,8 +399,12 @@ export default function SettingsModal({
       await onImportWorkspace(file, includeCredentials);
       return;
     }
-    throw new Error(t("dataManagement.teamRestoreUnsupported"));
-  }, [onImportWorkspace, storageStatus?.mode, t]);
+    if (!teamSession) throw new Error(t("dataManagement.teamSessionRequired"));
+    const csrfToken = readTeamCsrfToken();
+    if (!csrfToken) throw new Error(t("dataManagement.teamSessionCsrfMissing"));
+    await restoreTeamWorkspaceBackup(file, includeCredentials, csrfToken);
+    await refreshDataSummary();
+  }, [onImportWorkspace, refreshDataSummary, storageStatus?.mode, t, teamSession]);
 
   const runDownloadSafetySnapshot = useCallback(async () => {
     if (storageStatus?.mode !== "postgres") {

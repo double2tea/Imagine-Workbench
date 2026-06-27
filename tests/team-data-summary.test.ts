@@ -38,6 +38,7 @@ test("getTeamWorkspaceDataSummary returns PostgreSQL workspace data health stats
     await writeMediaFile(mediaDir, PAYLOAD_STORAGE_KEY);
     await writeMediaFile(mediaDir, "originals/image/orphan.png");
     await writeMediaFile(mediaDir, "previews/image/orphan.webp");
+    await writeMediaFile(mediaDir, "backups/latest.zip");
     await writeMediaFile(mediaDir, "tmp/staged.part");
     await writeMediaFile(mediaDir, "trash/old.png");
 

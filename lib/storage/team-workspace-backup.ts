@@ -1,16 +1,26 @@
 import JSZip from "jszip";
+import { randomUUID } from "node:crypto";
 import { badRequest } from "@/lib/api/errors";
-import type { StorageItemMeta, StorageItemType } from "@/lib/db";
+import type { BoardDocument } from "@/lib/board/types";
+import type { LibraryAssetRecord, StorageItemMeta, StorageItemType } from "@/lib/db";
+import type { GenerationTask } from "@/lib/generation-tasks";
+import { dataUriToBlob, parseDataUri } from "@/lib/providers/utils";
+import { LocalFilePayloadStore } from "@/lib/storage/local-file-payload-store";
 import type { PostgresStorageConfig } from "@/lib/storage/postgres/config";
 import type { PostgresQueryable } from "@/lib/storage/postgres/connection";
+import type { WorkspaceStorageRepository } from "@/lib/storage/repository";
 import type {
   WorkspaceAssetRecord,
   WorkspaceAssetPayloadRef,
+  WorkspaceSafetySnapshotRecord,
 } from "@/lib/storage/schema";
 import { recordTeamAuditEvent } from "@/lib/storage/team-audit";
 import { createTeamWorkspaceStorageContext } from "@/lib/storage/team-context";
 import { redactTeamBoardDocument } from "@/lib/storage/team-boards";
-import type { TeamWorkspaceBackupExport } from "@/lib/storage/team-workspace-backup-types";
+import type {
+  TeamWorkspaceBackupExport,
+  TeamWorkspaceBackupRestoreResult,
+} from "@/lib/storage/team-workspace-backup-types";
 import {
   ASSET_INDEX_FILE,
   BACKUP_APP_NAME,
@@ -18,12 +28,16 @@ import {
   GENERATION_TASK_INDEX_FILE,
   LIBRARY_INDEX_FILE,
   MANIFEST_FILE,
+  MAX_BACKUP_FILE_COUNT,
   SETTINGS_FILE,
+  SUPPORTED_WORKSPACE_BACKUP_SCHEMA_VERSIONS,
   VOICE_PROFILE_INDEX_FILE,
   WORKSPACE_BACKUP_SCHEMA_VERSION,
   type WorkspaceBackupAssetRecord,
   type WorkspaceBackupManifest,
+  type WorkspaceBackupSettings,
 } from "@/lib/workspace-backup-format";
+import type { VoiceProfile } from "@/lib/voice-profiles";
 
 const BACKUP_PAGE_SIZE = 500;
 
@@ -108,6 +122,82 @@ export async function exportTeamWorkspaceBackup(
   };
 }
 
+export async function restoreTeamWorkspaceBackup(
+  queryable: PostgresQueryable,
+  config: PostgresStorageConfig,
+  request: Request,
+  backupFile: Blob,
+  includeCredentials: boolean,
+): Promise<TeamWorkspaceBackupRestoreResult> {
+  if (includeCredentials) {
+    throw badRequest(
+      "PostgreSQL credential-inclusive backup restore is not available yet",
+      "team_restore_credentials_unsupported",
+    );
+  }
+  const context = await createTeamWorkspaceStorageContext(queryable, config, request, { minimumRole: "admin" });
+  const parsed = await parseTeamWorkspaceBackup(backupFile);
+  if (Object.keys(parsed.settings.localStorage).length > 0) {
+    throw badRequest(
+      "PostgreSQL backup settings restore is not available yet",
+      "team_restore_settings_unsupported",
+    );
+  }
+  const safetySnapshot = await createTeamRestoreSafetySnapshot(queryable, config, request);
+  const writtenPayloads: WorkspaceAssetPayloadRef[] = [];
+  await context.queryable.query("begin");
+  try {
+    await clearTeamWorkspace(context.repository);
+    for (const asset of parsed.assets) {
+      const payload = await restoreTeamAsset(context.repository, asset, writtenPayloads);
+      await context.repository.assets.put({ meta: payload ? assetMetaWithPayload(asset.record, payload) : assetRecordToMeta(asset.record), payload });
+    }
+    for (const board of parsed.boards) {
+      await context.repository.boards.put(board);
+    }
+    for (const record of parsed.libraryAssets) {
+      await context.repository.assetLibrary.put({ record });
+    }
+    for (const task of parsed.generationTasks) {
+      await context.repository.generationTasks.put(task);
+    }
+    for (const profile of parsed.voiceProfiles) {
+      await context.repository.voiceProfiles.put({ profile });
+    }
+    await recordTeamAuditEvent(context.queryable, {
+      eventType: "team_backup.restore",
+      metadata: {
+        assetCount: parsed.assets.length,
+        boardCount: parsed.boards.length,
+        generationTaskCount: parsed.generationTasks.length,
+        libraryAssetCount: parsed.libraryAssets.length,
+        safetySnapshotId: safetySnapshot.id,
+        settingsKeyCount: 0,
+        voiceProfileCount: parsed.voiceProfiles.length,
+      },
+      userId: context.session.userId,
+      workspaceId: context.session.workspaceId,
+    });
+    await context.queryable.query("commit");
+  } catch (error) {
+    await context.queryable.query("rollback");
+    await Promise.allSettled(writtenPayloads.map(ref => context.repository.payloads.delete(ref)));
+    throw error;
+  }
+  return {
+    assetCount: parsed.assets.length,
+    boardCount: parsed.boards.length,
+    fileName: "Team workspace restore",
+    generationTaskCount: parsed.generationTasks.length,
+    libraryAssetCount: parsed.libraryAssets.length,
+    safetySnapshotId: safetySnapshot.id,
+    settingsKeyCount: 0,
+    targetKind: "postgres",
+    voiceProfileCount: parsed.voiceProfiles.length,
+    workspaceId: context.session.workspaceId,
+  };
+}
+
 async function listAll<T>(load: (offset: number) => Promise<T[]>): Promise<T[]> {
   const all: T[] = [];
   for (let offset = 0; ; offset += BACKUP_PAGE_SIZE) {
@@ -115,6 +205,115 @@ async function listAll<T>(load: (offset: number) => Promise<T[]>): Promise<T[]> 
     all.push(...page);
     if (page.length < BACKUP_PAGE_SIZE) return all;
   }
+}
+
+async function createTeamRestoreSafetySnapshot(
+  queryable: PostgresQueryable,
+  config: PostgresStorageConfig,
+  request: Request,
+): Promise<WorkspaceSafetySnapshotRecord> {
+  const snapshotExport = await exportTeamWorkspaceBackup(queryable, config, request, false);
+  const createdAt = new Date().toISOString();
+  const id = randomUUID();
+  const payload = await new LocalFilePayloadStore(config.mediaDir).write({
+    blob: new Blob([snapshotExport.body], { type: "application/zip" }),
+    mimeType: "application/zip",
+  });
+  const context = await createTeamWorkspaceStorageContext(queryable, config, request, { minimumRole: "admin" });
+  const snapshot: WorkspaceSafetySnapshotRecord = {
+    assetCount: snapshotExport.assetCount,
+    boardCount: snapshotExport.boardCount,
+    createdAt,
+    fileName: snapshotExport.fileName,
+    generationTaskCount: snapshotExport.generationTaskCount,
+    id,
+    libraryAssetCount: snapshotExport.libraryAssetCount,
+    origin: new URL(request.url).origin,
+    payload,
+    reason: "restore-workspace",
+    settingsKeyCount: snapshotExport.settingsKeyCount,
+    sizeBytes: snapshotExport.body.byteLength,
+    voiceProfileCount: snapshotExport.voiceProfileCount,
+  };
+  await context.repository.safetySnapshots.put(snapshot);
+  await recordTeamAuditEvent(context.queryable, {
+    eventType: "safety_snapshot.save",
+    metadata: {
+      assetCount: snapshot.assetCount,
+      boardCount: snapshot.boardCount,
+      id: snapshot.id,
+      reason: snapshot.reason,
+      sizeBytes: snapshot.sizeBytes,
+    },
+    userId: context.session.userId,
+    workspaceId: context.session.workspaceId,
+  });
+  return snapshot;
+}
+
+async function clearTeamWorkspace(repository: WorkspaceStorageRepository): Promise<void> {
+  const [libraryRecords, generationTasks, voiceProfiles, boards, assets] = await Promise.all([
+    listAll(offset => repository.assetLibrary.list({ limit: BACKUP_PAGE_SIZE, offset })),
+    listAll(offset => repository.generationTasks.list({ limit: BACKUP_PAGE_SIZE, offset })),
+    listAll(offset => repository.voiceProfiles.list({ limit: BACKUP_PAGE_SIZE, offset })),
+    listAll(offset => repository.boards.list({ limit: BACKUP_PAGE_SIZE, offset })),
+    listAll(offset => repository.assets.list({ limit: BACKUP_PAGE_SIZE, offset })),
+  ]);
+  for (const record of libraryRecords) await repository.assetLibrary.delete(record.record.id);
+  for (const task of generationTasks) await repository.generationTasks.delete(task.task.id);
+  for (const profile of voiceProfiles) await repository.voiceProfiles.delete(profile.profile.id);
+  for (const board of boards) await repository.boards.delete(board.board.id);
+  for (const asset of assets) await repository.assets.delete(asset.meta.id);
+}
+
+async function restoreTeamAsset(
+  repository: WorkspaceStorageRepository,
+  asset: ParsedTeamBackupAsset,
+  writtenPayloads: WorkspaceAssetPayloadRef[],
+): Promise<WorkspaceAssetPayloadRef | undefined> {
+  const meta = assetRecordToMeta(asset.record);
+  await repository.assets.put({ meta });
+  const payloadInput = await teamBackupAssetPayload(asset);
+  if (!payloadInput) return undefined;
+  const payload = await repository.payloads.write({
+    assetId: meta.id,
+    blob: payloadInput.blob,
+    mimeType: payloadInput.mimeType,
+  });
+  writtenPayloads.push(payload);
+  return payload;
+}
+
+function assetRecordToMeta(record: WorkspaceBackupAssetRecord): StorageItemMeta {
+  const { mediaFile: _mediaFile, mediaMimeType: _mediaMimeType, url, ...meta } = record;
+  void _mediaFile;
+  void _mediaMimeType;
+  return {
+    ...meta,
+    hasBlob: Boolean(record.mediaFile || url?.startsWith("data:") || record.hasBlob),
+    url: url?.startsWith("data:") ? undefined : url,
+  };
+}
+
+function assetMetaWithPayload(record: WorkspaceBackupAssetRecord, payload: WorkspaceAssetPayloadRef): StorageItemMeta {
+  return {
+    ...assetRecordToMeta(record),
+    contentHash: payload.contentHash,
+    hasBlob: true,
+    url: undefined,
+  };
+}
+
+async function teamBackupAssetPayload(asset: ParsedTeamBackupAsset): Promise<{ blob: Blob; mimeType: string } | null> {
+  if (asset.media) return asset.media;
+  const url = asset.record.url;
+  if (!url?.startsWith("data:")) {
+    if (asset.record.hasBlob) throw badRequest(`Asset ${asset.record.id} is missing media content`, "invalid_team_backup");
+    return null;
+  }
+  const { mimeType } = parseDataUri(url);
+  validateAssetMimeType(asset.record.id, asset.record.type, mimeType);
+  return { blob: dataUriToBlob(url), mimeType };
 }
 
 async function addTeamAssetToZip(
@@ -141,11 +340,305 @@ async function addTeamAssetToZip(
   };
 }
 
+interface ParsedTeamWorkspaceBackup {
+  assets: ParsedTeamBackupAsset[];
+  boards: BoardDocument[];
+  generationTasks: GenerationTask[];
+  libraryAssets: LibraryAssetRecord[];
+  settings: WorkspaceBackupSettings;
+  voiceProfiles: VoiceProfile[];
+}
+
+interface ParsedTeamBackupAsset {
+  media?: {
+    blob: Blob;
+    mimeType: string;
+  };
+  record: WorkspaceBackupAssetRecord;
+}
+
+async function parseTeamWorkspaceBackup(file: Blob): Promise<ParsedTeamWorkspaceBackup> {
+  const zip = await JSZip.loadAsync(await file.arrayBuffer());
+  if (Object.keys(zip.files).length > MAX_BACKUP_FILE_COUNT) {
+    throw badRequest("Backup file count exceeds the limit", "invalid_team_backup");
+  }
+  const manifest = parseTeamBackupManifest(await readRequiredZipText(zip, MANIFEST_FILE));
+  const assetRecords = parseTeamAssetRecords(await readRequiredZipText(zip, manifest.assetsFile));
+  const libraryAssets = manifest.libraryFile
+    ? parseRecordArray<LibraryAssetRecord>(await readRequiredZipText(zip, manifest.libraryFile), "library")
+    : [];
+  const boards = parseRecordArray<BoardDocument>(await readRequiredZipText(zip, manifest.boardsFile), "boards");
+  const generationTasks = manifest.generationTasksFile
+    ? parseRecordArray<GenerationTask>(await readRequiredZipText(zip, manifest.generationTasksFile), "generation tasks")
+    : [];
+  const voiceProfiles = manifest.voiceProfilesFile
+    ? parseRecordArray<VoiceProfile>(await readRequiredZipText(zip, manifest.voiceProfilesFile), "voice profiles")
+    : [];
+  const settings = manifest.settingsFile
+    ? parseTeamBackupSettings(await readRequiredZipText(zip, manifest.settingsFile))
+    : { localStorage: {} };
+  if (manifest.counts.assets !== assetRecords.length) throw badRequest("Backup asset count does not match manifest", "invalid_team_backup");
+  if (manifest.counts.boards !== boards.length) throw badRequest("Backup board count does not match manifest", "invalid_team_backup");
+  if ((manifest.counts.generationTasks ?? 0) !== generationTasks.length) {
+    throw badRequest("Backup generation task count does not match manifest", "invalid_team_backup");
+  }
+  if ((manifest.counts.libraryAssets ?? 0) !== libraryAssets.length) {
+    throw badRequest("Backup library count does not match manifest", "invalid_team_backup");
+  }
+  if ((manifest.counts.voiceProfiles ?? 0) !== voiceProfiles.length) {
+    throw badRequest("Backup voice profile count does not match manifest", "invalid_team_backup");
+  }
+  if (manifest.counts.settingsKeys !== Object.keys(settings.localStorage).length) {
+    throw badRequest("Backup settings count does not match manifest", "invalid_team_backup");
+  }
+  validateImportedReferences({
+    assetIds: new Set(assetRecords.map(asset => asset.id)),
+    generationTasks,
+    libraryAssets,
+    voiceProfiles,
+  });
+  return {
+    assets: await Promise.all(assetRecords.map(record => parseTeamBackupAssetMedia(zip, record))),
+    boards,
+    generationTasks,
+    libraryAssets,
+    settings,
+    voiceProfiles,
+  };
+}
+
+async function parseTeamBackupAssetMedia(
+  zip: JSZip,
+  record: WorkspaceBackupAssetRecord,
+): Promise<ParsedTeamBackupAsset> {
+  if (!record.mediaFile) return { record };
+  if (!record.mediaMimeType) throw badRequest(`Asset ${record.id} is missing media MIME`, "invalid_team_backup");
+  validateAssetMimeType(record.id, record.type, record.mediaMimeType);
+  const mediaFile = zip.file(record.mediaFile);
+  if (!mediaFile) throw badRequest(`Asset ${record.id} is missing media file`, "invalid_team_backup");
+  const data = await mediaFile.async("uint8array");
+  const bytes = new Uint8Array(data);
+  return {
+    media: {
+      blob: new Blob([bytes], { type: record.mediaMimeType }),
+      mimeType: record.mediaMimeType,
+    },
+    record,
+  };
+}
+
+async function readRequiredZipText(zip: JSZip, filePath: string): Promise<string> {
+  const file = zip.file(filePath);
+  if (!file) throw badRequest(`Backup is missing ${filePath}`, "invalid_team_backup");
+  return file.async("text");
+}
+
+function parseTeamBackupManifest(text: string): WorkspaceBackupManifest {
+  const value = parseJsonRecord(text, "manifest");
+  const app = readString(value, "app");
+  const schemaVersion = readNumber(value, "schemaVersion");
+  if (app !== BACKUP_APP_NAME) throw badRequest("Backup is not an Imagine Workbench backup", "invalid_team_backup");
+  if (!SUPPORTED_WORKSPACE_BACKUP_SCHEMA_VERSIONS.has(schemaVersion)) {
+    throw badRequest("Backup schema version is unsupported", "invalid_team_backup");
+  }
+  const counts = readRecord(value, "counts");
+  return {
+    app,
+    schemaVersion,
+    exportedAt: readString(value, "exportedAt"),
+    assetsFile: readLiteral(value, "assetsFile", ASSET_INDEX_FILE),
+    boardsFile: readLiteral(value, "boardsFile", BOARD_INDEX_FILE),
+    generationTasksFile: readOptionalLiteral(value, "generationTasksFile", GENERATION_TASK_INDEX_FILE),
+    libraryFile: readOptionalLiteral(value, "libraryFile", LIBRARY_INDEX_FILE),
+    settingsFile: readOptionalLiteral(value, "settingsFile", SETTINGS_FILE),
+    voiceProfilesFile: readOptionalLiteral(value, "voiceProfilesFile", VOICE_PROFILE_INDEX_FILE),
+    counts: {
+      assets: readNumber(counts, "assets"),
+      boards: readNumber(counts, "boards"),
+      generationTasks: readOptionalNumber(counts, "generationTasks"),
+      libraryAssets: readOptionalNumber(counts, "libraryAssets"),
+      settingsKeys: readNumber(counts, "settingsKeys"),
+      voiceProfiles: readOptionalNumber(counts, "voiceProfiles"),
+    },
+  };
+}
+
+function parseTeamAssetRecords(text: string): WorkspaceBackupAssetRecord[] {
+  const value = parseJsonArray(text, "assets");
+  const seenIds = new Set<string>();
+  return value.map((item, index) => {
+    if (!isRecord(item)) throw badRequest(`Asset ${index + 1} is invalid`, "invalid_team_backup");
+    const id = readString(item, "id");
+    if (seenIds.has(id)) throw badRequest(`Duplicate asset id ${id}`, "invalid_team_backup");
+    seenIds.add(id);
+    return {
+      aspectRatio: readString(item, "aspectRatio"),
+      boardId: readOptionalString(item, "boardId") ?? "",
+      contentHash: readOptionalString(item, "contentHash"),
+      createdAt: readString(item, "createdAt"),
+      cropDerivative: readOptionalUnknown(item, "cropDerivative") as WorkspaceBackupAssetRecord["cropDerivative"],
+      errorMessage: readOptionalString(item, "errorMessage"),
+      generationRequest: readOptionalUnknown(item, "generationRequest") as WorkspaceBackupAssetRecord["generationRequest"],
+      hasBlob: readOptionalBoolean(item, "hasBlob") ?? Boolean(readOptionalString(item, "mediaFile")),
+      id,
+      libraryItemId: readOptionalString(item, "libraryItemId"),
+      maskOriginalId: readOptionalString(item, "maskOriginalId"),
+      mediaFile: readOptionalSafePath(item, "mediaFile"),
+      mediaMimeType: readOptionalString(item, "mediaMimeType"),
+      model: readString(item, "model"),
+      operationName: readOptionalString(item, "operationName"),
+      progress: readNumber(item, "progress"),
+      prompt: readString(item, "prompt"),
+      scope: item.scope === "board" ? "board" : "workspace",
+      sourceBoardNodeId: readOptionalString(item, "sourceBoardNodeId"),
+      sourceBoardResultStackKey: readOptionalString(item, "sourceBoardResultStackKey"),
+      status: readAssetStatus(item, "status"),
+      type: readAssetType(item, "type"),
+      url: readOptionalString(item, "url"),
+    };
+  });
+}
+
+function parseTeamBackupSettings(text: string): WorkspaceBackupSettings {
+  const value = parseJsonRecord(text, "settings");
+  const localStorage = readRecord(value, "localStorage");
+  const entries: Record<string, string> = {};
+  for (const [key, item] of Object.entries(localStorage)) {
+    if (typeof item !== "string") throw badRequest(`Setting ${key} is invalid`, "invalid_team_backup");
+    entries[key] = item;
+  }
+  return { localStorage: entries };
+}
+
+function parseRecordArray<T>(text: string, label: string): T[] {
+  const value = parseJsonArray(text, label);
+  for (const [index, item] of value.entries()) {
+    if (!isRecord(item)) throw badRequest(`${label} item ${index + 1} is invalid`, "invalid_team_backup");
+  }
+  return value as T[];
+}
+
+function validateImportedReferences(input: {
+  assetIds: Set<string>;
+  generationTasks: GenerationTask[];
+  libraryAssets: LibraryAssetRecord[];
+  voiceProfiles: VoiceProfile[];
+}): void {
+  for (const record of input.libraryAssets) {
+    if (!input.assetIds.has(record.assetId)) throw badRequest(`Library record ${record.id} references a missing asset`, "invalid_team_backup");
+  }
+  for (const task of input.generationTasks) {
+    for (const assetId of [...task.resultAssetIds, ...(task.activeResultAssetId ? [task.activeResultAssetId] : [])]) {
+      if (!input.assetIds.has(assetId)) throw badRequest(`Generation task ${task.id} references a missing asset`, "invalid_team_backup");
+    }
+  }
+  for (const profile of input.voiceProfiles) {
+    const refs = [
+      ...profile.referenceAudioAssetIds,
+      ...(profile.sourceAssetIds ?? []),
+      ...(profile.previewAudioAssetId ? [profile.previewAudioAssetId] : []),
+    ];
+    for (const assetId of refs) {
+      if (!input.assetIds.has(assetId)) throw badRequest(`Voice profile ${profile.id} references a missing asset`, "invalid_team_backup");
+    }
+  }
+}
+
+function parseJsonRecord(text: string, label: string): Record<string, unknown> {
+  const value: unknown = JSON.parse(text);
+  if (!isRecord(value)) throw badRequest(`${label} must be an object`, "invalid_team_backup");
+  return value;
+}
+
+function parseJsonArray(text: string, label: string): unknown[] {
+  const value: unknown = JSON.parse(text);
+  if (!Array.isArray(value)) throw badRequest(`${label} must be an array`, "invalid_team_backup");
+  return value;
+}
+
+function readRecord(record: Record<string, unknown>, key: string): Record<string, unknown> {
+  const value = record[key];
+  if (!isRecord(value)) throw badRequest(`${key} must be an object`, "invalid_team_backup");
+  return value;
+}
+
+function readString(record: Record<string, unknown>, key: string): string {
+  const value = record[key];
+  if (typeof value !== "string" || !value.trim()) throw badRequest(`${key} is required`, "invalid_team_backup");
+  return value;
+}
+
+function readOptionalString(record: Record<string, unknown>, key: string): string | undefined {
+  const value = record[key];
+  return typeof value === "string" && value.trim() ? value : undefined;
+}
+
+function readOptionalSafePath(record: Record<string, unknown>, key: string): string | undefined {
+  const value = readOptionalString(record, key);
+  if (!value) return undefined;
+  if (value.startsWith("/") || value.split(/[\\/]+/).some(part => part === "" || part === "..")) {
+    throw badRequest(`${key} is invalid`, "invalid_team_backup");
+  }
+  return value;
+}
+
+function readNumber(record: Record<string, unknown>, key: string): number {
+  const value = record[key];
+  if (typeof value !== "number" || !Number.isFinite(value)) throw badRequest(`${key} must be a number`, "invalid_team_backup");
+  return value;
+}
+
+function readOptionalNumber(record: Record<string, unknown>, key: string): number | undefined {
+  return record[key] === undefined ? undefined : readNumber(record, key);
+}
+
+function readOptionalBoolean(record: Record<string, unknown>, key: string): boolean | undefined {
+  const value = record[key];
+  return typeof value === "boolean" ? value : undefined;
+}
+
+function readOptionalUnknown(record: Record<string, unknown>, key: string): unknown {
+  return record[key];
+}
+
+function readLiteral<T extends string>(record: Record<string, unknown>, key: string, expected: T): T {
+  if (record[key] !== expected) throw badRequest(`${key} is invalid`, "invalid_team_backup");
+  return expected;
+}
+
+function readOptionalLiteral<T extends string>(record: Record<string, unknown>, key: string, expected: T): T | undefined {
+  if (record[key] === undefined) return undefined;
+  return readLiteral(record, key, expected);
+}
+
+function readAssetType(record: Record<string, unknown>, key: string): StorageItemType {
+  const value = record[key];
+  if (value === "image" || value === "video" || value === "audio" || value === "transcript") return value;
+  throw badRequest(`${key} is invalid`, "invalid_team_backup");
+}
+
+function readAssetStatus(record: Record<string, unknown>, key: string): StorageItemMeta["status"] {
+  const value = record[key];
+  if (value === "complete" || value === "processing" || value === "failed") return value;
+  throw badRequest(`${key} is invalid`, "invalid_team_backup");
+}
+
+function isRecord(value: unknown): value is Record<string, unknown> {
+  return typeof value === "object" && value !== null && !Array.isArray(value);
+}
+
 function redactAssetMeta(meta: StorageItemMeta): StorageItemMeta {
   if (!meta.generationRequest?.runningHubAccessPassword) return meta;
   const { runningHubAccessPassword: _runningHubAccessPassword, ...generationRequest } = meta.generationRequest;
   void _runningHubAccessPassword;
   return { ...meta, generationRequest };
+}
+
+function validateAssetMimeType(id: string, type: StorageItemType, mimeType: string): void {
+  if (type === "image" && !mimeType.startsWith("image/")) throw badRequest(`Asset ${id} media type is not image`, "invalid_team_backup");
+  if (type === "video" && !mimeType.startsWith("video/")) throw badRequest(`Asset ${id} media type is not video`, "invalid_team_backup");
+  if (type === "audio" && !mimeType.startsWith("audio/")) throw badRequest(`Asset ${id} media type is not audio`, "invalid_team_backup");
+  if (type === "transcript" && mimeType !== "text/plain") throw badRequest(`Asset ${id} media type is not text`, "invalid_team_backup");
 }
 
 function mediaExtension(mimeType: string, type: StorageItemType): string {
