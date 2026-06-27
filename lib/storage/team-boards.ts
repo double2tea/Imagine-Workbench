@@ -17,6 +17,10 @@ interface TeamBoardVersionRow extends QueryResultRow {
   version: number | string;
 }
 
+interface TeamBoardExistsRow extends QueryResultRow {
+  id: string;
+}
+
 export async function listTeamBoardSummaries(
   queryable: PostgresQueryable,
   config: PostgresStorageConfig,
@@ -60,6 +64,43 @@ export async function getTeamBoardDocument(
   };
 }
 
+export async function createTeamBoardDocument(
+  queryable: PostgresQueryable,
+  config: PostgresStorageConfig,
+  request: Request,
+  board: BoardDocument,
+): Promise<TeamBoardDocumentResult> {
+  assertTeamBoardDocumentSafeForWrite(board);
+  const context = await createTeamWorkspaceStorageContext(queryable, config, request, { minimumRole: "editor" });
+  const summary = toBoardSummary(board);
+  await context.queryable.query("begin");
+  try {
+    const insertResult = await context.queryable.query<TeamBoardVersionRow>(
+      `insert into boards (id, workspace_id, board, updated_at)
+       values ($1, $2, $3, now())
+       on conflict (id) do nothing
+       returning version`,
+      [board.id, context.session.workspaceId, board],
+    );
+    const version = insertResult.rows[0]?.version;
+    if (version === undefined) {
+      throw new ApiError(409, "team_board_already_exists", "Team board already exists");
+    }
+    await upsertTeamBoardSummary(context.queryable, board.id, context.session.workspaceId, summary);
+    await context.queryable.query("commit");
+    return {
+      board: redactTeamBoardDocument(board),
+      summary,
+      targetKind: "postgres",
+      version: Number(version),
+      workspaceId: context.session.workspaceId,
+    };
+  } catch (error) {
+    await context.queryable.query("rollback");
+    throw error;
+  }
+}
+
 export async function saveTeamBoardDocument(
   queryable: PostgresQueryable,
   config: PostgresStorageConfig,
@@ -90,12 +131,7 @@ export async function saveTeamBoardDocument(
       }
       throw new ApiError(404, "team_board_not_found", "Team board was not found");
     }
-    await context.queryable.query(
-      `insert into board_summaries (board_id, workspace_id, summary, updated_at)
-       values ($1, $2, $3, now())
-       on conflict (board_id) do update set summary = excluded.summary, updated_at = now()`,
-      [board.id, context.session.workspaceId, summary],
-    );
+    await upsertTeamBoardSummary(context.queryable, board.id, context.session.workspaceId, summary);
     await context.queryable.query("commit");
     return {
       board: redactTeamBoardDocument(board),
@@ -108,6 +144,20 @@ export async function saveTeamBoardDocument(
     await context.queryable.query("rollback");
     throw error;
   }
+}
+
+export async function deleteTeamBoardDocument(
+  queryable: PostgresQueryable,
+  config: PostgresStorageConfig,
+  request: Request,
+  boardId: string,
+): Promise<void> {
+  const context = await createTeamWorkspaceStorageContext(queryable, config, request, { minimumRole: "editor" });
+  const result = await context.queryable.query<TeamBoardExistsRow>(
+    "delete from boards where workspace_id = $1 and id = $2 returning id",
+    [context.session.workspaceId, boardId],
+  );
+  if (!result.rows[0]) throw new ApiError(404, "team_board_not_found", "Team board was not found");
 }
 
 export function redactTeamBoardDocument(board: BoardDocument): BoardDocument {
@@ -129,6 +179,20 @@ function assertTeamBoardDocumentSafeForWrite(board: BoardDocument): void {
       throw badRequest("Team board secret fields are not supported yet", "team_board_secret_fields_unsupported");
     }
   }
+}
+
+async function upsertTeamBoardSummary(
+  queryable: PostgresQueryable,
+  boardId: string,
+  workspaceId: string,
+  summary: BoardSummary,
+): Promise<void> {
+  await queryable.query(
+    `insert into board_summaries (board_id, workspace_id, summary, updated_at)
+     values ($1, $2, $3, now())
+     on conflict (board_id) do update set summary = excluded.summary, updated_at = now()`,
+    [boardId, workspaceId, summary],
+  );
 }
 
 function toBoardSummary(board: BoardDocument): BoardSummary {

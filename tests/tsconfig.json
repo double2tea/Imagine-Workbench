@@ -126,6 +126,7 @@
     "../lib/storage/team-auth.ts",
     "../lib/storage/team-asset-types.ts",
     "../lib/storage/team-assets.ts",
+    "../lib/storage/team-board-request.ts",
     "../lib/storage/team-board-types.ts",
     "../lib/storage/team-boards.ts",
     "../lib/storage/team-client.ts",

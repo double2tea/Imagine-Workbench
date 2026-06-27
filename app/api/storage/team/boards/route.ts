@@ -2,7 +2,12 @@ import { apiErrorResponse, badRequest } from "@/lib/api/errors";
 import { PostgresStorageConfigError, resolvePostgresStorageConfig } from "@/lib/storage/postgres/config";
 import { withPostgresClient } from "@/lib/storage/postgres/connection";
 import type { WorkspaceBoardListOptions } from "@/lib/storage/repository";
-import { listTeamBoardSummaries } from "@/lib/storage/team-boards";
+import { readTeamBoardDocumentRequestJson } from "@/lib/storage/team-board-request";
+import {
+  assertTeamCsrf,
+  assertTrustedTeamRequestOrigin,
+} from "@/lib/storage/team-auth";
+import { createTeamBoardDocument, listTeamBoardSummaries } from "@/lib/storage/team-boards";
 
 export const runtime = "nodejs";
 export const dynamic = "force-dynamic";
@@ -15,6 +20,25 @@ export async function GET(request: Request): Promise<Response> {
     return Response.json(result);
   } catch (error) {
     const response = apiErrorResponse(error, "Team board list failed");
+    return Response.json(response.body, {
+      status: error instanceof PostgresStorageConfigError ? 400 : response.status,
+    });
+  }
+}
+
+export async function POST(request: Request): Promise<Response> {
+  try {
+    assertTrustedTeamRequestOrigin(request, {
+      APP_URL: process.env.APP_URL,
+      IMAGINE_TRUSTED_ORIGINS: process.env.IMAGINE_TRUSTED_ORIGINS,
+    });
+    assertTeamCsrf(request);
+    const board = await readTeamBoardDocumentRequestJson(request);
+    const config = resolvePostgresStorageConfig(process.env);
+    const result = await withPostgresClient(config, client => createTeamBoardDocument(client, config, request, board));
+    return Response.json(result, { status: 201 });
+  } catch (error) {
+    const response = apiErrorResponse(error, "Team board create failed");
     return Response.json(response.body, {
       status: error instanceof PostgresStorageConfigError ? 400 : response.status,
     });

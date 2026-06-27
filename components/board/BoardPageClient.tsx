@@ -130,10 +130,7 @@ import {
   composeBoardMultiGridImage,
   createEmptyBoard,
   boardNodeAbsolutePosition,
-  deleteBoardFromDB,
-  listBoardSummariesFromDB,
   resolveBoardConnectionKind,
-  saveBoardToDB,
   type BoardDocument,
   type BoardGenerateNodeUpdate,
   type BoardGenerationStatus,
@@ -154,6 +151,11 @@ import {
   hasRunningHubBindingIdentity,
   parseRunningHubBindingsFromJsonText,
 } from "@/lib/board";
+import {
+  createTeamBoardStorageAdapter,
+  indexedDbBoardStorageAdapter,
+  type BoardStorageAdapter,
+} from "@/lib/board/storage-adapter";
 import type { ReferenceImageRef } from "@/components/reference/ReferenceImagePicker";
 import {
   getMediaReferenceType,
@@ -187,6 +189,7 @@ import {
 } from "@/lib/data-management";
 import { API_ROUTES } from "@/lib/api/routes";
 import { readFetchError, toErrorMessage } from "@/lib/client-fetch-error";
+import { fetchWorkspaceStorageRuntimeStatus } from "@/lib/storage/team-client";
 
 type NoticeType = "error" | "info" | "success";
 type MaskDestination = "creative" | "agent" | "board-asset";
@@ -1637,6 +1640,8 @@ export default function BoardPage({ boardId = DEFAULT_BOARD_ID }: BoardPageProps
   const { t: creationT } = useTranslations("creation");
   const router = useRouter();
   const [resolvedBoardId, setResolvedBoardId] = useState(() => initialResolvedBoardId(boardId));
+  const [boardStorageTarget, setBoardStorageTarget] = useState<"indexeddb" | "postgres">("indexeddb");
+  const teamBoardStorageRef = useRef<BoardStorageAdapter | null>(null);
   useEffect(() => {
     const queryBoardId = new URLSearchParams(window.location.search).get("boardId");
     const nextBoardId = boardId !== DEFAULT_BOARD_ID ? boardId : queryBoardId?.trim() || DEFAULT_BOARD_ID;
@@ -1644,7 +1649,12 @@ export default function BoardPage({ boardId = DEFAULT_BOARD_ID }: BoardPageProps
     const frame = window.requestAnimationFrame(() => setResolvedBoardId(nextBoardId));
     return () => window.cancelAnimationFrame(frame);
   }, [boardId, resolvedBoardId]);
-  const boardController = useBoardState(resolvedBoardId);
+  const boardStorage = useMemo(() => {
+    if (boardStorageTarget !== "postgres") return indexedDbBoardStorageAdapter;
+    teamBoardStorageRef.current ??= createTeamBoardStorageAdapter();
+    return teamBoardStorageRef.current;
+  }, [boardStorageTarget]);
+  const boardController = useBoardState(resolvedBoardId, boardStorage);
   const {
     items,
     isCurrentScopeLoaded: isBoardAssetScopeLoaded,
@@ -1771,6 +1781,20 @@ export default function BoardPage({ boardId = DEFAULT_BOARD_ID }: BoardPageProps
     window.setTimeout(() => dismissWorkspaceNotice(id), 8000);
   }, [dismissWorkspaceNotice]);
 
+  useEffect(() => {
+    let isActive = true;
+    void fetchWorkspaceStorageRuntimeStatus()
+      .then(status => {
+        if (isActive) setBoardStorageTarget(status.targetKind);
+      })
+      .catch(error => {
+        if (isActive) pushWorkspaceNotice("error", `Storage status read failed: ${toErrorMessage(error, "Storage status failed")}`);
+      });
+    return () => {
+      isActive = false;
+    };
+  }, [pushWorkspaceNotice]);
+
   const {
     resolveIntegrationAvailable,
     resolveIntegrationEnabled,
@@ -1783,17 +1807,17 @@ export default function BoardPage({ boardId = DEFAULT_BOARD_ID }: BoardPageProps
 
   useEffect(() => {
     let isActive = true;
-    void listBoardSummariesFromDB()
+    void boardStorage.listBoardSummaries()
       .then(summaries => {
         if (isActive) setBoardSummaries(summaries);
       })
       .catch(error => {
-        if (isActive) pushWorkspaceNotice("error", `Board list read failed: ${toErrorMessage(error, "IndexedDB read failed")}`);
+        if (isActive) pushWorkspaceNotice("error", `Board list read failed: ${toErrorMessage(error, "Board list read failed")}`);
       });
     return () => {
       isActive = false;
     };
-  }, [pushWorkspaceNotice, t]);
+  }, [boardStorage, pushWorkspaceNotice, t]);
 
   useEffect(() => {
     const legacyItemsById = new Map<string, StorageItem>();
@@ -4919,7 +4943,7 @@ export default function BoardPage({ boardId = DEFAULT_BOARD_ID }: BoardPageProps
         createdAt: now,
         updatedAt: now,
       };
-      await saveBoardToDB(nextBoard);
+      await boardStorage.createBoard(nextBoard);
       setBoardSummaries(prev => [boardSummaryFromDocument(nextBoard), ...prev]);
       setResolvedBoardId(nextBoard.id);
       router.push(boardRoute(nextBoard.id));
@@ -4927,7 +4951,7 @@ export default function BoardPage({ boardId = DEFAULT_BOARD_ID }: BoardPageProps
     } catch (error) {
       pushWorkspaceNotice("error", toErrorMessage(error, t("common.dataManagement.boardCopyFailed")));
     }
-  }, [boardController, pushWorkspaceNotice, router, t]);
+  }, [boardController, boardStorage, pushWorkspaceNotice, router, t]);
 
   const createBoardPage = useCallback(async () => {
     flushSync(() => flushAllBoardText());
@@ -4935,11 +4959,11 @@ export default function BoardPage({ boardId = DEFAULT_BOARD_ID }: BoardPageProps
     const nextIndex = boardSummaries.length + 1;
     const nextId = makeClientId("board");
     const nextBoard = createEmptyBoard(nextId, `${t("board.boardLabel")} ${nextIndex}`);
-    await saveBoardToDB(nextBoard);
+    await boardStorage.createBoard(nextBoard);
     setBoardSummaries(prev => [boardSummaryFromDocument(nextBoard), ...prev]);
     setResolvedBoardId(nextId);
     router.push(boardRoute(nextId));
-  }, [boardController, boardSummaries.length, router]);
+  }, [boardController, boardStorage, boardSummaries.length, router, t]);
 
   const selectBoardPage = useCallback(async (nextBoardId: string): Promise<void> => {
     flushSync(() => flushAllBoardText());
@@ -4982,9 +5006,9 @@ export default function BoardPage({ boardId = DEFAULT_BOARD_ID }: BoardPageProps
     const nextBoardId = nextBoard?.id ?? DEFAULT_BOARD_ID;
     setResolvedBoardId(nextBoardId);
     router.push(boardRoute(nextBoardId));
-    await deleteBoardFromDB(deletedBoardId);
+    await boardStorage.deleteBoard(deletedBoardId);
     setBoardSummaries(prev => prev.filter(item => item.id !== deletedBoardId));
-  }, [boardController.board.id, boardController.board.title, boardSummaries, confirmAction, pushWorkspaceNotice, router, t]);
+  }, [boardController.board.id, boardController.board.title, boardStorage, boardSummaries, confirmAction, pushWorkspaceNotice, router, t]);
 
   const saveBoardNow = boardController.saveNow;
 

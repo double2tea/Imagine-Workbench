@@ -4,6 +4,8 @@ import type { BoardDocument, BoardSummary } from "../lib/board/types";
 
 import {
   bootstrapTeamOwner,
+  createTeamBoardDocument,
+  deleteTeamBoardDocument,
   fetchTeamBoardDocument,
   fetchTeamAssets,
   fetchTeamBoardSummaries,
@@ -166,8 +168,27 @@ test("fetchTeamBoardSummaries sends list filters and validates summaries", async
   );
 });
 
-test("team board document client reads redacted boards and saves with version headers", async () => {
+test("team board document client creates, reads, saves, and deletes boards", async () => {
   const board = createBoardDocument();
+  let createCsrfHeader: string | null = null;
+  const createResult = await createTeamBoardDocument(board, "csrf-token", async (input, init) => {
+    assert.equal(String(input), "/api/storage/team/boards");
+    assert.equal(init?.method, "POST");
+    const headers = new Headers(init?.headers);
+    createCsrfHeader = headers.get("x-imagine-csrf-token");
+    assert.deepEqual(JSON.parse(String(init?.body ?? "")), board);
+    return jsonResponse({
+      board,
+      summary: createBoardSummary(),
+      targetKind: "postgres",
+      version: 1,
+      workspaceId: "workspace_1",
+    }, { status: 201 });
+  });
+
+  assert.equal(createResult.version, 1);
+  assert.equal(createCsrfHeader, "csrf-token");
+
   const readResult = await fetchTeamBoardDocument("board_1", async input => {
     assert.equal(String(input), "/api/storage/team/boards/board_1");
     return jsonResponse({
@@ -206,8 +227,26 @@ test("team board document client reads redacted boards and saves with version he
   assert.equal(csrfHeader, "csrf-token");
   assert.deepEqual(JSON.parse(requestBody), board);
 
+  let deleteCsrfHeader: string | null = null;
+  await deleteTeamBoardDocument("board_1", "csrf-token", async (input, init) => {
+    assert.equal(String(input), "/api/storage/team/boards/board_1");
+    assert.equal(init?.method, "DELETE");
+    const headers = new Headers(init?.headers);
+    deleteCsrfHeader = headers.get("x-imagine-csrf-token");
+    return jsonResponse({ ok: true });
+  });
+  assert.equal(deleteCsrfHeader, "csrf-token");
+
+  await assert.rejects(
+    createTeamBoardDocument(board, " "),
+    /CSRF token is required/,
+  );
   await assert.rejects(
     saveTeamBoardDocument(board, 7, " "),
+    /CSRF token is required/,
+  );
+  await assert.rejects(
+    deleteTeamBoardDocument("board_1", " "),
     /CSRF token is required/,
   );
 });

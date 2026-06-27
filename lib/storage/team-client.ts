@@ -66,6 +66,16 @@ export interface TeamBoardSummaryListOptions {
 
 type Fetcher = typeof fetch;
 
+export class TeamStorageClientError extends Error {
+  constructor(
+    message: string,
+    readonly code?: string,
+  ) {
+    super(message);
+    this.name = "TeamStorageClientError";
+  }
+}
+
 export function teamAssetMediaUrl(assetId: string, options: { download?: boolean } = {}): string {
   return API_ROUTES.storage.teamAssetMedia(assetId, options);
 }
@@ -140,8 +150,30 @@ export async function fetchTeamBoardDocument(
   const response = await fetcher(API_ROUTES.storage.teamBoard(boardId), { cache: "no-store" });
   const body: unknown = await response.json();
   if (!response.ok) {
-    const error = readStringField(body, "error") ?? "Team board read failed";
-    throw new Error(error);
+    throw readTeamStorageClientError(body, "Team board read failed");
+  }
+  return parseTeamBoardDocumentResult(body);
+}
+
+export async function createTeamBoardDocument(
+  board: BoardDocument,
+  csrfToken: string,
+  fetcher: Fetcher = fetch,
+): Promise<TeamBoardDocumentResult> {
+  const token = csrfToken.trim();
+  if (!token) throw new Error("CSRF token is required");
+  const response = await fetcher(API_ROUTES.storage.teamBoards, {
+    cache: "no-store",
+    body: JSON.stringify(board),
+    headers: {
+      "content-type": "application/json",
+      "x-imagine-csrf-token": token,
+    },
+    method: "POST",
+  });
+  const body: unknown = await response.json();
+  if (!response.ok) {
+    throw readTeamStorageClientError(body, "Team board create failed");
   }
   return parseTeamBoardDocumentResult(body);
 }
@@ -166,10 +198,27 @@ export async function saveTeamBoardDocument(
   });
   const body: unknown = await response.json();
   if (!response.ok) {
-    const error = readStringField(body, "error") ?? "Team board save failed";
-    throw new Error(error);
+    throw readTeamStorageClientError(body, "Team board save failed");
   }
   return parseTeamBoardDocumentResult(body);
+}
+
+export async function deleteTeamBoardDocument(
+  boardId: string,
+  csrfToken: string,
+  fetcher: Fetcher = fetch,
+): Promise<void> {
+  const token = csrfToken.trim();
+  if (!token) throw new Error("CSRF token is required");
+  const response = await fetcher(API_ROUTES.storage.teamBoard(boardId), {
+    cache: "no-store",
+    headers: { "x-imagine-csrf-token": token },
+    method: "DELETE",
+  });
+  const body: unknown = await response.json();
+  if (!response.ok) {
+    throw readTeamStorageClientError(body, "Team board delete failed");
+  }
 }
 
 export async function loginTeamSession(
@@ -292,6 +341,10 @@ function parseTeamBoardSummaryListResult(value: unknown): TeamBoardSummaryListRe
 function parseTeamBoardDocumentResult(value: unknown): TeamBoardDocumentResult {
   if (!isTeamBoardDocumentResult(value)) throw new Error("Team board response is invalid");
   return value;
+}
+
+function readTeamStorageClientError(value: unknown, fallback: string): TeamStorageClientError {
+  return new TeamStorageClientError(readStringField(value, "error") ?? fallback, readStringField(value, "code") ?? undefined);
 }
 
 function teamAssetsUrl(options: TeamAssetListOptions): string {

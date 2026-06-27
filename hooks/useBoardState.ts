@@ -18,8 +18,6 @@ import {
   DEFAULT_REFERENCE_GROUP_NODE_SIZE,
   DEFAULT_RUNNINGHUB_APP_NODE_SIZE,
   createEmptyBoard,
-  getBoardFromDB,
-  saveBoardToDB,
   type BoardAgentNode,
   type BoardConfig,
   type BoardDocument,
@@ -72,6 +70,7 @@ import {
   fitBoardGroupLayoutToChildren,
   resolveMovedBoardNodeParents,
 } from "@/lib/board";
+import { indexedDbBoardStorageAdapter, type BoardStorageAdapter } from "@/lib/board/storage-adapter";
 import {
   DEFAULT_BOARD_MULTI_GRID_ASPECT_RATIO,
   DEFAULT_BOARD_MULTI_GRID_SIZE,
@@ -1688,7 +1687,10 @@ function clampMultiGridScale(value: number): number {
   return Math.max(0.5, Math.min(3, value));
 }
 
-export function useBoardState(boardId: string = DEFAULT_BOARD_ID): BoardStateController {
+export function useBoardState(
+  boardId: string = DEFAULT_BOARD_ID,
+  storage: BoardStorageAdapter = indexedDbBoardStorageAdapter,
+): BoardStateController {
   const [board, setBoardState] = useState<BoardDocument>(() => createEmptyBoard(boardId, t("board.workspace.boardLabel")));
   const [selectedNodeId, setSelectedNodeId] = useState<string | null>(null);
   const [selectedEdgeId, setSelectedEdgeId] = useState<string | null>(null);
@@ -1802,7 +1804,7 @@ export function useBoardState(boardId: string = DEFAULT_BOARD_ID): BoardStateCon
     async function loadBoard(): Promise<void> {
       setHasLoaded(false);
       setSaveStatus("loading");
-      const storedBoard = await getBoardFromDB(boardId);
+      const storedBoard = await storage.getBoard(boardId);
       if (!isActive) return;
 
       clearUndoHistory();
@@ -1824,7 +1826,7 @@ export function useBoardState(boardId: string = DEFAULT_BOARD_ID): BoardStateCon
     return () => {
       isActive = false;
     };
-  }, [boardId, clearUndoHistory]);
+  }, [boardId, clearUndoHistory, storage]);
 
   useEffect(() => {
     if (selectedNodeId && !board.nodes.some(node => node.id === selectedNodeId)) {
@@ -1842,7 +1844,7 @@ export function useBoardState(boardId: string = DEFAULT_BOARD_ID): BoardStateCon
     let isActive = true;
     const saveTimer = window.setTimeout(() => {
       setSaveStatus("saving");
-      saveBoardToDB(board)
+      storage.saveBoard(board)
         .then(() => {
           if (!isActive) return;
           setSaveError(null);
@@ -1859,14 +1861,14 @@ export function useBoardState(boardId: string = DEFAULT_BOARD_ID): BoardStateCon
       isActive = false;
       window.clearTimeout(saveTimer);
     };
-  }, [board, boardId, hasLoaded]);
+  }, [board, boardId, hasLoaded, storage]);
 
   const saveNow = useCallback(async () => {
     const currentBoard = boardRef.current;
     if (!hasLoaded || currentBoard.id !== boardId) return;
     setSaveStatus("saving");
     try {
-      await saveBoardToDB(currentBoard);
+      await storage.saveBoard(currentBoard);
       setSaveError(null);
       setSaveStatus("saved");
     } catch (error: unknown) {
@@ -1874,7 +1876,7 @@ export function useBoardState(boardId: string = DEFAULT_BOARD_ID): BoardStateCon
       setSaveStatus("error");
       throw error;
     }
-  }, [boardId, hasLoaded]);
+  }, [boardId, hasLoaded, storage]);
 
   const addAssetNode = useCallback((input: CreateAssetNodeInput): string => {
     const node = createAssetBoardNode(input, board.nodes);

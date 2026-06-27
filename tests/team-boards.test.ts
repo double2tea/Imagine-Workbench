@@ -6,9 +6,9 @@ import { ApiError } from "../lib/api/errors";
 import type { BoardDocument, BoardSummary } from "../lib/board/types";
 import type { PostgresQueryable } from "../lib/storage/postgres/connection";
 import { hashTeamSessionToken } from "../lib/storage/team-auth";
-import { getTeamBoardDocument, listTeamBoardSummaries, saveTeamBoardDocument } from "../lib/storage/team-boards";
-import { GET as getTeamBoards } from "../app/api/storage/team/boards/route";
-import { PUT as putTeamBoard } from "../app/api/storage/team/boards/[boardId]/route";
+import { createTeamBoardDocument, deleteTeamBoardDocument, getTeamBoardDocument, listTeamBoardSummaries, saveTeamBoardDocument } from "../lib/storage/team-boards";
+import { GET as getTeamBoards, POST as postTeamBoard } from "../app/api/storage/team/boards/route";
+import { DELETE as deleteTeamBoard, PUT as putTeamBoard } from "../app/api/storage/team/boards/[boardId]/route";
 
 const RAW_SESSION_TOKEN = "raw-session-token";
 const WORKSPACE_ID = "workspace_1";
@@ -90,6 +90,22 @@ test("getTeamBoardDocument returns a redacted versioned board document", async (
   assert.deepEqual(result.summary, createBoardSummary());
 });
 
+test("createTeamBoardDocument inserts a new editor-scoped board", async () => {
+  const queries: Array<{ text: string; values?: readonly unknown[] }> = [];
+  const board = createBoardDocument({ includeSecret: false });
+  const result = await createTeamBoardDocument(
+    createTeamBoardsQueryable(queries, { insertVersion: 1, role: "editor" }),
+    { databaseUrl: "postgres://localhost/imagine", mediaDir: "/srv/imagine/media" },
+    requestWithSession(),
+    board,
+  );
+
+  assert.equal(result.version, 1);
+  const insertQuery = queries.find(query => query.text.trim().startsWith("insert into boards"));
+  assert.deepEqual(insertQuery?.values, [BOARD_ID, WORKSPACE_ID, board]);
+  assert.equal(queries.at(-1)?.text, "commit");
+});
+
 test("saveTeamBoardDocument updates only the expected board version", async () => {
   const queries: Array<{ text: string; values?: readonly unknown[] }> = [];
   const board = createBoardDocument({ includeSecret: false });
@@ -133,6 +149,43 @@ test("saveTeamBoardDocument rejects secret fields and version conflicts", async 
   assert.equal(queries.at(-1)?.text, "rollback");
 });
 
+test("createTeamBoardDocument rejects existing boards and deleteTeamBoardDocument requires a match", async () => {
+  const createQueries: Array<{ text: string; values?: readonly unknown[] }> = [];
+  await assert.rejects(
+    () => createTeamBoardDocument(
+      createTeamBoardsQueryable(createQueries, { role: "editor" }),
+      { databaseUrl: "postgres://localhost/imagine", mediaDir: "/srv/imagine/media" },
+      requestWithSession(),
+      createBoardDocument({ includeSecret: false }),
+    ),
+    (error: unknown) => error instanceof ApiError && error.status === 409 && error.code === "team_board_already_exists",
+  );
+  assert.equal(createQueries.at(-1)?.text, "rollback");
+
+  await assert.rejects(
+    () => deleteTeamBoardDocument(
+      createTeamBoardsQueryable([], { role: "editor" }),
+      { databaseUrl: "postgres://localhost/imagine", mediaDir: "/srv/imagine/media" },
+      requestWithSession(),
+      BOARD_ID,
+    ),
+    (error: unknown) => error instanceof ApiError && error.status === 404 && error.code === "team_board_not_found",
+  );
+});
+
+test("deleteTeamBoardDocument deletes an editor-scoped board", async () => {
+  const queries: Array<{ text: string; values?: readonly unknown[] }> = [];
+  await deleteTeamBoardDocument(
+    createTeamBoardsQueryable(queries, { deleteFound: true, role: "editor" }),
+    { databaseUrl: "postgres://localhost/imagine", mediaDir: "/srv/imagine/media" },
+    requestWithSession(),
+    BOARD_ID,
+  );
+
+  const deleteQuery = queries.find(query => query.text.startsWith("delete from boards"));
+  assert.deepEqual(deleteQuery?.values, [WORKSPACE_ID, BOARD_ID]);
+});
+
 test("team board route rejects missing write versions before opening a database client", async () => {
   const originalEnv = {
     APP_URL: process.env.APP_URL,
@@ -168,6 +221,47 @@ test("team board route rejects missing write versions before opening a database 
   }
 });
 
+test("team board create and delete routes reject missing CSRF before opening a database client", async () => {
+  const originalEnv = {
+    APP_URL: process.env.APP_URL,
+    DATABASE_URL: process.env.DATABASE_URL,
+    IMAGINE_MEDIA_DIR: process.env.IMAGINE_MEDIA_DIR,
+    IMAGINE_STORAGE_TARGET: process.env.IMAGINE_STORAGE_TARGET,
+  };
+  try {
+    process.env.APP_URL = "http://localhost:3000";
+    process.env.DATABASE_URL = "postgres://localhost/imagine";
+    process.env.IMAGINE_MEDIA_DIR = "/srv/imagine/media";
+    process.env.IMAGINE_STORAGE_TARGET = "postgres";
+
+    const createResponse = await postTeamBoard(new Request("http://localhost:3000/api/storage/team/boards", {
+      body: JSON.stringify(createBoardDocument({ includeSecret: false })),
+      headers: { origin: "http://localhost:3000" },
+      method: "POST",
+    }));
+    assert.equal(createResponse.status, 403);
+    assert.deepEqual(await createResponse.json(), {
+      code: "invalid_csrf",
+      error: "Valid CSRF token is required",
+    });
+
+    const deleteResponse = await deleteTeamBoard(new Request("http://localhost:3000/api/storage/team/boards/board_1", {
+      headers: { origin: "http://localhost:3000" },
+      method: "DELETE",
+    }), routeContext());
+    assert.equal(deleteResponse.status, 403);
+    assert.deepEqual(await deleteResponse.json(), {
+      code: "invalid_csrf",
+      error: "Valid CSRF token is required",
+    });
+  } finally {
+    restoreEnv("APP_URL", originalEnv.APP_URL);
+    restoreEnv("DATABASE_URL", originalEnv.DATABASE_URL);
+    restoreEnv("IMAGINE_MEDIA_DIR", originalEnv.IMAGINE_MEDIA_DIR);
+    restoreEnv("IMAGINE_STORAGE_TARGET", originalEnv.IMAGINE_STORAGE_TARGET);
+  }
+});
+
 function requestWithSession(): Request {
   return new Request("http://localhost:3000/api/storage/team/boards", {
     headers: { cookie: `imagine_team_session=${RAW_SESSION_TOKEN}` },
@@ -180,7 +274,13 @@ function routeContext(): { params: Promise<{ boardId: string }> } {
 
 function createTeamBoardsQueryable(
   queries: Array<{ text: string; values?: readonly unknown[] }> = [],
-  options: { conflictVersion?: number; role?: "owner" | "admin" | "editor" | "viewer"; updateVersion?: number } = {},
+  options: {
+    conflictVersion?: number;
+    deleteFound?: boolean;
+    insertVersion?: number;
+    role?: "owner" | "admin" | "editor" | "viewer";
+    updateVersion?: number;
+  } = {},
 ): PostgresQueryable {
   return {
     query: async <T extends QueryResultRow = QueryResultRow>(text: string, values?: readonly unknown[]) => {
@@ -204,10 +304,18 @@ function createTeamBoardsQueryable(
           options.updateVersion === undefined ? [] : [{ version: options.updateVersion }],
         );
       }
+      if (text.trim().startsWith("insert into boards")) {
+        return typedQueryResult<T>(
+          options.insertVersion === undefined ? [] : [{ version: options.insertVersion }],
+        );
+      }
       if (text.startsWith("select version from boards")) {
         return typedQueryResult<T>(
           options.conflictVersion === undefined ? [] : [{ version: options.conflictVersion }],
         );
+      }
+      if (text.startsWith("delete from boards")) {
+        return typedQueryResult<T>(options.deleteFound ? [{ id: BOARD_ID }] : []);
       }
       if (text.trim().startsWith("insert into board_summaries")) {
         return typedQueryResult<T>([]);
