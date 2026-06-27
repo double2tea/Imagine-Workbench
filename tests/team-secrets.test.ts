@@ -68,6 +68,12 @@ test("saveTeamSecret encrypts the value before writing settings", async () => {
   assert.equal(decryptWorkspaceSecret(encryptedValue, ENCRYPTION_KEY), "provider-api-key");
   assert.deepEqual(write?.values?.slice(0, 3), [WORKSPACE_ID, "provider:demo:apiKey", "provider"]);
   assert.equal(write?.values?.[4], true);
+  const audit = queries.find(query => query.text.includes("insert into audit_events"));
+  assert.deepEqual(audit?.values?.slice(0, 3), [WORKSPACE_ID, "user_1", "team_secret.save"]);
+  assert.deepEqual(JSON.parse(String(audit?.values?.[3])) as unknown, {
+    group: "provider",
+    key: "provider:demo:apiKey",
+  });
 });
 
 test("deleteTeamSecret removes an admin-scoped setting key", async () => {
@@ -83,6 +89,11 @@ test("deleteTeamSecret removes an admin-scoped setting key", async () => {
     queries.find(query => query.text.startsWith("delete from settings"))?.values,
     [WORKSPACE_ID, "provider:demo:apiKey"],
   );
+  const audit = queries.find(query => query.text.includes("insert into audit_events"));
+  assert.deepEqual(audit?.values?.slice(0, 3), [WORKSPACE_ID, "user_1", "team_secret.delete"]);
+  assert.deepEqual(JSON.parse(String(audit?.values?.[3])) as unknown, {
+    key: "provider:demo:apiKey",
+  });
 });
 
 test("team secret service requires admin access", async () => {

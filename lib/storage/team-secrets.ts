@@ -2,6 +2,7 @@ import { badRequest } from "@/lib/api/errors";
 import type { PostgresStorageConfig } from "@/lib/storage/postgres/config";
 import type { PostgresQueryable } from "@/lib/storage/postgres/connection";
 import type { WorkspaceSettingGroup, WorkspaceSettingRecord } from "@/lib/storage/schema";
+import { recordTeamAuditEvent } from "@/lib/storage/team-audit";
 import { createTeamWorkspaceStorageContext } from "@/lib/storage/team-context";
 import { encryptWorkspaceSecret } from "@/lib/storage/team-secret-crypto";
 import type {
@@ -54,6 +55,12 @@ export async function saveTeamSecret(
     value: encryptedValue,
   };
   await context.repository.settings.put(record);
+  await recordTeamAuditEvent(context.queryable, {
+    eventType: "team_secret.save",
+    metadata: { group, key },
+    userId: context.session.userId,
+    workspaceId: context.session.workspaceId,
+  });
   return {
     secret: toPublicTeamSecretStatus(record),
     targetKind: "postgres",
@@ -68,7 +75,14 @@ export async function deleteTeamSecret(
   key: string,
 ): Promise<void> {
   const context = await createTeamWorkspaceStorageContext(queryable, config, request, { minimumRole: "admin" });
-  await context.repository.settings.delete(normalizeTeamSecretKey(key));
+  const normalizedKey = normalizeTeamSecretKey(key);
+  await context.repository.settings.delete(normalizedKey);
+  await recordTeamAuditEvent(context.queryable, {
+    eventType: "team_secret.delete",
+    metadata: { key: normalizedKey },
+    userId: context.session.userId,
+    workspaceId: context.session.workspaceId,
+  });
 }
 
 function toPublicTeamSecretStatus(record: WorkspaceSettingRecord): PublicTeamSecretStatus {

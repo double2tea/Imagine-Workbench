@@ -11,6 +11,7 @@ import type {
 } from "@/lib/board/types";
 import type { PostgresStorageConfig } from "@/lib/storage/postgres/config";
 import type { PostgresQueryable } from "@/lib/storage/postgres/connection";
+import { recordTeamAuditEvent } from "@/lib/storage/team-audit";
 import { createTeamWorkspaceStorageContext } from "@/lib/storage/team-context";
 import { encryptWorkspaceSecret } from "@/lib/storage/team-secret-crypto";
 import type {
@@ -92,6 +93,16 @@ export async function saveTeamProviderTarget(
   );
   const row = result.rows[0];
   if (!row) throw new Error("Team provider target save failed");
+  await recordTeamAuditEvent(context.queryable, {
+    eventType: "team_provider_target.save",
+    metadata: {
+      provider: "runninghub",
+      targetId: normalized.targetId,
+      targetType: normalized.targetType,
+    },
+    userId: context.session.userId,
+    workspaceId: context.session.workspaceId,
+  });
   return {
     target: publicTargetFromRow(row),
     targetKind: "postgres",
@@ -112,6 +123,12 @@ export async function deleteTeamProviderTarget(
     "delete from saved_provider_targets where workspace_id = $1 and id = $2",
     [context.session.workspaceId, storageId],
   );
+  await recordTeamAuditEvent(context.queryable, {
+    eventType: "team_provider_target.delete",
+    metadata: { provider: "runninghub", targetId: publicId },
+    userId: context.session.userId,
+    workspaceId: context.session.workspaceId,
+  });
 }
 
 function publicTargetFromRow(row: TeamProviderTargetRow): PublicTeamProviderTarget {

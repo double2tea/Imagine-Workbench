@@ -126,6 +126,7 @@
     "../lib/storage/postgres/connection.ts",
     "../lib/storage/postgres/migrations.ts",
     "../lib/storage/postgres/repository.ts",
+    "../lib/storage/team-audit.ts",
     "../lib/storage/team-bootstrap.ts",
     "../lib/storage/team-context.ts",
     "../lib/storage/team-auth.ts",

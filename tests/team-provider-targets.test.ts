@@ -92,6 +92,13 @@ test("saveTeamProviderTarget encrypts access passwords before writing", async ()
   assert.equal(isEncryptedWorkspaceSecret(storedTarget.accessPasswordEncrypted ?? ""), true);
   assert.equal(decryptWorkspaceSecret(storedTarget.accessPasswordEncrypted ?? "", ENCRYPTION_KEY), "app-password");
   assert.deepEqual(write?.values?.slice(0, 3), [`${WORKSPACE_ID}:runninghub:${result.target.id}`, WORKSPACE_ID, "runninghub"]);
+  const audit = queries.find(query => query.text.includes("insert into audit_events"));
+  assert.deepEqual(audit?.values?.slice(0, 3), [WORKSPACE_ID, "user_1", "team_provider_target.save"]);
+  assert.deepEqual(JSON.parse(String(audit?.values?.[3])) as unknown, {
+    provider: "runninghub",
+    targetId: "1937084622758465538",
+    targetType: "ai-app",
+  });
 });
 
 test("saveTeamProviderTarget preserves existing encrypted passwords when omitted", async () => {
@@ -130,6 +137,12 @@ test("deleteTeamProviderTarget removes an admin-scoped saved target", async () =
     queries.find(query => query.text.startsWith("delete from saved_provider_targets"))?.values,
     [WORKSPACE_ID, `${WORKSPACE_ID}:runninghub:ai-app:1937084622758465538`],
   );
+  const audit = queries.find(query => query.text.includes("insert into audit_events"));
+  assert.deepEqual(audit?.values?.slice(0, 3), [WORKSPACE_ID, "user_1", "team_provider_target.delete"]);
+  assert.deepEqual(JSON.parse(String(audit?.values?.[3])) as unknown, {
+    provider: "runninghub",
+    targetId: "ai-app:1937084622758465538",
+  });
 });
 
 test("team provider target service requires admin access", async () => {
