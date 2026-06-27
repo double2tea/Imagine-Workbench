@@ -5,6 +5,7 @@ import type { QueryResult, QueryResultRow } from "pg";
 import type { PostgresQueryable } from "../lib/storage/postgres/connection";
 import { bootstrapFirstTeamOwner } from "../lib/storage/team-bootstrap";
 import { hashTeamCsrfToken, hashTeamSessionToken, verifyTeamPassword } from "../lib/storage/team-auth";
+import { resetTeamRateLimitsForTests } from "../lib/storage/team-rate-limit";
 import { POST as bootstrapPost } from "../app/api/storage/team/bootstrap/route";
 
 function queryResult<T extends QueryResultRow>(rows: T[]): QueryResult<T> {
@@ -164,6 +165,59 @@ test("team bootstrap route rejects malformed request JSON", async () => {
     restoreEnv("IMAGINE_TEAM_SETUP_TOKEN", originalEnv.IMAGINE_TEAM_SETUP_TOKEN);
   }
 });
+
+test("team bootstrap route rate-limits invalid setup token attempts with generic errors", async () => {
+  resetTeamRateLimitsForTests();
+  const originalEnv = {
+    APP_URL: process.env.APP_URL,
+    DATABASE_URL: process.env.DATABASE_URL,
+    IMAGINE_MEDIA_DIR: process.env.IMAGINE_MEDIA_DIR,
+    IMAGINE_STORAGE_TARGET: process.env.IMAGINE_STORAGE_TARGET,
+    IMAGINE_TEAM_SETUP_TOKEN: process.env.IMAGINE_TEAM_SETUP_TOKEN,
+  };
+  try {
+    process.env.APP_URL = "http://localhost:3000";
+    process.env.DATABASE_URL = "postgres://localhost/imagine";
+    process.env.IMAGINE_MEDIA_DIR = "/srv/imagine/media";
+    process.env.IMAGINE_STORAGE_TARGET = "postgres";
+    process.env.IMAGINE_TEAM_SETUP_TOKEN = "setup-token";
+
+    for (let attempt = 0; attempt < 5; attempt += 1) {
+      const response = await bootstrapPost(invalidSetupTokenRequest());
+      assert.equal(response.status, 401);
+      assert.deepEqual(await response.json(), {
+        code: "team_bootstrap_failed",
+        error: "Team bootstrap failed",
+      });
+    }
+
+    const limitedResponse = await bootstrapPost(invalidSetupTokenRequest());
+    assert.equal(limitedResponse.status, 429);
+    assert.deepEqual(await limitedResponse.json(), {
+      code: "team_rate_limited",
+      error: "Too many attempts. Try again later.",
+    });
+  } finally {
+    resetTeamRateLimitsForTests();
+    restoreEnv("APP_URL", originalEnv.APP_URL);
+    restoreEnv("DATABASE_URL", originalEnv.DATABASE_URL);
+    restoreEnv("IMAGINE_MEDIA_DIR", originalEnv.IMAGINE_MEDIA_DIR);
+    restoreEnv("IMAGINE_STORAGE_TARGET", originalEnv.IMAGINE_STORAGE_TARGET);
+    restoreEnv("IMAGINE_TEAM_SETUP_TOKEN", originalEnv.IMAGINE_TEAM_SETUP_TOKEN);
+  }
+});
+
+function invalidSetupTokenRequest(): Request {
+  return new Request("http://localhost:3000/api/storage/team/bootstrap", {
+    method: "POST",
+    headers: {
+      origin: "http://localhost:3000",
+      "x-forwarded-for": "192.168.1.20",
+      "x-imagine-setup-token": "wrong-token",
+    },
+    body: JSON.stringify({ email: "owner@example.com", password: "a long bootstrap password" }),
+  });
+}
 
 function restoreEnv(key: string, value: string | undefined): void {
   if (value === undefined) {

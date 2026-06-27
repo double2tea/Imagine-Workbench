@@ -1,5 +1,5 @@
 import { z } from "zod";
-import { apiErrorResponse, badRequest } from "@/lib/api/errors";
+import { ApiError, apiErrorResponse, badRequest } from "@/lib/api/errors";
 import { PostgresStorageConfigError, resolvePostgresStorageConfig } from "@/lib/storage/postgres/config";
 import { withPostgresClient } from "@/lib/storage/postgres/connection";
 import {
@@ -9,6 +9,13 @@ import {
   serializeTeamCsrfCookie,
   serializeTeamSessionCookie,
 } from "@/lib/storage/team-auth";
+import {
+  assertTeamRateLimit,
+  clearTeamRateLimit,
+  recordTeamRateLimitFailure,
+  teamRequestRateLimitKey,
+  TEAM_LOGIN_RATE_LIMIT,
+} from "@/lib/storage/team-rate-limit";
 import { createTeamSession, deleteTeamSession } from "@/lib/storage/team-session";
 
 export const runtime = "nodejs";
@@ -42,7 +49,20 @@ export async function POST(request: Request): Promise<Response> {
     const parsedBody = sessionLoginBodySchema.safeParse(await readTeamSessionRequestJson(request));
     if (!parsedBody.success) throw badRequest("Invalid team session request", "invalid_team_session_request");
     const appUrl = requireAppUrl(process.env.APP_URL);
-    const result = await withPostgresClient(config, client => createTeamSession(client, parsedBody.data));
+    const rateLimitKey = teamRequestRateLimitKey(request, "team-login", parsedBody.data.email);
+    assertTeamRateLimit(rateLimitKey, TEAM_LOGIN_RATE_LIMIT);
+    const result = await withPostgresClient(config, async client => {
+      try {
+        const session = await createTeamSession(client, parsedBody.data);
+        clearTeamRateLimit(rateLimitKey);
+        return session;
+      } catch (error) {
+        if (error instanceof ApiError && error.code === "invalid_credentials") {
+          recordTeamRateLimitFailure(rateLimitKey, TEAM_LOGIN_RATE_LIMIT);
+        }
+        throw error;
+      }
+    });
 
     const headers = new Headers();
     headers.append("Set-Cookie", serializeTeamSessionCookie(result.sessionToken, result.sessionTokenExpiresAt, appUrl));

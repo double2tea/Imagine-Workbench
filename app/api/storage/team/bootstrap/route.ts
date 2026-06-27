@@ -1,6 +1,6 @@
 import { z } from "zod";
-import { apiErrorResponse, badRequest } from "@/lib/api/errors";
-import { PostgresStorageConfigError, requireTeamSetupToken, resolvePostgresStorageConfig } from "@/lib/storage/postgres/config";
+import { ApiError, apiErrorResponse, badRequest } from "@/lib/api/errors";
+import { PostgresStorageConfigError, resolvePostgresStorageConfig } from "@/lib/storage/postgres/config";
 import { withPostgresClient } from "@/lib/storage/postgres/connection";
 import { bootstrapFirstTeamOwner } from "@/lib/storage/team-bootstrap";
 import {
@@ -8,6 +8,13 @@ import {
   serializeTeamCsrfCookie,
   serializeTeamSessionCookie,
 } from "@/lib/storage/team-auth";
+import {
+  assertTeamRateLimit,
+  clearTeamRateLimit,
+  recordTeamRateLimitFailure,
+  teamRequestRateLimitKey,
+  TEAM_BOOTSTRAP_RATE_LIMIT,
+} from "@/lib/storage/team-rate-limit";
 
 export const runtime = "nodejs";
 export const dynamic = "force-dynamic";
@@ -21,11 +28,13 @@ const bootstrapBodySchema = z.object({
 
 export async function POST(request: Request): Promise<Response> {
   try {
-    requireTeamSetupToken(process.env, request.headers.get("x-imagine-setup-token"));
     assertTrustedTeamRequestOrigin(request, {
       APP_URL: process.env.APP_URL,
       IMAGINE_TRUSTED_ORIGINS: process.env.IMAGINE_TRUSTED_ORIGINS,
     });
+    const rateLimitKey = teamRequestRateLimitKey(request, "team-bootstrap");
+    assertTeamRateLimit(rateLimitKey, TEAM_BOOTSTRAP_RATE_LIMIT);
+    assertBootstrapSetupToken(process.env.IMAGINE_TEAM_SETUP_TOKEN, request.headers.get("x-imagine-setup-token"), rateLimitKey);
     const config = resolvePostgresStorageConfig(process.env);
     const parsedBody = bootstrapBodySchema.safeParse(await readBootstrapRequestJson(request));
     if (!parsedBody.success) throw badRequest("Invalid team bootstrap request", "invalid_bootstrap_request");
@@ -38,6 +47,7 @@ export async function POST(request: Request): Promise<Response> {
       teamName: body.teamName,
       workspaceName: body.workspaceName,
     }));
+    clearTeamRateLimit(rateLimitKey);
 
     const headers = new Headers();
     headers.append("Set-Cookie", serializeTeamSessionCookie(result.sessionToken, result.sessionTokenExpiresAt, appUrl));
@@ -56,6 +66,18 @@ export async function POST(request: Request): Promise<Response> {
       status: error instanceof PostgresStorageConfigError ? 400 : response.status,
     });
   }
+}
+
+function assertBootstrapSetupToken(
+  expectedToken: string | undefined,
+  requestToken: string | null,
+  rateLimitKey: string,
+): void {
+  const setupToken = expectedToken?.trim();
+  if (!setupToken) throw new PostgresStorageConfigError("IMAGINE_TEAM_SETUP_TOKEN is required for team storage migrations");
+  if (requestToken === setupToken) return;
+  recordTeamRateLimitFailure(rateLimitKey, TEAM_BOOTSTRAP_RATE_LIMIT);
+  throw new ApiError(401, "team_bootstrap_failed", "Team bootstrap failed");
 }
 
 function requireAppUrl(value: string | undefined): string {
