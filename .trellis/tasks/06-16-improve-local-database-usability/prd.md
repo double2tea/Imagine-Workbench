@@ -93,6 +93,7 @@ Completed in the latest continuation:
 * Added required `IMAGINE_MAX_MEDIA_PAYLOAD_BYTES` configuration for PostgreSQL team mode, wired it into `LocalFilePayloadStore` writes, team backup/restore payload imports, Docker Compose, Settings -> Data health display, public runtime status, and deployment docs.
 * Media payloads larger than the configured byte limit now fail visibly before a local-file payload is written, and config/status APIs expose only the non-secret byte limit without returning `DATABASE_URL` or `IMAGINE_MEDIA_DIR`.
 * Added config/runtime/payload-store tests covering missing/invalid byte limits, public redaction, and over-limit payload rejection.
+* Added non-secret system audit events for applied PostgreSQL schema migrations: `applyPostgresMigrations()` now records `team_migrations.apply` with app version, applied count, and migration ids after pending migrations run, without storing setup tokens, database URLs, or media paths.
 
 Still remaining before the full PRD can be considered complete:
 

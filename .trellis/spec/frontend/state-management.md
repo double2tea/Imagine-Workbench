@@ -1306,7 +1306,7 @@ if (storageTarget === "postgres") await resetTeamBoards(readTeamCsrfToken());
 - Board result ownership must stay distinct from plain asset derivation. Connected `result` nodes represent generated provenance; ordinary asset nodes and split/crop asset references do not recreate source result ownership.
 - Team mode requires local account/session auth, CSRF/origin checks for mutating routes, role-based authorization, encrypted workspace secrets, and audit events for sensitive actions. `settings.is_secret = true` records must be encrypted before repository storage; repository writes must fail if a secret value is plaintext.
 - Team secret save/delete and RunningHub provider target save/delete mutations must write `audit_events` rows with workspace id, actor user id, event type, and non-secret metadata only.
-- Team bootstrap owner, team session login/logout, team member create/update-role/delete, team secret save/delete, and RunningHub provider target save/delete mutations must write `audit_events` rows. Event metadata may include ids, emails, roles, provider names, and target ids, but must never include passwords, session tokens, CSRF tokens, secret plaintext, or encrypted secret payloads.
+- Team bootstrap owner, team session login/logout, team member create/update-role/delete, team secret save/delete, RunningHub provider target save/delete, and PostgreSQL schema migration mutations must write `audit_events` rows. Event metadata may include ids, emails, roles, provider names, target ids, app version, and migration ids, but must never include passwords, session tokens, CSRF tokens, setup tokens, secret plaintext, encrypted secret payloads, database URLs, or media paths.
 - Team password hashes use the server-side `scrypt:v1:<salt>:<hash>` format. Plaintext passwords must never be stored.
 - Role checks rank `owner > admin > editor > viewer`. Server routes must call the role check before shared workspace reads/writes instead of relying on UI affordances.
 - Team member management is owner/admin-only. Owner memberships are immutable through the basic member-management UI/API, and a member cannot change or delete their own membership through these routes.
@@ -1327,6 +1327,7 @@ if (storageTarget === "postgres") await resetTeamBoards(readTeamCsrfToken());
 - `POST /api/storage/team/migrations` with missing `IMAGINE_TEAM_SETUP_TOKEN` -> `400` with explicit setup-token config error.
 - `POST /api/storage/team/migrations` with missing/invalid `x-imagine-setup-token` -> `400` and no migration query execution.
 - Database schema older than app requires -> run documented migrations or fail with migration instructions.
+- Successful schema migration -> insert a `team_migrations.apply` audit row with null workspace/user ids and non-secret migration metadata.
 - Database schema newer than app supports -> refuse to start in PostgreSQL mode.
 - Hosted/edge deployment (`CF_PAGES=1`, `VERCEL=1`, `NETLIFY=true`, or `NEXT_RUNTIME=edge`) with `postgres` selected -> fail visibly unless the deployment path explicitly supports the Node server runtime.
 - Unauthenticated PostgreSQL shared-data request -> reject before repository access.
@@ -1443,7 +1444,7 @@ if (storageTarget === "postgres") await resetTeamBoards(readTeamCsrfToken());
 - Unit: hosted/edge environment rejects PostgreSQL mode unless a Node server deployment path is explicitly configured.
 - Unit/integration: missing `DATABASE_URL`, missing/unwritable `IMAGINE_MEDIA_DIR`, older schema, and newer schema produce explicit visible errors.
 - Unit: Postgres config parsing requires explicit `postgres` mode, private database/media config, and setup token for migration routes.
-- Unit: Postgres migration status reports all migrations pending when `schema_migrations` is absent and flags unsupported newer schemas.
+- Unit: Postgres migration status reports all migrations pending when `schema_migrations` is absent, flags unsupported newer schemas, and records a non-secret `team_migrations.apply` audit event when applying pending migrations.
 - Unit: initial PostgreSQL migration SQL contains the team foundation tables listed in this scenario.
 - Unit: localStorage inventory covers every current managed key, including provider selection/custom providers, default generation models, image-edit feature models, custom prompt templates, price visibility, RunningHub saved targets, Resolve toggle, Agent/board preferences, and board generated-media viewed markers as local/per-user state.
 - Unit: team-storage client parses browser status, surfaces health errors, requires setup token for migrations/bootstrap, and sends the setup token only as a request header.

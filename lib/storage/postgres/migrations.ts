@@ -1,6 +1,7 @@
 import type { QueryResultRow } from "pg";
 import { WORKSPACE_STORAGE_SCHEMA_VERSION } from "@/lib/storage/schema";
 import type { PostgresQueryable } from "@/lib/storage/postgres/connection";
+import { recordTeamAuditEvent } from "@/lib/storage/team-audit";
 
 const INITIAL_TEAM_STORAGE_SQL = `
 create extension if not exists pgcrypto;
@@ -269,6 +270,7 @@ export async function applyPostgresMigrations(queryable: PostgresQueryable, appV
       throw new Error(`Database schema version ${before.currentSchemaVersion} is newer than supported version ${WORKSPACE_STORAGE_SCHEMA_VERSION}`);
     }
     const appliedSet = new Set(before.appliedMigrationIds);
+    const appliedNow: string[] = [];
     for (const migration of POSTGRES_SCHEMA_MIGRATIONS) {
       if (appliedSet.has(migration.id)) continue;
       await queryable.query(migration.sql);
@@ -276,6 +278,19 @@ export async function applyPostgresMigrations(queryable: PostgresQueryable, appV
         "insert into schema_migrations (migration_id, checksum, app_schema_version, app_version) values ($1, $2, $3, $4)",
         [migration.id, migration.checksum, migration.appSchemaVersion, appVersion],
       );
+      appliedNow.push(migration.id);
+    }
+    if (appliedNow.length > 0) {
+      await recordTeamAuditEvent(queryable, {
+        eventType: "team_migrations.apply",
+        metadata: {
+          appVersion,
+          appliedCount: appliedNow.length,
+          appliedMigrationIds: appliedNow,
+        },
+        userId: null,
+        workspaceId: null,
+      });
     }
     await queryable.query("commit");
   } catch (error) {

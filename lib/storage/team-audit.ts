@@ -2,9 +2,9 @@ import type { PostgresQueryable } from "@/lib/storage/postgres/connection";
 
 export interface TeamAuditEventInput {
   eventType: string;
-  metadata: Record<string, string | number | boolean | null>;
-  userId: string;
-  workspaceId: string;
+  metadata: Record<string, string | number | boolean | null | readonly string[]>;
+  userId: string | null;
+  workspaceId: string | null;
 }
 
 export async function recordTeamAuditEvent(

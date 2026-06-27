@@ -13,6 +13,7 @@ import {
 import { createPostgresWorkspaceStorageRepository } from "../lib/storage/postgres/repository";
 import {
   POSTGRES_SCHEMA_MIGRATIONS,
+  applyPostgresMigrations,
   getPostgresMigrationStatus,
 } from "../lib/storage/postgres/migrations";
 import type { PostgresQueryable } from "../lib/storage/postgres/connection";
@@ -148,6 +149,46 @@ test("getPostgresMigrationStatus rejects newer schemas through status flag", asy
   assert.equal(status.schemaTableExists, true);
   assert.equal(status.currentSchemaVersion, 999);
   assert.equal(status.unsupportedNewerSchema, true);
+});
+
+test("applyPostgresMigrations records a non-secret system audit event", async () => {
+  let schemaTableExists = false;
+  const appliedRows: Array<{ app_schema_version: number; migration_id: string }> = [];
+  const queries: Array<{ text: string; values?: readonly unknown[] }> = [];
+  const queryable: PostgresQueryable = {
+    query: async <T extends QueryResultRow = QueryResultRow>(text: string, values?: unknown[]) => {
+      queries.push({ text, values });
+      if (text.includes("to_regclass")) {
+        return typedQueryResult<T>([{ regclass: schemaTableExists ? "schema_migrations" : null }]);
+      }
+      if (text.includes("select migration_id")) {
+        return typedQueryResult<T>(appliedRows);
+      }
+      if (text.includes("create table if not exists schema_migrations")) {
+        schemaTableExists = true;
+      }
+      if (text.startsWith("insert into schema_migrations")) {
+        appliedRows.push({
+          app_schema_version: Number(values?.[2]),
+          migration_id: String(values?.[0]),
+        });
+      }
+      return typedQueryResult<T>([]);
+    },
+  };
+
+  const status = await applyPostgresMigrations(queryable, "0.1.0");
+  const audit = queries.find(query => query.text.includes("insert into audit_events"));
+
+  assert.deepEqual(status.appliedMigrationIds, ["0001_initial_team_storage"]);
+  assert.deepEqual(audit?.values?.slice(0, 3), [null, null, "team_migrations.apply"]);
+  assert.deepEqual(JSON.parse(String(audit?.values?.[3])) as unknown, {
+    appVersion: "0.1.0",
+    appliedCount: 1,
+    appliedMigrationIds: ["0001_initial_team_storage"],
+  });
+  assert.equal(queries[0]?.text, "begin");
+  assert.equal(queries.some(query => query.text === "commit"), true);
 });
 
 test("initial PostgreSQL migration contains the team storage foundation tables", () => {
