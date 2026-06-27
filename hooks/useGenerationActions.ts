@@ -18,11 +18,9 @@ import {
   type StorageItem,
 } from "@/lib/db";
 import {
-  cancelGenerationTask,
   createGenerationTask,
-  saveGenerationTask,
-  updateGenerationTask,
   type GenerationTask,
+  type GenerationTaskStorage,
   type GenerationTaskSource,
   type GenerationTaskUpdate,
 } from "@/lib/generation-tasks";
@@ -78,6 +76,7 @@ interface UseGenerationActionsParams {
   referenceImages: ReferenceImageRef[];
   runningHubYouchuan: RunningHubYouchuanAdvancedSettings;
   deleteAssetById: (id: string) => Promise<void>;
+  generationTaskStorage: Pick<GenerationTaskStorage, "cancel" | "save" | "update">;
   saveAssetDirect: (item: StorageItem) => Promise<StorageItem>;
   saveAssetWithPreview: (item: StorageItem) => Promise<StorageItem>;
   selectedModel: string;
@@ -269,6 +268,7 @@ function upsertGenerationTask(tasks: GenerationTask[], task: GenerationTask): Ge
 
 async function saveTaskOrWarn(
   task: GenerationTask,
+  saveGenerationTask: GenerationTaskStorage["save"],
   pushWorkspaceNotice: (type: NoticeType, message: string) => void,
   t: TFunction,
 ): Promise<boolean> {
@@ -286,6 +286,7 @@ async function saveTaskOrWarn(
 async function updateTaskOrWarn(
   id: string,
   update: GenerationTaskUpdate,
+  updateGenerationTask: GenerationTaskStorage["update"],
   pushWorkspaceNotice: (type: NoticeType, message: string) => void,
   t: TFunction,
 ): Promise<GenerationTask | null> {
@@ -301,6 +302,7 @@ async function updateTaskOrWarn(
 
 async function cancelTaskOrWarn(
   id: string,
+  cancelGenerationTask: GenerationTaskStorage["cancel"],
   pushWorkspaceNotice: (type: NoticeType, message: string) => void,
   t: TFunction,
 ): Promise<GenerationTask | null> {
@@ -406,6 +408,7 @@ export function useGenerationActions({
   referenceImages,
   runningHubYouchuan,
   deleteAssetById,
+  generationTaskStorage,
   saveAssetDirect,
   saveAssetWithPreview,
   selectedModel,
@@ -541,7 +544,7 @@ export function useGenerationActions({
       source: resolveTaskSource(overrides),
       request: generationRequest,
     });
-    if (!await saveTaskOrWarn(task, pushWorkspaceNotice, t)) {
+    if (!await saveTaskOrWarn(task, generationTaskStorage.save, pushWorkspaceNotice, t)) {
       setImageSubmitCount(prev => Math.max(0, prev - 1));
       return true;
     }
@@ -575,7 +578,7 @@ export function useGenerationActions({
             status: "processing",
             progress: 15,
             canCancelRemote: operationName.startsWith("12ai:video:"),
-          }, pushWorkspaceNotice, t);
+          }, generationTaskStorage.update, pushWorkspaceNotice, t);
           if (processingTask) recordGenerationTask(processingTask);
           return true;
         }
@@ -614,7 +617,7 @@ export function useGenerationActions({
             status: "failed",
             progress: 100,
             errorMessage: t("common.notices.imageResultAssetSaveFailed"),
-          }, pushWorkspaceNotice, t);
+          }, generationTaskStorage.update, pushWorkspaceNotice, t);
           if (failedTask) recordGenerationTask(failedTask);
           return true;
         }
@@ -624,7 +627,7 @@ export function useGenerationActions({
           resultAssetIds,
           status: "complete",
           progress: 100,
-        }, pushWorkspaceNotice, t);
+        }, generationTaskStorage.update, pushWorkspaceNotice, t);
         if (completeTask) recordGenerationTask(completeTask);
         setItems(prev => [...savedCompletedItems, ...prev]);
       } else {
@@ -633,7 +636,7 @@ export function useGenerationActions({
     } catch (error) {
       if (locallyCanceledItemIdsRef.current.has(taskId) || isAbortError(error)) {
         locallyCanceledItemIdsRef.current.delete(taskId);
-        const canceledTask = await cancelTaskOrWarn(taskId, pushWorkspaceNotice, t);
+        const canceledTask = await cancelTaskOrWarn(taskId, generationTaskStorage.cancel, pushWorkspaceNotice, t);
         if (canceledTask) recordGenerationTask(canceledTask);
         return true;
       }
@@ -643,7 +646,7 @@ export function useGenerationActions({
         status: "failed",
         progress: 100,
         errorMessage: message,
-      }, pushWorkspaceNotice, t);
+      }, generationTaskStorage.update, pushWorkspaceNotice, t);
       if (failedTask) recordGenerationTask(failedTask);
       pushWorkspaceNotice("error", message);
       return true;
@@ -738,7 +741,7 @@ export function useGenerationActions({
       source: resolveTaskSource(overrides),
       request: generationRequest,
     });
-    if (!await saveTaskOrWarn(task, pushWorkspaceNotice, t)) {
+    if (!await saveTaskOrWarn(task, generationTaskStorage.save, pushWorkspaceNotice, t)) {
       setVideoSubmitCount(prev => Math.max(0, prev - 1));
       return true;
     }
@@ -784,7 +787,7 @@ export function useGenerationActions({
           status: "processing",
           progress: 15,
           canCancelRemote: activeOperationName.startsWith("12ai:video:"),
-        }, pushWorkspaceNotice, t);
+        }, generationTaskStorage.update, pushWorkspaceNotice, t);
         if (processingTask) recordGenerationTask(processingTask);
       } else {
         throw new Error(await readFetchError(res, t("common.notices.videoGenRequestFailed")));
@@ -792,7 +795,7 @@ export function useGenerationActions({
     } catch (error) {
       if (locallyCanceledItemIdsRef.current.has(taskId) || isAbortError(error)) {
         locallyCanceledItemIdsRef.current.delete(taskId);
-        const canceledTask = await cancelTaskOrWarn(taskId, pushWorkspaceNotice, t);
+        const canceledTask = await cancelTaskOrWarn(taskId, generationTaskStorage.cancel, pushWorkspaceNotice, t);
         if (canceledTask) recordGenerationTask(canceledTask);
         return true;
       }
@@ -802,7 +805,7 @@ export function useGenerationActions({
         status: "failed",
         progress: 100,
         errorMessage: message,
-      }, pushWorkspaceNotice, t);
+      }, generationTaskStorage.update, pushWorkspaceNotice, t);
       if (failedTask) recordGenerationTask(failedTask);
       pushWorkspaceNotice("error", message);
       return true;
@@ -948,7 +951,7 @@ export function useGenerationActions({
         source: resolveTaskSource(overrides),
         request: generationRequest,
       });
-      if (!await saveTaskOrWarn(task, pushWorkspaceNotice, t)) {
+      if (!await saveTaskOrWarn(task, generationTaskStorage.save, pushWorkspaceNotice, t)) {
         setAudioSubmitCount(prev => Math.max(0, prev - 1));
         return true;
       }
@@ -1017,7 +1020,7 @@ export function useGenerationActions({
                 status: "failed",
                 progress: 100,
                 errorMessage: t("common.notices.imageResultAssetSaveFailed"),
-              }, pushWorkspaceNotice, t);
+              }, generationTaskStorage.update, pushWorkspaceNotice, t);
               if (failedTask) recordGenerationTask(failedTask);
               return true;
             }
@@ -1026,7 +1029,7 @@ export function useGenerationActions({
               resultAssetIds: [completedAssetId],
               status: "complete",
               progress: 100,
-            }, pushWorkspaceNotice, t);
+            }, generationTaskStorage.update, pushWorkspaceNotice, t);
             if (completeTask) recordGenerationTask(completeTask);
             setItems(prev => [savedCompletedItem, ...prev]);
             pushWorkspaceNotice("success", t("common.notices.audioTranscribeComplete"));
@@ -1061,7 +1064,7 @@ export function useGenerationActions({
               status: "failed",
               progress: 100,
               errorMessage: t("common.notices.imageResultAssetSaveFailed"),
-            }, pushWorkspaceNotice, t);
+            }, generationTaskStorage.update, pushWorkspaceNotice, t);
             if (failedTask) recordGenerationTask(failedTask);
             return true;
           }
@@ -1070,7 +1073,7 @@ export function useGenerationActions({
             resultAssetIds: [completedAssetId],
             status: "complete",
             progress: 100,
-          }, pushWorkspaceNotice, t);
+          }, generationTaskStorage.update, pushWorkspaceNotice, t);
           if (completeTask) recordGenerationTask(completeTask);
           setItems(prev => [savedCompletedItem, ...prev]);
           pushWorkspaceNotice("success", t("common.notices.audioGenComplete"));
@@ -1086,7 +1089,7 @@ export function useGenerationActions({
           status: "processing",
           progress: 15,
           canCancelRemote: activeOperationName.startsWith("12ai:video:"),
-        }, pushWorkspaceNotice, t);
+        }, generationTaskStorage.update, pushWorkspaceNotice, t);
         if (processingTask) recordGenerationTask(processingTask);
       } else {
         const parsedModel = parseProviderModel(requestModel, "12ai");
@@ -1097,7 +1100,7 @@ export function useGenerationActions({
       } catch (error) {
         if (locallyCanceledItemIdsRef.current.has(taskId) || isAbortError(error)) {
           locallyCanceledItemIdsRef.current.delete(taskId);
-          const canceledTask = await cancelTaskOrWarn(taskId, pushWorkspaceNotice, t);
+          const canceledTask = await cancelTaskOrWarn(taskId, generationTaskStorage.cancel, pushWorkspaceNotice, t);
           if (canceledTask) recordGenerationTask(canceledTask);
           return true;
         }
@@ -1107,7 +1110,7 @@ export function useGenerationActions({
           status: "failed",
           progress: 100,
           errorMessage: message,
-        }, pushWorkspaceNotice, t);
+        }, generationTaskStorage.update, pushWorkspaceNotice, t);
         if (failedTask) recordGenerationTask(failedTask);
         pushWorkspaceNotice("error", message);
         return true;

@@ -50,10 +50,10 @@ import { saveItemWithPreview } from "@/lib/assets/previews";
 import { resolveAssetOriginalUrl } from "@/lib/assets/resolve-url";
 import { audioOperationFormatOptions, audioOperationRequiresStylePrompt, audioOperationRequiresTextInput } from "@/lib/audio-operation-rules";
 import {
-  cancelGenerationTask,
-  deleteGenerationTask,
   generationTaskToGalleryItem,
+  indexedDbGenerationTaskStorage,
   legacyGenerationTaskId,
+  type GenerationTaskStorage,
 } from "@/lib/generation-tasks";
 import {
   IMAGE_REFERENCE_LIMIT,
@@ -134,11 +134,16 @@ import {
   type WorkspaceCleanupKind,
 } from "@/lib/data-management";
 import {
+  cancelTeamGenerationTask,
   deleteTeamAsset,
+  deleteTeamGenerationTask,
+  fetchTeamGenerationTasks,
   fetchTeamWorkspaceGalleryItems,
   fetchWorkspaceStorageRuntimeStatus,
   readTeamCsrfToken,
   saveTeamAsset,
+  saveTeamGenerationTask,
+  updateTeamGenerationTask,
 } from "@/lib/storage/team-client";
 import { useTranslations, t as translate } from "@/lib/i18n";
 import { readFetchError, toErrorMessage } from "@/lib/client-fetch-error";
@@ -188,6 +193,12 @@ function getStringField(value: unknown, field: string): string | null {
   const record = value as Record<string, unknown>;
   const fieldValue = record[field];
   return typeof fieldValue === "string" && fieldValue.trim() ? fieldValue : null;
+}
+
+function requireTeamCsrfToken(): string {
+  const csrfToken = readTeamCsrfToken();
+  if (!csrfToken) throw new Error("CSRF token is required");
+  return csrfToken;
 }
 
 function isAbortError(error: unknown): boolean {
@@ -281,7 +292,19 @@ export default function Home() {
   // Database State
   const [items, setItems] = useState<StorageItem[]>([]);
   const [workspaceStorageTarget, setWorkspaceStorageTarget] = useState<WorkspaceAssetStorageTarget>("indexeddb");
-  const { generationTasks, setGenerationTasks } = useGenerationTaskStore();
+  const workspaceGenerationTaskStorage = useMemo<GenerationTaskStorage>(() => {
+    if (workspaceStorageTarget !== "postgres") return indexedDbGenerationTaskStorage;
+    return {
+      cancel: taskId => cancelTeamGenerationTask(taskId, requireTeamCsrfToken()),
+      delete: taskId => deleteTeamGenerationTask(taskId, requireTeamCsrfToken()),
+      list: async options => (await fetchTeamGenerationTasks(options)).tasks,
+      save: async task => {
+        await saveTeamGenerationTask(task, requireTeamCsrfToken());
+      },
+      update: (taskId, update) => updateTeamGenerationTask(taskId, update, requireTeamCsrfToken()),
+    };
+  }, [workspaceStorageTarget]);
+  const { generationTasks, setGenerationTasks } = useGenerationTaskStore({ storage: workspaceGenerationTaskStorage });
 
   // Traditional Form States
   const [prompt, setPrompt] = useState("");
@@ -447,9 +470,7 @@ export default function Home() {
 
   const deleteWorkspaceAssetById = useCallback(async (id: string): Promise<void> => {
     if (workspaceStorageTarget === "postgres") {
-      const csrfToken = readTeamCsrfToken();
-      if (!csrfToken) throw new Error("CSRF token is required");
-      await deleteTeamAsset(id, csrfToken);
+      await deleteTeamAsset(id, requireTeamCsrfToken());
       return;
     }
     await deleteFromDB(id);
@@ -457,9 +478,7 @@ export default function Home() {
 
   const saveWorkspaceAssetDirect = useCallback(async (item: StorageItem): Promise<StorageItem> => {
     if (workspaceStorageTarget === "postgres") {
-      const csrfToken = readTeamCsrfToken();
-      if (!csrfToken) throw new Error("CSRF token is required");
-      return saveTeamAsset(item, csrfToken);
+      return saveTeamAsset(item, requireTeamCsrfToken());
     }
     await saveToDB(item);
     return item;
@@ -467,9 +486,7 @@ export default function Home() {
 
   const saveWorkspaceAssetWithPreview = useCallback(async (item: StorageItem): Promise<StorageItem> => {
     if (workspaceStorageTarget === "postgres") {
-      const csrfToken = readTeamCsrfToken();
-      if (!csrfToken) throw new Error("CSRF token is required");
-      return saveTeamAsset(item, csrfToken);
+      return saveTeamAsset(item, requireTeamCsrfToken());
     }
     return saveItemWithPreview(item);
   }, [workspaceStorageTarget]);
@@ -816,6 +833,7 @@ export default function Home() {
     pollingFailuresRef,
     pushWorkspaceNotice,
     saveAssetWithPreview: saveWorkspaceAssetWithPreview,
+    updateGenerationTask: workspaceGenerationTaskStorage.update,
     setGenerationTasks,
     setItems,
   });
@@ -846,6 +864,7 @@ export default function Home() {
     referenceImages,
     runningHubYouchuan,
     deleteAssetById: deleteWorkspaceAssetById,
+    generationTaskStorage: workspaceGenerationTaskStorage,
     saveAssetDirect: saveWorkspaceAssetDirect,
     saveAssetWithPreview: saveWorkspaceAssetWithPreview,
     selectedModel,
@@ -950,7 +969,7 @@ export default function Home() {
         }
       }
 
-      const canceledTask = await cancelGenerationTask(task.id);
+      const canceledTask = await workspaceGenerationTaskStorage.cancel(task.id);
       setGenerationTasks(prev => prev.map(entry => entry.id === canceledTask.id ? canceledTask : entry));
       delete pollingFailuresRef.current[task.id];
       pushWorkspaceNotice("success", task.canCancelRemote ? t("common.notices.generationTaskCancelled") : t("common.notices.taskCancelledLocally"));
@@ -967,6 +986,7 @@ export default function Home() {
     pushWorkspaceNotice,
     setCancelingItemIds,
     setGenerationTasks,
+    workspaceGenerationTaskStorage,
   ]);
 
   const deleteGalleryRecords = useCallback(async (ids: string[]) => {
@@ -982,9 +1002,9 @@ export default function Home() {
           locallyCanceledItemIdsRef.current.add(task.id);
           controller.abort();
         }
-        await cancelGenerationTask(task.id);
+        await workspaceGenerationTaskStorage.cancel(task.id);
       } else {
-        await deleteGenerationTask(task.id);
+        await workspaceGenerationTaskStorage.delete(task.id);
       }
       delete pollingFailuresRef.current[task.id];
     }
@@ -996,7 +1016,7 @@ export default function Home() {
     setItems(prev => prev.filter(item => !assetIds.includes(item.id)));
     setSelectedItemIds(prev => prev.filter(id => !idSet.has(id)));
     setCompareItemIds(prev => prev.filter(id => !idSet.has(id)));
-  }, [deleteWorkspaceAssetById, generationTasks, setCompareItemIds, setGenerationTasks, setItems, setSelectedItemIds]);
+  }, [deleteWorkspaceAssetById, generationTasks, setCompareItemIds, setGenerationTasks, setItems, setSelectedItemIds, workspaceGenerationTaskStorage]);
 
   const handleGalleryBatchDelete = async () => {
     if (selectedItemIds.length === 0) return;

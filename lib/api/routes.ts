@@ -29,6 +29,8 @@ export const API_ROUTES = {
     localStatus: "/api/storage/local/status",
     teamBootstrap: "/api/storage/team/bootstrap",
     teamAssets: "/api/storage/team/assets",
+    teamGenerationTasks: "/api/storage/team/generation-tasks",
+    teamGenerationTask: (taskId: string) => `/api/storage/team/generation-tasks/${encodeURIComponent(taskId)}`,
     teamBoards: "/api/storage/team/boards",
     teamBoard: (boardId: string) => `/api/storage/team/boards/${encodeURIComponent(boardId)}`,
     teamMembers: "/api/storage/team/members",

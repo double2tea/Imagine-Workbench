@@ -3,7 +3,7 @@ import { useEffect, useRef, type Dispatch, type MutableRefObject, type SetStateA
 import { API_ROUTES } from "@/lib/api/routes";
 import { readFetchError, toErrorMessage } from "@/lib/client-fetch-error";
 import { buildStorageItem, type GenerationRequestSnapshot, type StorageItem } from "@/lib/db";
-import { updateGenerationTask, type GenerationTask, type GenerationTaskUpdate } from "@/lib/generation-tasks";
+import type { GenerationTask, GenerationTaskStorage, GenerationTaskUpdate } from "@/lib/generation-tasks";
 
 type NoticeType = "error" | "info" | "success";
 const PROCESSING_TIMEOUT_MS = 2 * 60 * 60 * 1000;
@@ -16,6 +16,7 @@ interface UseMediaPollingParams {
   pushWorkspaceNotice: (type: NoticeType, message: string) => void;
   deleteAssetById: (id: string) => Promise<void>;
   saveAssetWithPreview: (item: StorageItem) => Promise<StorageItem>;
+  updateGenerationTask: GenerationTaskStorage["update"];
   setGenerationTasks: Dispatch<SetStateAction<GenerationTask[]>>;
   setItems: Dispatch<SetStateAction<StorageItem[]>>;
 }
@@ -99,6 +100,7 @@ function upsertGenerationTask(tasks: GenerationTask[], task: GenerationTask): Ge
 async function updateTaskOrWarn(
   id: string,
   update: GenerationTaskUpdate,
+  updateGenerationTask: GenerationTaskStorage["update"],
   pushWorkspaceNotice: (type: NoticeType, message: string) => void,
 ): Promise<GenerationTask | null> {
   try {
@@ -129,13 +131,14 @@ async function stopIfTaskLocallyCanceled(
   task: GenerationTask,
   locallyCanceledItemIdsRef: MutableRefObject<Set<string>>,
   pushWorkspaceNotice: (type: NoticeType, message: string) => void,
+  updateGenerationTask: GenerationTaskStorage["update"],
   setGenerationTasks: Dispatch<SetStateAction<GenerationTask[]>>,
 ): Promise<boolean> {
   if (!isTaskLocallyCanceled(task, locallyCanceledItemIdsRef)) return false;
   const canceledTask = await updateTaskOrWarn(task.id, {
     status: "canceled",
     progress: 100,
-  }, pushWorkspaceNotice);
+  }, updateGenerationTask, pushWorkspaceNotice);
   if (canceledTask) setGenerationTasks(current => upsertGenerationTask(current, canceledTask));
   return true;
 }
@@ -156,6 +159,7 @@ export function useMediaPolling({
   pushWorkspaceNotice,
   deleteAssetById,
   saveAssetWithPreview,
+  updateGenerationTask,
   setGenerationTasks,
   setItems,
 }: UseMediaPollingParams) {
@@ -182,13 +186,13 @@ export function useMediaPolling({
         if (task.status === "pending") {
           if (!isProcessingTimedOut(task)) continue;
           const timeoutMessage = t("common.notices.taskTimeoutPending");
-          if (await stopIfTaskLocallyCanceled(task, locallyCanceledItemIdsRef, pushWorkspaceNotice, setGenerationTasks)) continue;
+          if (await stopIfTaskLocallyCanceled(task, locallyCanceledItemIdsRef, pushWorkspaceNotice, updateGenerationTask, setGenerationTasks)) continue;
           const failedTask = await updateTaskOrWarn(task.id, {
             status: "failed",
             progress: 100,
             errorMessage: timeoutMessage,
-          }, pushWorkspaceNotice);
-          if (await stopIfTaskLocallyCanceled(task, locallyCanceledItemIdsRef, pushWorkspaceNotice, setGenerationTasks)) continue;
+          }, updateGenerationTask, pushWorkspaceNotice);
+          if (await stopIfTaskLocallyCanceled(task, locallyCanceledItemIdsRef, pushWorkspaceNotice, updateGenerationTask, setGenerationTasks)) continue;
           delete pollingFailuresRef.current[task.id];
           if (failedTask) setGenerationTasks(current => upsertGenerationTask(current, failedTask));
           pushWorkspaceNotice("error", timeoutMessage);
@@ -198,13 +202,13 @@ export function useMediaPolling({
         if (!task.operationName) {
           if (!isProcessingTimedOut(task)) continue;
           const timeoutMessage = t("common.notices.taskTimeoutOperation");
-          if (await stopIfTaskLocallyCanceled(task, locallyCanceledItemIdsRef, pushWorkspaceNotice, setGenerationTasks)) continue;
+          if (await stopIfTaskLocallyCanceled(task, locallyCanceledItemIdsRef, pushWorkspaceNotice, updateGenerationTask, setGenerationTasks)) continue;
           const failedTask = await updateTaskOrWarn(task.id, {
             status: "failed",
             progress: 100,
             errorMessage: timeoutMessage,
-          }, pushWorkspaceNotice);
-          if (await stopIfTaskLocallyCanceled(task, locallyCanceledItemIdsRef, pushWorkspaceNotice, setGenerationTasks)) continue;
+          }, updateGenerationTask, pushWorkspaceNotice);
+          if (await stopIfTaskLocallyCanceled(task, locallyCanceledItemIdsRef, pushWorkspaceNotice, updateGenerationTask, setGenerationTasks)) continue;
           delete pollingFailuresRef.current[task.id];
           if (failedTask) setGenerationTasks(current => upsertGenerationTask(current, failedTask));
           pushWorkspaceNotice("error", timeoutMessage);
@@ -212,7 +216,7 @@ export function useMediaPolling({
         }
 
         if (task.operationName) {
-          if (await stopIfTaskLocallyCanceled(task, locallyCanceledItemIdsRef, pushWorkspaceNotice, setGenerationTasks)) continue;
+          if (await stopIfTaskLocallyCanceled(task, locallyCanceledItemIdsRef, pushWorkspaceNotice, updateGenerationTask, setGenerationTasks)) continue;
           try {
             const headers = buildProviderHeaders(task.operationName);
 
@@ -232,16 +236,16 @@ export function useMediaPolling({
             }
             const statusRecord = statusData as Record<string, unknown>;
             pollingFailuresRef.current[task.id] = 0;
-            if (await stopIfTaskLocallyCanceled(task, locallyCanceledItemIdsRef, pushWorkspaceNotice, setGenerationTasks)) continue;
+            if (await stopIfTaskLocallyCanceled(task, locallyCanceledItemIdsRef, pushWorkspaceNotice, updateGenerationTask, setGenerationTasks)) continue;
 
             if (statusRecord.done === true && statusRecord.status === "failed") {
-              if (await stopIfTaskLocallyCanceled(task, locallyCanceledItemIdsRef, pushWorkspaceNotice, setGenerationTasks)) continue;
+              if (await stopIfTaskLocallyCanceled(task, locallyCanceledItemIdsRef, pushWorkspaceNotice, updateGenerationTask, setGenerationTasks)) continue;
               const failedTask = await updateTaskOrWarn(task.id, {
                 status: "failed",
                 progress: 100,
                 errorMessage: getStringField(statusData, "errorMessage") ?? t("common.notices.asyncTaskFailed"),
-              }, pushWorkspaceNotice);
-              if (await stopIfTaskLocallyCanceled(task, locallyCanceledItemIdsRef, pushWorkspaceNotice, setGenerationTasks)) continue;
+              }, updateGenerationTask, pushWorkspaceNotice);
+              if (await stopIfTaskLocallyCanceled(task, locallyCanceledItemIdsRef, pushWorkspaceNotice, updateGenerationTask, setGenerationTasks)) continue;
               delete pollingFailuresRef.current[task.id];
               if (failedTask) {
                 setGenerationTasks(current => upsertGenerationTask(current, failedTask));
@@ -280,12 +284,12 @@ export function useMediaPolling({
                   }
 
                   const blob = await dlRes.blob();
-                  if (await stopIfTaskLocallyCanceled(task, locallyCanceledItemIdsRef, pushWorkspaceNotice, setGenerationTasks)) {
+                  if (await stopIfTaskLocallyCanceled(task, locallyCanceledItemIdsRef, pushWorkspaceNotice, updateGenerationTask, setGenerationTasks)) {
                     wasCanceled = true;
                     break;
                   }
                   const completedUrl = await blobToDataUrl(blob);
-                  if (await stopIfTaskLocallyCanceled(task, locallyCanceledItemIdsRef, pushWorkspaceNotice, setGenerationTasks)) {
+                  if (await stopIfTaskLocallyCanceled(task, locallyCanceledItemIdsRef, pushWorkspaceNotice, updateGenerationTask, setGenerationTasks)) {
                     wasCanceled = true;
                     break;
                   }
@@ -307,7 +311,7 @@ export function useMediaPolling({
                     },
                     { boardId: task.source.boardId },
                   );
-                  if (await stopIfTaskLocallyCanceled(task, locallyCanceledItemIdsRef, pushWorkspaceNotice, setGenerationTasks)) {
+                  if (await stopIfTaskLocallyCanceled(task, locallyCanceledItemIdsRef, pushWorkspaceNotice, updateGenerationTask, setGenerationTasks)) {
                     wasCanceled = true;
                     break;
                   }
@@ -320,7 +324,7 @@ export function useMediaPolling({
                   const savedCompletedItem = await saveItemOrWarn(completedItem, saveAssetWithPreview, pushWorkspaceNotice);
                   if (savedCompletedItem) savedCompletedItems.push(savedCompletedItem);
                 }
-                if (await stopIfTaskLocallyCanceled(task, locallyCanceledItemIdsRef, pushWorkspaceNotice, setGenerationTasks)) {
+                if (await stopIfTaskLocallyCanceled(task, locallyCanceledItemIdsRef, pushWorkspaceNotice, updateGenerationTask, setGenerationTasks)) {
                   for (const savedItem of savedCompletedItems) await deleteItemOrWarn(savedItem.id, deleteAssetById, pushWorkspaceNotice);
                   continue;
                 }
@@ -330,7 +334,7 @@ export function useMediaPolling({
                       status: "failed",
                       progress: 100,
                       errorMessage: t("common.notices.imageResultAssetSaveFailed"),
-                    }, pushWorkspaceNotice);
+                    }, updateGenerationTask, pushWorkspaceNotice);
                   delete pollingFailuresRef.current[task.id];
                   if (failedTask) setGenerationTasks(current => upsertGenerationTask(current, failedTask));
                   continue;
@@ -341,12 +345,12 @@ export function useMediaPolling({
                   resultAssetIds,
                   status: "complete",
                   progress: 100,
-                }, pushWorkspaceNotice);
+                }, updateGenerationTask, pushWorkspaceNotice);
                 if (!completedTask) {
                   for (const savedItem of savedCompletedItems) await deleteItemOrWarn(savedItem.id, deleteAssetById, pushWorkspaceNotice);
                   continue;
                 }
-                if (await stopIfTaskLocallyCanceled(task, locallyCanceledItemIdsRef, pushWorkspaceNotice, setGenerationTasks)) {
+                if (await stopIfTaskLocallyCanceled(task, locallyCanceledItemIdsRef, pushWorkspaceNotice, updateGenerationTask, setGenerationTasks)) {
                   for (const savedItem of savedCompletedItems) await deleteItemOrWarn(savedItem.id, deleteAssetById, pushWorkspaceNotice);
                   continue;
                 }
@@ -360,13 +364,13 @@ export function useMediaPolling({
             } else {
               if (isProcessingTimedOut(task)) {
                 const timeoutMessage = t("common.notices.taskTimeoutProcessing");
-                if (await stopIfTaskLocallyCanceled(task, locallyCanceledItemIdsRef, pushWorkspaceNotice, setGenerationTasks)) continue;
+                if (await stopIfTaskLocallyCanceled(task, locallyCanceledItemIdsRef, pushWorkspaceNotice, updateGenerationTask, setGenerationTasks)) continue;
                 const failedTask = await updateTaskOrWarn(task.id, {
                   status: "failed",
                   progress: 100,
                   errorMessage: timeoutMessage,
-                }, pushWorkspaceNotice);
-                if (await stopIfTaskLocallyCanceled(task, locallyCanceledItemIdsRef, pushWorkspaceNotice, setGenerationTasks)) continue;
+                }, updateGenerationTask, pushWorkspaceNotice);
+                if (await stopIfTaskLocallyCanceled(task, locallyCanceledItemIdsRef, pushWorkspaceNotice, updateGenerationTask, setGenerationTasks)) continue;
                 delete pollingFailuresRef.current[task.id];
                 if (failedTask) setGenerationTasks(current => upsertGenerationTask(current, failedTask));
                 pushWorkspaceNotice("error", timeoutMessage);
@@ -375,30 +379,30 @@ export function useMediaPolling({
 
               const nextProgress = typeof statusRecord.progress === "number" ? statusRecord.progress : task.progress;
               if (task.progress !== nextProgress) {
-                if (await stopIfTaskLocallyCanceled(task, locallyCanceledItemIdsRef, pushWorkspaceNotice, setGenerationTasks)) continue;
+                if (await stopIfTaskLocallyCanceled(task, locallyCanceledItemIdsRef, pushWorkspaceNotice, updateGenerationTask, setGenerationTasks)) continue;
                 const progressTask = await updateTaskOrWarn(task.id, {
                   progress: nextProgress,
                   errorMessage: undefined,
-                }, pushWorkspaceNotice);
-                if (await stopIfTaskLocallyCanceled(task, locallyCanceledItemIdsRef, pushWorkspaceNotice, setGenerationTasks)) continue;
+                }, updateGenerationTask, pushWorkspaceNotice);
+                if (await stopIfTaskLocallyCanceled(task, locallyCanceledItemIdsRef, pushWorkspaceNotice, updateGenerationTask, setGenerationTasks)) continue;
                 if (progressTask) setGenerationTasks(current => upsertGenerationTask(current, progressTask));
               }
             }
           } catch (error) {
-            if (await stopIfTaskLocallyCanceled(task, locallyCanceledItemIdsRef, pushWorkspaceNotice, setGenerationTasks)) continue;
+            if (await stopIfTaskLocallyCanceled(task, locallyCanceledItemIdsRef, pushWorkspaceNotice, updateGenerationTask, setGenerationTasks)) continue;
             const previousFailures = pollingFailuresRef.current[task.id] ?? 0;
             const nextFailures = previousFailures + 1;
             pollingFailuresRef.current[task.id] = nextFailures;
             console.error(`Polling failed for ${task.id}:`, error);
 
             if (nextFailures >= 3) {
-              if (await stopIfTaskLocallyCanceled(task, locallyCanceledItemIdsRef, pushWorkspaceNotice, setGenerationTasks)) continue;
+              if (await stopIfTaskLocallyCanceled(task, locallyCanceledItemIdsRef, pushWorkspaceNotice, updateGenerationTask, setGenerationTasks)) continue;
               const waitingTask = await updateTaskOrWarn(task.id, {
                 status: "failed",
                 progress: 100,
                 errorMessage: toErrorMessage(error, t("common.notices.taskPollingFailed")),
-              }, pushWorkspaceNotice);
-              if (await stopIfTaskLocallyCanceled(task, locallyCanceledItemIdsRef, pushWorkspaceNotice, setGenerationTasks)) continue;
+              }, updateGenerationTask, pushWorkspaceNotice);
+              if (await stopIfTaskLocallyCanceled(task, locallyCanceledItemIdsRef, pushWorkspaceNotice, updateGenerationTask, setGenerationTasks)) continue;
               delete pollingFailuresRef.current[task.id];
               if (waitingTask) {
                 setGenerationTasks(current => upsertGenerationTask(current, waitingTask));
@@ -423,5 +427,5 @@ export function useMediaPolling({
     }, 4000);
 
     return () => clearInterval(interval);
-  }, [buildProviderHeaders, deleteAssetById, generationTasks, locallyCanceledItemIdsRef, pollingFailuresRef, pushWorkspaceNotice, saveAssetWithPreview, setGenerationTasks, setItems]);
+  }, [buildProviderHeaders, deleteAssetById, generationTasks, locallyCanceledItemIdsRef, pollingFailuresRef, pushWorkspaceNotice, saveAssetWithPreview, setGenerationTasks, setItems, updateGenerationTask]);
 }

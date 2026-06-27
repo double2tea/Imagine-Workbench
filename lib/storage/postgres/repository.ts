@@ -258,7 +258,7 @@ class PostgresGenerationTaskRepository implements WorkspaceGenerationTaskReposit
   async list(options: WorkspaceGenerationTaskListOptions = {}): Promise<WorkspaceGenerationTaskRecord[]> {
     const clauses: string[] = ["workspace_id = $1"];
     const values: unknown[] = [this.workspaceId];
-    if (options.boardId) {
+    if (options.boardId !== undefined) {
       values.push(options.boardId);
       clauses.push(`board_id = $${values.length}`);
     }

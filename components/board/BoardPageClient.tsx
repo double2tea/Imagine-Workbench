@@ -84,11 +84,11 @@ import {
   type StorageItem,
 } from "@/lib/db";
 import {
-  cancelGenerationTask,
-  deleteGenerationTask,
   generationTaskToGalleryItem,
+  indexedDbGenerationTaskStorage,
   legacyGenerationTaskId,
   type GenerationTask,
+  type GenerationTaskStorage,
 } from "@/lib/generation-tasks";
 import {
   DEFAULT_AUDIO_MODEL,
@@ -190,10 +190,15 @@ import {
 import { API_ROUTES } from "@/lib/api/routes";
 import { readFetchError, toErrorMessage } from "@/lib/client-fetch-error";
 import {
+  cancelTeamGenerationTask,
   deleteTeamAsset,
+  deleteTeamGenerationTask,
+  fetchTeamGenerationTasks,
   fetchWorkspaceStorageRuntimeStatus,
   readTeamCsrfToken,
   saveTeamAsset,
+  saveTeamGenerationTask,
+  updateTeamGenerationTask,
 } from "@/lib/storage/team-client";
 
 type NoticeType = "error" | "info" | "success";
@@ -241,6 +246,12 @@ function hasLocallyCanceledQuickEdit(ids: string[], canceledIds: Set<string>): b
 
 function clearLocallyCanceledQuickEdit(ids: string[], canceledIds: Set<string>): void {
   for (const id of ids) canceledIds.delete(id);
+}
+
+function requireTeamCsrfToken(): string {
+  const csrfToken = readTeamCsrfToken();
+  if (!csrfToken) throw new Error("CSRF token is required");
+  return csrfToken;
 }
 
 async function runSequentialGenerationVariants(variantCount: number, run: () => Promise<boolean>): Promise<boolean[]> {
@@ -1668,7 +1679,22 @@ export default function BoardPage({ boardId = DEFAULT_BOARD_ID }: BoardPageProps
     setItems,
   } = useBoardAssetStore(resolvedBoardId, boardController.board.nodes, boardStorageTarget);
   const updateBoardAssetReferenceUrls = boardController.updateAssetReferenceUrls;
-  const { generationTasks, setGenerationTasks } = useGenerationTaskStore({ boardId: resolvedBoardId });
+  const boardGenerationTaskStorage = useMemo<GenerationTaskStorage>(() => {
+    if (boardStorageTarget !== "postgres") return indexedDbGenerationTaskStorage;
+    return {
+      cancel: taskId => cancelTeamGenerationTask(taskId, requireTeamCsrfToken()),
+      delete: taskId => deleteTeamGenerationTask(taskId, requireTeamCsrfToken()),
+      list: async options => (await fetchTeamGenerationTasks(options)).tasks,
+      save: async task => {
+        await saveTeamGenerationTask(task, requireTeamCsrfToken());
+      },
+      update: (taskId, update) => updateTeamGenerationTask(taskId, update, requireTeamCsrfToken()),
+    };
+  }, [boardStorageTarget]);
+  const { generationTasks, setGenerationTasks } = useGenerationTaskStore({
+    boardId: resolvedBoardId,
+    storage: boardGenerationTaskStorage,
+  });
   const [boardSummaries, setBoardSummaries] = useState<BoardSummary[]>([]);
   const [, setMode] = useState<BoardMode>("image");
   const [prompt, setPrompt] = useState("");
@@ -1802,9 +1828,7 @@ export default function BoardPage({ boardId = DEFAULT_BOARD_ID }: BoardPageProps
 
   const deleteBoardAssetById = useCallback(async (id: string): Promise<void> => {
     if (boardStorageTarget === "postgres") {
-      const csrfToken = readTeamCsrfToken();
-      if (!csrfToken) throw new Error("CSRF token is required");
-      await deleteTeamAsset(id, csrfToken);
+      await deleteTeamAsset(id, requireTeamCsrfToken());
       return;
     }
     await deleteFromDB(id);
@@ -1812,9 +1836,7 @@ export default function BoardPage({ boardId = DEFAULT_BOARD_ID }: BoardPageProps
 
   const saveBoardAssetDirect = useCallback(async (item: StorageItem): Promise<StorageItem> => {
     if (boardStorageTarget === "postgres") {
-      const csrfToken = readTeamCsrfToken();
-      if (!csrfToken) throw new Error("CSRF token is required");
-      return saveTeamAsset(item, csrfToken);
+      return saveTeamAsset(item, requireTeamCsrfToken());
     }
     await saveToDB(item);
     return item;
@@ -1822,9 +1844,7 @@ export default function BoardPage({ boardId = DEFAULT_BOARD_ID }: BoardPageProps
 
   const saveBoardAssetWithPreview = useCallback(async (item: StorageItem): Promise<StorageItem> => {
     if (boardStorageTarget === "postgres") {
-      const csrfToken = readTeamCsrfToken();
-      if (!csrfToken) throw new Error("CSRF token is required");
-      return saveTeamAsset(item, csrfToken);
+      return saveTeamAsset(item, requireTeamCsrfToken());
     }
     return saveItemWithPreview(item);
   }, [boardStorageTarget]);
@@ -2268,6 +2288,7 @@ export default function BoardPage({ boardId = DEFAULT_BOARD_ID }: BoardPageProps
     pollingFailuresRef,
     pushWorkspaceNotice,
     saveAssetWithPreview: saveBoardAssetWithPreview,
+    updateGenerationTask: boardGenerationTaskStorage.update,
     setGenerationTasks,
     setItems,
   });
@@ -2294,6 +2315,7 @@ export default function BoardPage({ boardId = DEFAULT_BOARD_ID }: BoardPageProps
     referenceImages,
     runningHubYouchuan: RUNNINGHUB_YOUCHUAN_ADVANCED_DEFAULTS,
     deleteAssetById: deleteBoardAssetById,
+    generationTaskStorage: boardGenerationTaskStorage,
     saveAssetDirect: saveBoardAssetDirect,
     saveAssetWithPreview: saveBoardAssetWithPreview,
     selectedModel,
@@ -3965,7 +3987,7 @@ export default function BoardPage({ boardId = DEFAULT_BOARD_ID }: BoardPageProps
       }
       locallyCanceledItemIdsRef.current.add(task.id);
 
-      const canceledTask = await cancelGenerationTask(task.id);
+      const canceledTask = await boardGenerationTaskStorage.cancel(task.id);
       setGenerationTasks(prev => prev.map(current => current.id === canceledTask.id ? canceledTask : current));
       delete pollingFailuresRef.current[task.id];
       if (isSourceStackTask(task, sourceNode)) {
@@ -3990,6 +4012,7 @@ export default function BoardPage({ boardId = DEFAULT_BOARD_ID }: BoardPageProps
     }
   }, [
     boardController,
+    boardGenerationTaskStorage,
     buildProviderHeaders,
     cancelingBoardItemIds,
     confirmAction,
@@ -5130,12 +5153,12 @@ export default function BoardPage({ boardId = DEFAULT_BOARD_ID }: BoardPageProps
         message: t("common.dataManagement.ignoreFailedTaskConfirm"),
         confirmLabel: t("common.buttons.ignore"),
       }))) return;
-      await deleteGenerationTask(task.id);
+      await boardGenerationTaskStorage.delete(task.id);
       setGenerationTasks(prev => prev.filter(current => current.id !== task.id));
       delete pollingFailuresRef.current[task.id];
       pushWorkspaceNotice("success", t("common.dataManagement.taskIgnored"));
     })().catch(error => pushWorkspaceNotice("error", toErrorMessage(error, t("common.dataManagement.taskIgnoreFailed"))));
-  }, [confirmAction, pollingFailuresRef, pushWorkspaceNotice, setGenerationTasks, t]);
+  }, [boardGenerationTaskStorage, confirmAction, pollingFailuresRef, pushWorkspaceNotice, setGenerationTasks, t]);
 
   const handleBoardConnectionError = useCallback((message: string) => {
     pushWorkspaceNotice("error", message);

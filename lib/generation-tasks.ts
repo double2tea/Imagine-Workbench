@@ -72,6 +72,14 @@ export interface CreateGenerationTaskRetryInput {
 
 export type GenerationTaskUpdate = Partial<Omit<GenerationTask, "id" | "createdAt">>;
 
+export interface GenerationTaskStorage {
+  cancel(id: string): Promise<GenerationTask>;
+  delete(id: string): Promise<void>;
+  list(options?: ListGenerationTasksOptions): Promise<GenerationTask[]>;
+  save(task: GenerationTask): Promise<void>;
+  update(id: string, update: GenerationTaskUpdate): Promise<GenerationTask>;
+}
+
 function clampProgress(progress: number): number {
   if (!Number.isFinite(progress)) return 0;
   return Math.max(0, Math.min(100, Math.round(progress)));
@@ -260,10 +268,8 @@ export async function listGenerationTasks(options: ListGenerationTasksOptions = 
   return sorted;
 }
 
-export async function updateGenerationTask(id: string, update: GenerationTaskUpdate): Promise<GenerationTask> {
-  const current = await getGenerationTask(id);
-  if (!current) throw new Error(`Generation task not found: ${id}`);
-  const next: GenerationTask = {
+export function applyGenerationTaskUpdate(current: GenerationTask, update: GenerationTaskUpdate): GenerationTask {
+  return {
     ...current,
     ...update,
     progress: update.progress === undefined ? current.progress : clampProgress(update.progress),
@@ -271,6 +277,12 @@ export async function updateGenerationTask(id: string, update: GenerationTaskUpd
     resultAssetIds: update.resultAssetIds ? dedupeIds(update.resultAssetIds) : current.resultAssetIds,
     updatedAt: update.updatedAt ?? new Date().toISOString(),
   };
+}
+
+export async function updateGenerationTask(id: string, update: GenerationTaskUpdate): Promise<GenerationTask> {
+  const current = await getGenerationTask(id);
+  if (!current) throw new Error(`Generation task not found: ${id}`);
+  const next = applyGenerationTaskUpdate(current, update);
   await saveGenerationTask(next);
   return next;
 }
@@ -312,3 +324,11 @@ export function createRetryGenerationTask(
     request: task.request,
   });
 }
+
+export const indexedDbGenerationTaskStorage: GenerationTaskStorage = {
+  cancel: cancelGenerationTask,
+  delete: deleteGenerationTask,
+  list: listGenerationTasks,
+  save: saveGenerationTask,
+  update: updateGenerationTask,
+};

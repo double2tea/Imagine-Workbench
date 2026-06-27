@@ -1,11 +1,14 @@
 import assert from "node:assert/strict";
 import test from "node:test";
 import type { BoardDocument, BoardSummary } from "../lib/board/types";
+import type { GenerationTask } from "../lib/generation-tasks";
 
 import {
   bootstrapTeamOwner,
+  cancelTeamGenerationTask,
   createTeamMember,
   deleteTeamAsset,
+  deleteTeamGenerationTask,
   deleteTeamMember,
   createTeamBoardDocument,
   deleteTeamBoardDocument,
@@ -13,6 +16,7 @@ import {
   fetchTeamMembers,
   fetchTeamAssets,
   fetchTeamBoardSummaries,
+  fetchTeamGenerationTasks,
   fetchTeamStorageHealth,
   fetchTeamSession,
   fetchTeamWorkspaceGalleryItems,
@@ -21,8 +25,10 @@ import {
   readTeamCsrfToken,
   saveTeamBoardDocument,
   saveTeamAsset,
+  saveTeamGenerationTask,
   teamAssetRecordToStorageItem,
   teamAssetMediaUrl,
+  updateTeamGenerationTask,
   updateTeamMemberRole,
   fetchWorkspaceStorageRuntimeStatus,
   runTeamStorageMigrations,
@@ -49,6 +55,27 @@ function createStorageItem() {
     status: "complete" as const,
     type: "image" as const,
     url: "data:image/png;base64,aW1hZ2U=",
+  };
+}
+
+function createGenerationTask(overrides: Partial<GenerationTask> = {}): GenerationTask {
+  return {
+    canCancelRemote: true,
+    createdAt: "2026-06-27T00:00:00.000Z",
+    id: "task_1",
+    mediaType: "image",
+    model: "model",
+    progress: 40,
+    prompt: "prompt",
+    resultAssetIds: [],
+    source: {
+      boardId: "board_1",
+      boardNodeId: "node_1",
+      surface: "board",
+    },
+    status: "processing",
+    updatedAt: "2026-06-27T00:00:00.000Z",
+    ...overrides,
   };
 }
 
@@ -254,6 +281,87 @@ test("saveTeamAsset posts asset data with CSRF and maps media URL", async () => 
   assert.equal(result.url, "/api/storage/team/assets/asset_1/media");
   await assert.rejects(
     saveTeamAsset(createStorageItem(), " "),
+    /CSRF token is required/,
+  );
+});
+
+test("fetchTeamGenerationTasks sends list filters", async () => {
+  let requestedUrl = "";
+  const result = await fetchTeamGenerationTasks({
+    boardId: "board_1",
+    limit: 20,
+    offset: 5,
+    sourceBoardNodeIds: ["node_1", "node with spaces"],
+    statuses: ["processing", "failed"],
+  }, async input => {
+    requestedUrl = String(input);
+    return jsonResponse({
+      limit: 20,
+      offset: 5,
+      targetKind: "postgres",
+      tasks: [createGenerationTask()],
+      workspaceId: "workspace_1",
+    });
+  });
+
+  assert.equal(
+    requestedUrl,
+    "/api/storage/team/generation-tasks?boardId=board_1&limit=20&offset=5&sourceBoardNodeId=node_1&sourceBoardNodeId=node+with+spaces&status=processing&status=failed",
+  );
+  assert.deepEqual(result.tasks.map(task => task.id), ["task_1"]);
+});
+
+test("team generation task mutations send CSRF headers and parse tasks", async () => {
+  const task = createGenerationTask({ status: "pending" });
+  const requested: Array<{ body: unknown; csrf: string | null; method: string | undefined; url: string }> = [];
+  const fetcher = async (input: RequestInfo | URL, init?: RequestInit): Promise<Response> => {
+    requested.push({
+      body: init?.body ? JSON.parse(String(init.body)) : null,
+      csrf: new Headers(init?.headers).get("x-imagine-csrf-token"),
+      method: init?.method,
+      url: String(input),
+    });
+    if (init?.method === "DELETE") return jsonResponse({ ok: true });
+    return jsonResponse({
+      targetKind: "postgres",
+      task,
+      workspaceId: "workspace_1",
+    });
+  };
+
+  await saveTeamGenerationTask(task, "csrf-token", fetcher);
+  await updateTeamGenerationTask("task/1", { progress: 50 }, "csrf-token", fetcher);
+  await cancelTeamGenerationTask("task/1", "csrf-token", fetcher);
+  await deleteTeamGenerationTask("task/1", "csrf-token", fetcher);
+
+  assert.deepEqual(requested, [
+    {
+      body: { task },
+      csrf: "csrf-token",
+      method: "POST",
+      url: "/api/storage/team/generation-tasks",
+    },
+    {
+      body: { update: { progress: 50 } },
+      csrf: "csrf-token",
+      method: "PATCH",
+      url: "/api/storage/team/generation-tasks/task%2F1",
+    },
+    {
+      body: { update: { progress: 100, status: "canceled" } },
+      csrf: "csrf-token",
+      method: "PATCH",
+      url: "/api/storage/team/generation-tasks/task%2F1",
+    },
+    {
+      body: null,
+      csrf: "csrf-token",
+      method: "DELETE",
+      url: "/api/storage/team/generation-tasks/task%2F1",
+    },
+  ]);
+  await assert.rejects(
+    saveTeamGenerationTask(task, " "),
     /CSRF token is required/,
   );
 });

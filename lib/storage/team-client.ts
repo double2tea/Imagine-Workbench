@@ -2,6 +2,12 @@ import { API_ROUTES } from "@/lib/api/routes";
 import type { BoardDocument, BoardSummary } from "@/lib/board/types";
 import { readFetchError } from "@/lib/client-fetch-error";
 import type { StorageItem, StorageItemMeta } from "@/lib/db";
+import type {
+  GenerationTask,
+  GenerationTaskStatus,
+  GenerationTaskUpdate,
+  ListGenerationTasksOptions,
+} from "@/lib/generation-tasks";
 import type { PublicLocalStorageRuntimeStatus } from "@/lib/storage/local-public-runtime";
 import type { WORKSPACE_STORAGE_SCHEMA_VERSION } from "@/lib/storage/schema";
 import type {
@@ -11,6 +17,10 @@ import type {
   TeamAssetMutationResult,
 } from "@/lib/storage/team-asset-types";
 import type { TeamBoardDocumentResult, TeamBoardSummaryListResult } from "@/lib/storage/team-board-types";
+import type {
+  TeamGenerationTaskListResult,
+  TeamGenerationTaskMutationResult,
+} from "@/lib/storage/team-generation-task-types";
 import type {
   ManageableTeamRole,
   PublicTeamMember,
@@ -80,6 +90,8 @@ export interface TeamBoardSummaryListOptions {
   limit?: number;
   offset?: number;
 }
+
+export type TeamGenerationTaskListOptions = ListGenerationTasksOptions;
 
 type Fetcher = typeof fetch;
 
@@ -280,6 +292,95 @@ export async function fetchTeamAssets(
     throw new Error(error);
   }
   return parseTeamAssetListResult(body);
+}
+
+export async function fetchTeamGenerationTasks(
+  options: TeamGenerationTaskListOptions = {},
+  fetcher: Fetcher = fetch,
+): Promise<TeamGenerationTaskListResult> {
+  const response = await fetcher(teamGenerationTasksUrl(options), { cache: "no-store" });
+  const body: unknown = await response.json();
+  if (!response.ok) {
+    const error = readStringField(body, "error") ?? "Team generation task list failed";
+    throw new Error(error);
+  }
+  return parseTeamGenerationTaskListResult(body);
+}
+
+export async function saveTeamGenerationTask(
+  task: GenerationTask,
+  csrfToken: string,
+  fetcher: Fetcher = fetch,
+): Promise<GenerationTask> {
+  const token = csrfToken.trim();
+  if (!token) throw new Error("CSRF token is required");
+  const response = await fetcher(API_ROUTES.storage.teamGenerationTasks, {
+    cache: "no-store",
+    body: JSON.stringify({ task }),
+    headers: {
+      "content-type": "application/json",
+      "x-imagine-csrf-token": token,
+    },
+    method: "POST",
+  });
+  const body: unknown = await response.json();
+  if (!response.ok) {
+    const error = readStringField(body, "error") ?? "Team generation task save failed";
+    throw new Error(error);
+  }
+  return parseTeamGenerationTaskMutationResult(body).task;
+}
+
+export async function updateTeamGenerationTask(
+  taskId: string,
+  update: GenerationTaskUpdate,
+  csrfToken: string,
+  fetcher: Fetcher = fetch,
+): Promise<GenerationTask> {
+  const token = csrfToken.trim();
+  if (!token) throw new Error("CSRF token is required");
+  const response = await fetcher(API_ROUTES.storage.teamGenerationTask(taskId), {
+    cache: "no-store",
+    body: JSON.stringify({ update }),
+    headers: {
+      "content-type": "application/json",
+      "x-imagine-csrf-token": token,
+    },
+    method: "PATCH",
+  });
+  const body: unknown = await response.json();
+  if (!response.ok) {
+    const error = readStringField(body, "error") ?? "Team generation task update failed";
+    throw new Error(error);
+  }
+  return parseTeamGenerationTaskMutationResult(body).task;
+}
+
+export async function cancelTeamGenerationTask(
+  taskId: string,
+  csrfToken: string,
+  fetcher: Fetcher = fetch,
+): Promise<GenerationTask> {
+  return updateTeamGenerationTask(taskId, { progress: 100, status: "canceled" }, csrfToken, fetcher);
+}
+
+export async function deleteTeamGenerationTask(
+  taskId: string,
+  csrfToken: string,
+  fetcher: Fetcher = fetch,
+): Promise<void> {
+  const token = csrfToken.trim();
+  if (!token) throw new Error("CSRF token is required");
+  const response = await fetcher(API_ROUTES.storage.teamGenerationTask(taskId), {
+    cache: "no-store",
+    headers: { "x-imagine-csrf-token": token },
+    method: "DELETE",
+  });
+  const body: unknown = await response.json();
+  if (!response.ok) {
+    const error = readStringField(body, "error") ?? "Team generation task delete failed";
+    throw new Error(error);
+  }
 }
 
 export async function fetchTeamBoardSummaries(
@@ -500,6 +601,16 @@ function parseTeamAssetMutationResult(value: unknown): TeamAssetMutationResult {
   return value;
 }
 
+function parseTeamGenerationTaskListResult(value: unknown): TeamGenerationTaskListResult {
+  if (!isTeamGenerationTaskListResult(value)) throw new Error("Team generation task list response is invalid");
+  return value;
+}
+
+function parseTeamGenerationTaskMutationResult(value: unknown): TeamGenerationTaskMutationResult {
+  if (!isTeamGenerationTaskMutationResult(value)) throw new Error("Team generation task response is invalid");
+  return value;
+}
+
 function parseTeamBoardSummaryListResult(value: unknown): TeamBoardSummaryListResult {
   if (!isTeamBoardSummaryListResult(value)) throw new Error("Team board list response is invalid");
   return value;
@@ -523,6 +634,17 @@ function teamAssetsUrl(options: TeamAssetListOptions): string {
   for (const status of options.statuses ?? []) searchParams.append("status", status);
   const query = searchParams.toString();
   return query ? `${API_ROUTES.storage.teamAssets}?${query}` : API_ROUTES.storage.teamAssets;
+}
+
+function teamGenerationTasksUrl(options: TeamGenerationTaskListOptions): string {
+  const searchParams = new URLSearchParams();
+  if (options.boardId !== undefined) searchParams.set("boardId", options.boardId);
+  if (options.limit !== undefined) searchParams.set("limit", String(options.limit));
+  if (options.offset !== undefined) searchParams.set("offset", String(options.offset));
+  for (const nodeId of options.sourceBoardNodeIds ?? []) searchParams.append("sourceBoardNodeId", nodeId);
+  for (const status of options.statuses ?? []) searchParams.append("status", status);
+  const query = searchParams.toString();
+  return query ? `${API_ROUTES.storage.teamGenerationTasks}?${query}` : API_ROUTES.storage.teamGenerationTasks;
 }
 
 function teamBoardsUrl(options: TeamBoardSummaryListOptions): string {
@@ -577,6 +699,27 @@ function isTeamAssetMutationResult(value: unknown): value is TeamAssetMutationRe
     value.targetKind === "postgres" &&
     typeof value.workspaceId === "string" &&
     isPublicTeamAssetRecord(value.asset)
+  );
+}
+
+function isTeamGenerationTaskListResult(value: unknown): value is TeamGenerationTaskListResult {
+  if (!isRecord(value)) return false;
+  return (
+    value.targetKind === "postgres" &&
+    typeof value.workspaceId === "string" &&
+    Number.isInteger(value.limit) &&
+    Number.isInteger(value.offset) &&
+    Array.isArray(value.tasks) &&
+    value.tasks.every(isGenerationTask)
+  );
+}
+
+function isTeamGenerationTaskMutationResult(value: unknown): value is TeamGenerationTaskMutationResult {
+  if (!isRecord(value)) return false;
+  return (
+    value.targetKind === "postgres" &&
+    typeof value.workspaceId === "string" &&
+    isGenerationTask(value.task)
   );
 }
 
@@ -703,6 +846,47 @@ function isTeamRole(value: unknown): value is TeamSessionContext["role"] {
 
 function isStorageItemStatus(value: unknown): value is StorageItemMeta["status"] {
   return value === "complete" || value === "processing" || value === "pending" || value === "failed";
+}
+
+function isGenerationTask(value: unknown): value is GenerationTask {
+  if (!isRecord(value)) return false;
+  return (
+    typeof value.id === "string" &&
+    isGenerationTaskMediaType(value.mediaType) &&
+    typeof value.prompt === "string" &&
+    typeof value.model === "string" &&
+    isGenerationTaskStatus(value.status) &&
+    typeof value.progress === "number" &&
+    typeof value.createdAt === "string" &&
+    typeof value.updatedAt === "string" &&
+    isGenerationTaskSource(value.source) &&
+    Array.isArray(value.resultAssetIds) &&
+    value.resultAssetIds.every(item => typeof item === "string") &&
+    optionalString(value.activeResultAssetId) &&
+    optionalString(value.operationName) &&
+    optionalString(value.errorMessage) &&
+    optionalString(value.legacyAssetId) &&
+    (value.request === undefined || isRecord(value.request)) &&
+    typeof value.canCancelRemote === "boolean"
+  );
+}
+
+function isGenerationTaskSource(value: unknown): boolean {
+  if (!isRecord(value)) return false;
+  return (
+    (value.surface === "workspace" || value.surface === "board" || value.surface === "agent") &&
+    optionalString(value.boardId) &&
+    optionalString(value.boardNodeId) &&
+    optionalString(value.resultStackKey)
+  );
+}
+
+function isGenerationTaskMediaType(value: unknown): boolean {
+  return value === "image" || value === "video" || value === "audio" || value === "transcript";
+}
+
+function isGenerationTaskStatus(value: unknown): value is GenerationTaskStatus {
+  return value === "pending" || value === "processing" || value === "complete" || value === "failed" || value === "canceled";
 }
 
 function isPayloadKind(value: unknown): value is PublicTeamAssetPayload["kind"] {
