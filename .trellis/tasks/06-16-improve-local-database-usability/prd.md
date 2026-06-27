@@ -184,8 +184,8 @@ Still remaining before the full PRD can be considered complete:
 
 * [x] Users can clearly see whether the active storage mode is IndexedDB or PostgreSQL.
 * [x] Browser/deployed mode continues to work with IndexedDB and does not require PostgreSQL.
-* [ ] With no PostgreSQL/team environment variables configured, the app behaves like the current project: no login prompt, no team setup prompt, no required migration, and no visible disruption to existing creation/board/gallery/settings workflows.
-* [ ] Team/PostgreSQL UI, auth bootstrap, and PostgreSQL routes are shown or enabled only when team mode is explicitly configured.
+* [x] With no PostgreSQL/team environment variables configured, the app behaves like the current project: no login prompt, no team setup prompt, no required migration, and no visible disruption to existing creation/board/gallery/settings workflows.
+* [x] Team/PostgreSQL UI, auth bootstrap, and PostgreSQL routes are shown or enabled only when team mode is explicitly configured.
 * [x] Storage-mode code exposes only `browser` and `postgres` for this task; stale SQLite/local-database/local-folder/remote-api planned targets are removed or made non-product-facing.
 * [x] Team deployment templates are included and documented: Dockerfile, Docker Compose, team env example, media volume mapping, PostgreSQL volume mapping, and first-run bootstrap instructions.
 * [x] Deployment templates do not change the default local/browser workflow and are opt-in.
@@ -229,7 +229,7 @@ Still remaining before the full PRD can be considered complete:
 * [x] Settings -> Data reports PostgreSQL mode health, storage counts, and actionable maintenance states.
 * [x] PostgreSQL routes and driver imports are Node-only and do not break Cloudflare Pages/public builds.
 * [x] PostgreSQL connections use a bounded server-side pool with configured timeouts; health checks fail visibly when the pool/database is unavailable.
-* [x] Storage-focused tests cover migrations, CRUD, payload refs, hosted/browser mode, PostgreSQL fail-fast config errors, explicit migration, backup/restore target selection, authz role checks, config hiding, and CSRF/origin rejection.
+* [x] Storage-focused tests cover migrations, CRUD, payload refs, hosted/browser mode, PostgreSQL fail-fast config errors, explicit migration, backup/restore target selection, authz role checks, config hiding, CSRF/origin rejection, and ego-browser browser-mode smoke coverage for the main workstation, board route, Settings -> Data, and disabled PostgreSQL health behavior.
 * [x] `pnpm run lint` and `pnpm run typecheck` pass.
 
 ## Research References
