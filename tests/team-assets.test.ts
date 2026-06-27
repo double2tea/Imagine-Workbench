@@ -60,6 +60,26 @@ test("listTeamAssets returns safe metadata records scoped to the session workspa
   );
 });
 
+test("listTeamAssets preserves empty board id for workspace gallery queries", async () => {
+  const queries: Array<{ text: string; values?: readonly unknown[] }> = [];
+  const result = await listTeamAssets(
+    createTeamAssetsQueryable(queries),
+    { databaseUrl: "postgres://localhost/imagine", mediaDir: "/srv/imagine/media" },
+    requestWithSession(),
+    {
+      boardId: "",
+      limit: 5,
+      offset: 0,
+    },
+  );
+
+  assert.equal(result.limit, 5);
+  assert.deepEqual(
+    queries.find(query => query.text.startsWith("select meta from assets"))?.values,
+    [WORKSPACE_ID, "", 5, 0],
+  );
+});
+
 test("team assets route rejects invalid query params before opening a database client", async () => {
   const originalEnv = {
     DATABASE_URL: process.env.DATABASE_URL,

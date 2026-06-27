@@ -19,6 +19,7 @@ export interface WorkspaceStoragePageOptions {
 }
 
 export interface WorkspaceAssetListOptions extends WorkspaceStoragePageOptions {
+  /** Empty string targets workspace-global assets. Undefined means no board filter. */
   boardId?: string;
   ids?: string[];
   statuses?: StorageItemMeta["status"][];

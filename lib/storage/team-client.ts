@@ -99,6 +99,13 @@ export function teamAssetRecordToStorageItem(record: PublicTeamAssetRecord): Sto
   };
 }
 
+export async function fetchTeamWorkspaceGalleryItems(fetcher: Fetcher = fetch): Promise<StorageItem[]> {
+  const result = await fetchTeamAssets({ boardId: "", limit: 200 }, fetcher);
+  return result.assets
+    .filter(record => !record.meta.libraryItemId)
+    .map(teamAssetRecordToStorageItem);
+}
+
 export function readTeamCsrfToken(cookieHeader = typeof document === "undefined" ? "" : document.cookie): string | null {
   for (const part of cookieHeader.split(";")) {
     const [rawKey, ...rawValue] = part.split("=");
@@ -456,7 +463,7 @@ function readTeamStorageClientError(value: unknown, fallback: string): TeamStora
 
 function teamAssetsUrl(options: TeamAssetListOptions): string {
   const searchParams = new URLSearchParams();
-  if (options.boardId) searchParams.set("boardId", options.boardId);
+  if (options.boardId !== undefined) searchParams.set("boardId", options.boardId);
   for (const id of options.ids ?? []) searchParams.append("id", id);
   if (options.limit !== undefined) searchParams.set("limit", String(options.limit));
   if (options.offset !== undefined) searchParams.set("offset", String(options.offset));

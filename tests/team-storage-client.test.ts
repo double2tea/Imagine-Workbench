@@ -14,6 +14,7 @@ import {
   fetchTeamBoardSummaries,
   fetchTeamStorageHealth,
   fetchTeamSession,
+  fetchTeamWorkspaceGalleryItems,
   loginTeamSession,
   logoutTeamSession,
   readTeamCsrfToken,
@@ -130,6 +131,58 @@ test("fetchTeamAssets sends list filters and rejects payload storage keys", asyn
     })),
     /Team asset list response is invalid/,
   );
+});
+
+test("fetchTeamWorkspaceGalleryItems reads workspace-global team assets", async () => {
+  let requestedUrl = "";
+  const result = await fetchTeamWorkspaceGalleryItems(async input => {
+    requestedUrl = String(input);
+    return jsonResponse({
+      assets: [
+        {
+          mediaUrl: "/api/storage/team/assets/workspace_asset/media",
+          meta: {
+            aspectRatio: "1:1",
+            boardId: "",
+            createdAt: "2026-06-27T00:00:00.000Z",
+            hasBlob: true,
+            id: "workspace_asset",
+            model: "model",
+            progress: 100,
+            prompt: "prompt",
+            scope: "workspace",
+            status: "complete",
+            type: "image",
+          },
+        },
+        {
+          mediaUrl: "/api/storage/team/assets/library_backing/media",
+          meta: {
+            aspectRatio: "1:1",
+            boardId: "",
+            createdAt: "2026-06-27T00:00:00.000Z",
+            hasBlob: true,
+            id: "library_backing",
+            libraryItemId: "library_1",
+            model: "model",
+            progress: 100,
+            prompt: "prompt",
+            scope: "workspace",
+            status: "complete",
+            type: "image",
+          },
+        },
+      ],
+      limit: 200,
+      offset: 0,
+      targetKind: "postgres",
+      workspaceId: "workspace_1",
+    });
+  });
+
+  assert.equal(requestedUrl, "/api/storage/team/assets?boardId=&limit=200");
+  assert.deepEqual(result.map(item => item.id), ["workspace_asset"]);
+  assert.equal(result[0]?.url, "/api/storage/team/assets/workspace_asset/media");
 });
 
 test("fetchTeamBoardSummaries sends list filters and validates summaries", async () => {

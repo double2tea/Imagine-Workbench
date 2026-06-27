@@ -25,7 +25,7 @@ export async function GET(request: Request): Promise<Response> {
 
 function parseTeamAssetListOptions(searchParams: URLSearchParams): WorkspaceAssetListOptions {
   return {
-    boardId: optionalTextParam(searchParams, "boardId"),
+    boardId: optionalBoardIdParam(searchParams, "boardId"),
     ids: repeatedTextParam(searchParams, "id"),
     limit: integerParam(searchParams, "limit", 100, 1, 200),
     offset: integerParam(searchParams, "offset", 0, 0, Number.MAX_SAFE_INTEGER),
@@ -33,9 +33,9 @@ function parseTeamAssetListOptions(searchParams: URLSearchParams): WorkspaceAsse
   };
 }
 
-function optionalTextParam(searchParams: URLSearchParams, name: string): string | undefined {
-  const value = searchParams.get(name)?.trim();
-  return value || undefined;
+function optionalBoardIdParam(searchParams: URLSearchParams, name: string): string | undefined {
+  const value = searchParams.get(name);
+  return value === null ? undefined : value.trim();
 }
 
 function repeatedTextParam(searchParams: URLSearchParams, name: string): string[] | undefined {

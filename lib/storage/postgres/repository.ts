@@ -111,7 +111,7 @@ class PostgresAssetRepository implements WorkspaceAssetRepository {
   async list(options: WorkspaceAssetListOptions = {}): Promise<WorkspaceAssetRecord[]> {
     const clauses: string[] = ["workspace_id = $1"];
     const values: unknown[] = [this.workspaceId];
-    if (options.boardId) {
+    if (options.boardId !== undefined) {
       values.push(options.boardId);
       clauses.push(`meta->>'boardId' = $${values.length}`);
     }

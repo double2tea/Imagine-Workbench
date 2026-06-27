@@ -132,12 +132,17 @@ import {
   type LocalStorageCleanupKind,
   type WorkspaceCleanupKind,
 } from "@/lib/data-management";
+import {
+  fetchTeamWorkspaceGalleryItems,
+  fetchWorkspaceStorageRuntimeStatus,
+} from "@/lib/storage/team-client";
 import { useTranslations, t as translate } from "@/lib/i18n";
 import { readFetchError, toErrorMessage } from "@/lib/client-fetch-error";
 import { getClearWorkspaceAssetsMessage } from "@/lib/workspace-messages";
 
 type NoticeType = "error" | "info" | "success";
 type MaskDestination = "creative" | "agent";
+type WorkspaceAssetStorageTarget = "indexeddb" | "postgres";
 type AssetLibraryMode = "manage" | "reference";
 type ImageSizeMode = "preset" | "custom";
 
@@ -271,6 +276,7 @@ export default function Home() {
 
   // Database State
   const [items, setItems] = useState<StorageItem[]>([]);
+  const [workspaceStorageTarget, setWorkspaceStorageTarget] = useState<WorkspaceAssetStorageTarget>("indexeddb");
   const { generationTasks, setGenerationTasks } = useGenerationTaskStore();
 
   // Traditional Form States
@@ -411,6 +417,20 @@ export default function Home() {
     enabled: resolveIntegrationEnabled,
     pushWorkspaceNotice,
   });
+
+  useEffect(() => {
+    let isActive = true;
+    void fetchWorkspaceStorageRuntimeStatus()
+      .then(status => {
+        if (isActive) setWorkspaceStorageTarget(status.targetKind);
+      })
+      .catch(error => {
+        if (isActive) pushWorkspaceNotice("error", `Storage status read failed: ${toErrorMessage(error, "Storage status failed")}`);
+      });
+    return () => {
+      isActive = false;
+    };
+  }, [pushWorkspaceNotice]);
 
   const resolveOriginalStorageItem = useCallback(async (item: StorageItem): Promise<StorageItem> => {
     const storedItem = items.find(entry => entry.id === item.id) ?? item;
@@ -1184,31 +1204,43 @@ export default function Home() {
 
   // Load items from database on mount
   useEffect(() => {
+    let isActive = true;
     async function loadWorkspace() {
       try {
+        if (workspaceStorageTarget === "postgres") {
+          const teamItems = await fetchTeamWorkspaceGalleryItems();
+          if (isActive) setItems(teamItems);
+          return;
+        }
         const metas = await listWorkspaceGalleryMetas();
+        if (!isActive) return;
         setItems(metas.map(metaToPlaceholderItem));
         const firstBatch = metas.slice(0, 40);
         if (firstBatch.length > 0) {
           const hydrated = await hydrateAssets(firstBatch);
+          if (!isActive) return;
           setItems(current => mergeStorageItems(current, hydrated));
           const rest = metas.slice(40, 120);
           if (rest.length > 0) {
             window.setTimeout(() => {
-              void hydrateAssets(rest).then(more =>
-                setItems(current => mergeStorageItems(current, more)),
-              );
+              void hydrateAssets(rest).then(more => {
+                if (isActive) setItems(current => mergeStorageItems(current, more));
+              });
             }, 0);
           }
         }
       } catch (error) {
-        console.error("IndexedDB Read Failed:", error);
-        pushWorkspaceNotice("error", t("common.notices.localProjectReadFailed", { error: toErrorMessage(error, t("common.notices.indexedDbReadFailed")) }));
+        console.error("Workspace asset read failed:", error);
+        if (isActive) {
+          pushWorkspaceNotice("error", t("common.notices.localProjectReadFailed", { error: toErrorMessage(error, t("common.notices.indexedDbReadFailed")) }));
+        }
       }
     }
     loadWorkspace();
-
-  }, [pushWorkspaceNotice]);
+    return () => {
+      isActive = false;
+    };
+  }, [pushWorkspaceNotice, t, workspaceStorageTarget]);
 
   // Optimize prompt inside text area using the selected chat model.
   const optimizeActivePrompt = async (promptOverride?: string) => {
@@ -1637,13 +1669,17 @@ export default function Home() {
     await clearProjectAssets();
   };
 
-  const reloadAssetsFromDB = useCallback(async () => {
+  const reloadWorkspaceAssets = useCallback(async () => {
+    if (workspaceStorageTarget === "postgres") {
+      setItems(await fetchTeamWorkspaceGalleryItems());
+      return;
+    }
     const metas = await listWorkspaceGalleryMetas();
     setItems(metas.map(metaToPlaceholderItem));
     void hydrateAssets(metas.slice(0, 80)).then(hydrated =>
       setItems(current => mergeStorageItems(current, hydrated)),
     );
-  }, []);
+  }, [workspaceStorageTarget]);
 
   const activePromptReferenceTarget = useCallback((): Exclude<AtDropdownTarget, "agent-prompt"> => {
     if (traditionalSubTab === "audio") return "audio-prompt";
@@ -1758,24 +1794,24 @@ export default function Home() {
   const handleDataCleanupAssets = useCallback(async (kind: WorkspaceCleanupKind) => {
     try {
       const result = await cleanupWorkspaceAssets(kind);
-      await reloadAssetsFromDB();
+      await reloadWorkspaceAssets();
       setSelectedItemIds(prev => prev.filter(id => !result.deletedIds.includes(id)));
       setCompareItemIds(prev => prev.filter(id => !result.deletedIds.includes(id)));
       pushWorkspaceNotice("success", t("common.dataManagement.assetsCleanupSuccess", { count: result.deletedIds.length }));
     } catch (error) {
       pushWorkspaceNotice("error", toErrorMessage(error, t("common.dataManagement.assetsCleanupFailed")));
     }
-  }, [pushWorkspaceNotice, reloadAssetsFromDB, setCompareItemIds, setSelectedItemIds]);
+  }, [pushWorkspaceNotice, reloadWorkspaceAssets, setCompareItemIds, setSelectedItemIds]);
 
   const handleDataRepairAssetSources = useCallback(async () => {
     try {
       const result = await repairStaleAssetSourceLinks();
-      await reloadAssetsFromDB();
+      await reloadWorkspaceAssets();
       pushWorkspaceNotice("success", t("common.dataManagement.sourceLinkRepairSuccess", { count: result.repairedIds.length }));
     } catch (error) {
       pushWorkspaceNotice("error", toErrorMessage(error, t("common.dataManagement.sourceLinkRepairFailed")));
     }
-  }, [pushWorkspaceNotice, reloadAssetsFromDB]);
+  }, [pushWorkspaceNotice, reloadWorkspaceAssets]);
 
   const handleDataClearLocalStorage = useCallback(async (kind: LocalStorageCleanupKind) => {
     const count = clearLocalStorageGroup(kind);
