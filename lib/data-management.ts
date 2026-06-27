@@ -113,6 +113,21 @@ const SAFETY_DB_NAME = "ImagineWorkbenchSafetyDB";
 const SAFETY_DB_VERSION = 1;
 const SAFETY_SNAPSHOT_STORE = "workspace_safety_snapshots";
 const LATEST_SAFETY_SNAPSHOT_ID = "latest";
+const INDEXEDDB_PREFIX = "ImagineWorkbench";
+const KNOWN_INDEXEDDB_STORES: Record<string, readonly string[]> = {
+  ImagineWorkbenchBoardDB: ["boards", "board_summaries"],
+  ImagineWorkbenchDB: [
+    "assets",
+    "assets_meta",
+    "assets_blob",
+    "asset_blob_payloads",
+    "asset_library",
+    "asset_previews",
+    "generation_tasks",
+  ],
+  ImagineWorkbenchSafetyDB: ["workspace_safety_snapshots"],
+  ImagineWorkbenchVoiceDB: ["voice_profiles"],
+};
 
 export type {
   LocalStorageCleanupKind,
@@ -141,6 +156,48 @@ export interface WorkspaceImportResult {
   generationTaskCount: number;
   libraryAssetCount: number;
   settingsKeyCount: number;
+  voiceProfileCount: number;
+}
+
+export interface WorkspaceBrowserMigrationUnknownIndexedDbSource {
+  database: string;
+  store?: string;
+}
+
+export interface WorkspaceBrowserMigrationPreview {
+  assetCount: number;
+  assetPayloadRecordCount: number;
+  assetPreviewRecordCount: number;
+  boardCount: number;
+  blockingIssueCount: number;
+  canImport: boolean;
+  generationTaskCount: number;
+  indexedDbIntrospectionAvailable: boolean;
+  libraryAssetCount: number;
+  localOnlyLocalStorageKeyCount: number;
+  managedLocalStorageBytes: number;
+  managedLocalStorageKeyCount: number;
+  optionalCredentialLocalStorageKeyCount: number;
+  optionalLocalStorageKeyCount: number;
+  requiredLocalStorageKeyCount: number;
+  safetySnapshotCount: number;
+  unknownIndexedDbSources: WorkspaceBrowserMigrationUnknownIndexedDbSource[];
+  unknownLocalStorageKeys: string[];
+  voiceProfileCount: number;
+}
+
+interface BrowserMigrationPreviewInput {
+  assetCount: number;
+  assetPayloadRecordCount: number;
+  assetPreviewRecordCount: number;
+  boardCount: number;
+  generationTaskCount: number;
+  indexedDbIntrospectionAvailable: boolean;
+  libraryAssetCount: number;
+  localStorageEntries: Record<string, string>;
+  safetySnapshotCount: number;
+  unknownIndexedDbSources: WorkspaceBrowserMigrationUnknownIndexedDbSource[];
+  unknownLocalStorageKeys: string[];
   voiceProfileCount: number;
 }
 
@@ -399,6 +456,80 @@ export async function previewWorkspaceBackup(file: File): Promise<WorkspaceImpor
     schemaVersion: manifest.schemaVersion,
     settingsKeyCount: Object.keys(settings.localStorage).length,
     voiceProfileCount: voiceProfiles.length,
+  };
+}
+
+export async function previewBrowserToPostgresMigration(): Promise<WorkspaceBrowserMigrationPreview> {
+  const [
+    assets,
+    boards,
+    libraryRecords,
+    generationTasks,
+    voiceProfiles,
+    stores,
+    latestSnapshot,
+    indexedDbSources,
+  ] = await Promise.all([
+    listAllAssetMetas(),
+    listBoardsFromDB(),
+    listLibraryAssetRecords(),
+    listGenerationTasks(),
+    listVoiceProfiles(),
+    getAssetDatabaseDiagnostics(),
+    getLatestWorkspaceSafetySnapshotSummary(),
+    inspectUnknownIndexedDbSources(),
+  ]);
+  return buildBrowserToPostgresMigrationPreview({
+    assetCount: assets.length,
+    assetPayloadRecordCount: stores.sharedBlobRecords + stores.legacyBlobRecords,
+    assetPreviewRecordCount: stores.previewRecords,
+    boardCount: boards.length,
+    generationTaskCount: generationTasks.length,
+    indexedDbIntrospectionAvailable: indexedDbSources.available,
+    libraryAssetCount: libraryRecords.length,
+    localStorageEntries: readManagedLocalStorage(true),
+    safetySnapshotCount: latestSnapshot ? 1 : 0,
+    unknownIndexedDbSources: indexedDbSources.unknownSources,
+    unknownLocalStorageKeys: readUnknownImagineLocalStorageKeys(),
+    voiceProfileCount: voiceProfiles.length,
+  });
+}
+
+export function buildBrowserToPostgresMigrationPreview(
+  input: BrowserMigrationPreviewInput,
+): WorkspaceBrowserMigrationPreview {
+  const inventory = buildManagedLocalStorageInventory(input.localStorageEntries);
+  const requiredLocalStorageKeyCount = inventory.filter(entry => entry.migrationPolicy === "required").length;
+  const optionalLocalStorageKeyCount = inventory.filter(entry => entry.migrationPolicy === "optional").length;
+  const localOnlyLocalStorageKeyCount = inventory.filter(entry => entry.migrationPolicy === "local-only").length;
+  const optionalCredentialLocalStorageKeyCount = inventory.filter(entry => entry.includeCredentialsRequired).length;
+  const unknownLocalStorageKeys = [...input.unknownLocalStorageKeys].sort((left, right) => left.localeCompare(right));
+  const unknownIndexedDbSources = [...input.unknownIndexedDbSources].sort((left, right) =>
+    `${left.database}:${left.store ?? ""}`.localeCompare(`${right.database}:${right.store ?? ""}`),
+  );
+  const blockingIssueCount = unknownLocalStorageKeys.length +
+    unknownIndexedDbSources.length +
+    (input.indexedDbIntrospectionAvailable ? 0 : 1);
+  return {
+    assetCount: input.assetCount,
+    assetPayloadRecordCount: input.assetPayloadRecordCount,
+    assetPreviewRecordCount: input.assetPreviewRecordCount,
+    boardCount: input.boardCount,
+    blockingIssueCount,
+    canImport: blockingIssueCount === 0,
+    generationTaskCount: input.generationTaskCount,
+    indexedDbIntrospectionAvailable: input.indexedDbIntrospectionAvailable,
+    libraryAssetCount: input.libraryAssetCount,
+    localOnlyLocalStorageKeyCount,
+    managedLocalStorageBytes: inventory.reduce((total, entry) => total + entry.bytes, 0),
+    managedLocalStorageKeyCount: inventory.length,
+    optionalCredentialLocalStorageKeyCount,
+    optionalLocalStorageKeyCount,
+    requiredLocalStorageKeyCount,
+    safetySnapshotCount: input.safetySnapshotCount,
+    unknownIndexedDbSources,
+    unknownLocalStorageKeys,
+    voiceProfileCount: input.voiceProfileCount,
   };
 }
 
@@ -1586,6 +1717,58 @@ function parseSettings(text: string): WorkspaceBackupSettings {
 function readManagedLocalStorage(includeCredentials: boolean): Record<string, string> {
   if (typeof window === "undefined") return {};
   return readManagedLocalStorageEntries(window.localStorage, includeCredentials);
+}
+
+function readUnknownImagineLocalStorageKeys(): string[] {
+  if (typeof window === "undefined") return [];
+  const keys: string[] = [];
+  for (let index = 0; index < window.localStorage.length; index += 1) {
+    const key = window.localStorage.key(index);
+    if (!key?.startsWith("imagine_")) continue;
+    if (!isManagedLocalStorageKey(key)) keys.push(key);
+  }
+  return keys.sort((left, right) => left.localeCompare(right));
+}
+
+async function inspectUnknownIndexedDbSources(): Promise<{
+  available: boolean;
+  unknownSources: WorkspaceBrowserMigrationUnknownIndexedDbSource[];
+}> {
+  if (typeof indexedDB === "undefined") return { available: false, unknownSources: [] };
+  const factory = indexedDB as IDBFactory & {
+    databases?: () => Promise<Array<{ name?: string | null }>>;
+  };
+  if (!factory.databases) return { available: false, unknownSources: [] };
+  const databases = await factory.databases();
+  const unknownSources: WorkspaceBrowserMigrationUnknownIndexedDbSource[] = [];
+  for (const database of databases) {
+    const name = database.name;
+    if (!name?.startsWith(INDEXEDDB_PREFIX)) continue;
+    const knownStores = KNOWN_INDEXEDDB_STORES[name];
+    if (!knownStores) {
+      unknownSources.push({ database: name });
+      continue;
+    }
+    const stores = await readIndexedDbStoreNames(name);
+    for (const store of stores) {
+      if (!knownStores.includes(store)) unknownSources.push({ database: name, store });
+    }
+  }
+  return { available: true, unknownSources };
+}
+
+function readIndexedDbStoreNames(databaseName: string): Promise<string[]> {
+  return new Promise((resolve, reject) => {
+    const request = indexedDB.open(databaseName);
+    request.onsuccess = () => {
+      const db = request.result;
+      const stores = Array.from(db.objectStoreNames);
+      db.close();
+      resolve(stores);
+    };
+    request.onblocked = () => reject(new Error(`IndexedDB source inspection blocked: ${databaseName}`));
+    request.onerror = () => reject(request.error ?? new Error(`IndexedDB source inspection failed: ${databaseName}`));
+  });
 }
 
 function clearManagedLocalStorage(includeCredentials: boolean): void {

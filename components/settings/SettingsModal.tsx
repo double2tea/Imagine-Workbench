@@ -14,7 +14,9 @@ import type { ProviderCredentials } from "@/lib/providers/types";
 import { WORKBENCH_OVERLAY_TRANSITION, WORKBENCH_PANEL_TRANSITION } from "@/lib/workbench-motion";
 import {
   getWorkspaceDataSummary,
+  previewBrowserToPostgresMigration,
   type LocalStorageCleanupKind,
+  type WorkspaceBrowserMigrationPreview,
   type WorkspaceCleanupKind,
   type WorkspaceDataSummary,
 } from "@/lib/data-management";
@@ -179,6 +181,8 @@ export default function SettingsModal({
   const [tab, setTab] = useState<SettingsTab>("connections");
   const [dataSummary, setDataSummary] = useState<WorkspaceDataSummary | null>(null);
   const [dataSummaryError, setDataSummaryError] = useState<string | null>(null);
+  const [migrationPreview, setMigrationPreview] = useState<WorkspaceBrowserMigrationPreview | null>(null);
+  const [migrationPreviewError, setMigrationPreviewError] = useState<string | null>(null);
   const [storageStatus, setStorageStatus] = useState<PublicLocalStorageRuntimeStatus | null>(null);
   const [storageStatusError, setStorageStatusError] = useState<string | null>(null);
   const [teamHealth, setTeamHealth] = useState<TeamStorageHealth | null>(null);
@@ -215,11 +219,23 @@ export default function SettingsModal({
     try {
       setDataSummaryError(null);
       const status = await fetchWorkspaceStorageRuntimeStatus();
-      setDataSummary(status.mode === "postgres"
-        ? await fetchTeamWorkspaceDataSummary()
-        : await getWorkspaceDataSummary());
+      if (status.mode === "postgres") {
+        setDataSummary(await fetchTeamWorkspaceDataSummary());
+        try {
+          setMigrationPreview(await previewBrowserToPostgresMigration());
+          setMigrationPreviewError(null);
+        } catch (error) {
+          setMigrationPreview(null);
+          setMigrationPreviewError(formatSettingsError(error, t));
+        }
+      } else {
+        setMigrationPreview(null);
+        setMigrationPreviewError(null);
+        setDataSummary(await getWorkspaceDataSummary());
+      }
     } catch (error) {
       setDataSummary(null);
+      setMigrationPreview(null);
       setDataSummaryError(formatSettingsError(error, t));
     }
   }, [t]);
@@ -624,6 +640,8 @@ export default function SettingsModal({
                   hasCurrentBoard={hasCurrentBoard}
                   summary={dataSummary}
                   summaryError={dataSummaryError}
+                  migrationPreview={migrationPreview}
+                  migrationPreviewError={migrationPreviewError}
                   storageStatus={storageStatus}
                   storageStatusError={storageStatusError}
                   teamHealth={teamHealth}

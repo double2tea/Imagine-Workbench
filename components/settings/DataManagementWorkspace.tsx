@@ -24,6 +24,7 @@ import {
   formatBytes,
   formatWorkspaceSafetySnapshotReason,
   type LocalStorageCleanupKind,
+  type WorkspaceBrowserMigrationPreview,
   type WorkspaceCleanupKind,
   type WorkspaceDataSummary,
 } from "@/lib/data-management";
@@ -37,6 +38,8 @@ interface DataManagementWorkspaceProps {
   hasCurrentBoard: boolean;
   summary: WorkspaceDataSummary | null;
   summaryError: string | null;
+  migrationPreview: WorkspaceBrowserMigrationPreview | null;
+  migrationPreviewError: string | null;
   storageStatus: PublicLocalStorageRuntimeStatus | null;
   storageStatusError: string | null;
   teamHealth: TeamStorageHealth | null;
@@ -295,6 +298,8 @@ export default function DataManagementWorkspace({
   hasCurrentBoard,
   summary,
   summaryError,
+  migrationPreview,
+  migrationPreviewError,
   storageStatus,
   storageStatusError,
   teamHealth,
@@ -403,6 +408,21 @@ export default function DataManagementWorkspace({
   const isTeamStorageMode = storageStatus?.mode === "postgres";
   const hasPendingTeamMigrations = (teamHealth?.migrationStatus?.pendingMigrationIds.length ?? 0) > 0;
   const canManageTeamMembers = teamSession?.role === "owner" || teamSession?.role === "admin";
+  const migrationUnknownDetails = migrationPreview
+    ? [
+        ...migrationPreview.unknownLocalStorageKeys.map(key =>
+          t("dataManagement.browserMigrationUnknownLocalStorageDetail", { key }),
+        ),
+        ...migrationPreview.unknownIndexedDbSources.map(source =>
+          source.store
+            ? t("dataManagement.browserMigrationUnknownIndexedDbStoreDetail", { database: source.database, store: source.store })
+            : t("dataManagement.browserMigrationUnknownIndexedDbDatabaseDetail", { database: source.database }),
+        ),
+        ...(!migrationPreview.indexedDbIntrospectionAvailable
+          ? [t("dataManagement.browserMigrationIndexedDbIntrospectionUnavailable")]
+          : []),
+      ]
+    : [];
   const storageSlotItems: Array<[string, number]> | null = assetStores
     ? isTeamStorageMode && teamStorageSummary
       ? [
@@ -929,6 +949,61 @@ export default function DataManagementWorkspace({
                   </form>
                 </div>
               )}
+            </div>
+
+            <div className="rounded-md border border-[var(--iw-border)] p-2 lg:col-span-2">
+              <div className="flex flex-wrap items-start justify-between gap-3">
+                <div>
+                  <p className="flex items-center gap-2 text-[10px] font-semibold uppercase text-[var(--iw-faint)]">
+                    <Database className="imagine-tone-icon h-3.5 w-3.5" data-tone={migrationPreview?.canImport ? "success" : "warning"} />
+                    {t("dataManagement.browserMigrationPreview")}
+                  </p>
+                  <p className="mt-2 text-[11px] leading-5 text-[var(--iw-muted)]">
+                    {migrationPreviewError
+                      ? t("dataManagement.browserMigrationPreviewError", { error: migrationPreviewError })
+                      : migrationPreview
+                        ? migrationPreview.canImport
+                          ? t("dataManagement.browserMigrationPreviewReady")
+                          : t("dataManagement.browserMigrationPreviewBlocked", { count: migrationPreview.blockingIssueCount })
+                        : t("dataManagement.browserMigrationPreviewWaiting")}
+                  </p>
+                </div>
+                {migrationPreview ? (
+                  <div className="rounded-md border border-[var(--iw-border)] px-2 py-1 font-mono text-[11px] text-[var(--iw-muted)]">
+                    {t("dataManagement.browserMigrationPreviewBlockingCount", { count: migrationPreview.blockingIssueCount })}
+                  </div>
+                ) : null}
+              </div>
+              {migrationPreview ? (
+                <>
+                  <div className="mt-3 grid grid-cols-2 gap-2 sm:grid-cols-4">
+                    <div className="rounded-md border border-[var(--iw-border)] px-2 py-1">
+                      <p className="text-[10px] text-[var(--iw-faint)]">{t("dataManagement.browserMigrationAssets")}</p>
+                      <p className="font-mono text-[11px] text-[var(--iw-text)]">{migrationPreview.assetCount}</p>
+                    </div>
+                    <div className="rounded-md border border-[var(--iw-border)] px-2 py-1">
+                      <p className="text-[10px] text-[var(--iw-faint)]">{t("dataManagement.browserMigrationBoards")}</p>
+                      <p className="font-mono text-[11px] text-[var(--iw-text)]">{migrationPreview.boardCount}</p>
+                    </div>
+                    <div className="rounded-md border border-[var(--iw-border)] px-2 py-1">
+                      <p className="text-[10px] text-[var(--iw-faint)]">{t("dataManagement.browserMigrationLocalStorage")}</p>
+                      <p className="font-mono text-[11px] text-[var(--iw-text)]">{migrationPreview.managedLocalStorageKeyCount}</p>
+                    </div>
+                    <div className="rounded-md border border-[var(--iw-border)] px-2 py-1">
+                      <p className="text-[10px] text-[var(--iw-faint)]">{t("dataManagement.browserMigrationCredentials")}</p>
+                      <p className="font-mono text-[11px] text-[var(--iw-text)]">{migrationPreview.optionalCredentialLocalStorageKeyCount}</p>
+                    </div>
+                  </div>
+                  <p className="mt-2 text-[10px] leading-5 text-[var(--iw-faint)]">
+                    {t("dataManagement.browserMigrationLocalStoragePolicySummary", {
+                      excluded: migrationPreview.localOnlyLocalStorageKeyCount,
+                      optional: migrationPreview.optionalLocalStorageKeyCount,
+                      required: migrationPreview.requiredLocalStorageKeyCount,
+                    })}
+                  </p>
+                  {migrationUnknownDetails.length > 0 ? <DetailList details={migrationUnknownDetails} t={t} /> : null}
+                </>
+              ) : null}
             </div>
           </div>
         ) : (

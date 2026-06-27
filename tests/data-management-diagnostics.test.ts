@@ -37,6 +37,7 @@ function registerCompiledPathAlias(): void {
 registerCompiledPathAlias();
 
 const {
+  buildBrowserToPostgresMigrationPreview,
   buildManagedLocalStorageInventory,
   buildWorkspaceIntegrityDiagnostics,
   buildWorkspaceIntegrityDiagnosticsWithPayloads,
@@ -302,4 +303,54 @@ test("buildManagedLocalStorageInventory classifies current persisted localStorag
     ],
   );
   assert.equal(inventory.every(entry => entry.bytes > 0), true);
+});
+
+test("buildBrowserToPostgresMigrationPreview blocks unknown browser sources", () => {
+  const preview = buildBrowserToPostgresMigrationPreview({
+    assetCount: 2,
+    assetPayloadRecordCount: 1,
+    assetPreviewRecordCount: 1,
+    boardCount: 1,
+    generationTaskCount: 1,
+    indexedDbIntrospectionAvailable: true,
+    libraryAssetCount: 1,
+    localStorageEntries: {
+      imagine_ai_provider: "grok2api",
+      imagine_provider_credentials: "{}",
+      imagine_resolve_integration_enabled: "1",
+    },
+    safetySnapshotCount: 1,
+    unknownIndexedDbSources: [{ database: "ImagineWorkbenchDB", store: "future_store" }],
+    unknownLocalStorageKeys: ["imagine_future_key"],
+    voiceProfileCount: 1,
+  });
+
+  assert.equal(preview.canImport, false);
+  assert.equal(preview.blockingIssueCount, 2);
+  assert.equal(preview.requiredLocalStorageKeyCount, 1);
+  assert.equal(preview.optionalLocalStorageKeyCount, 1);
+  assert.equal(preview.localOnlyLocalStorageKeyCount, 1);
+  assert.equal(preview.optionalCredentialLocalStorageKeyCount, 1);
+  assert.deepEqual(preview.unknownLocalStorageKeys, ["imagine_future_key"]);
+  assert.deepEqual(preview.unknownIndexedDbSources, [{ database: "ImagineWorkbenchDB", store: "future_store" }]);
+});
+
+test("buildBrowserToPostgresMigrationPreview requires IndexedDB introspection", () => {
+  const preview = buildBrowserToPostgresMigrationPreview({
+    assetCount: 0,
+    assetPayloadRecordCount: 0,
+    assetPreviewRecordCount: 0,
+    boardCount: 0,
+    generationTaskCount: 0,
+    indexedDbIntrospectionAvailable: false,
+    libraryAssetCount: 0,
+    localStorageEntries: {},
+    safetySnapshotCount: 0,
+    unknownIndexedDbSources: [],
+    unknownLocalStorageKeys: [],
+    voiceProfileCount: 0,
+  });
+
+  assert.equal(preview.canImport, false);
+  assert.equal(preview.blockingIssueCount, 1);
 });
