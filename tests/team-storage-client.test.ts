@@ -18,6 +18,7 @@ import {
   logoutTeamSession,
   readTeamCsrfToken,
   saveTeamBoardDocument,
+  teamAssetRecordToStorageItem,
   teamAssetMediaUrl,
   updateTeamMemberRole,
   fetchWorkspaceStorageRuntimeStatus,
@@ -103,7 +104,10 @@ test("fetchTeamAssets sends list filters and rejects payload storage keys", asyn
     requestedUrl,
     "/api/storage/team/assets?boardId=board_1&id=asset_1&id=asset+with+spaces&limit=20&offset=5&status=complete&status=failed",
   );
-  assert.equal(result.assets[0]?.payload?.kind, "local-file");
+  const firstAsset = result.assets[0];
+  assert.ok(firstAsset);
+  assert.equal(firstAsset.payload?.kind, "local-file");
+  assert.equal(teamAssetRecordToStorageItem(firstAsset).url, "/api/storage/team/assets/asset_1/media");
 
   await assert.rejects(
     fetchTeamAssets(undefined, async () => jsonResponse({

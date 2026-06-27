@@ -1,7 +1,7 @@
 import { API_ROUTES } from "@/lib/api/routes";
 import type { BoardDocument, BoardSummary } from "@/lib/board/types";
 import { readFetchError } from "@/lib/client-fetch-error";
-import type { StorageItemMeta } from "@/lib/db";
+import type { StorageItem, StorageItemMeta } from "@/lib/db";
 import type { PublicLocalStorageRuntimeStatus } from "@/lib/storage/local-public-runtime";
 import type { WORKSPACE_STORAGE_SCHEMA_VERSION } from "@/lib/storage/schema";
 import type { PublicTeamAssetPayload, PublicTeamAssetRecord, TeamAssetListResult } from "@/lib/storage/team-asset-types";
@@ -90,6 +90,13 @@ export class TeamStorageClientError extends Error {
 
 export function teamAssetMediaUrl(assetId: string, options: { download?: boolean } = {}): string {
   return API_ROUTES.storage.teamAssetMedia(assetId, options);
+}
+
+export function teamAssetRecordToStorageItem(record: PublicTeamAssetRecord): StorageItem {
+  return {
+    ...record.meta,
+    url: record.mediaUrl ?? record.meta.url ?? "",
+  };
 }
 
 export function readTeamCsrfToken(cookieHeader = typeof document === "undefined" ? "" : document.cookie): string | null {

@@ -16,6 +16,7 @@ import {
   type StorageItem,
   type StorageItemMeta,
 } from "@/lib/db";
+import { fetchTeamAssets, teamAssetRecordToStorageItem } from "@/lib/storage/team-client";
 
 interface UseBoardAssetStoreResult {
   items: StorageItem[];
@@ -38,8 +39,15 @@ function idsFromKey(key: string): string[] {
   return key ? key.split(ID_KEY_SEPARATOR) : [];
 }
 
-function boardAssetScopeKey(boardId: string, referencedAssetIdsKey: string, boardNodeIdsKey: string): string {
-  return [boardId, referencedAssetIdsKey, boardNodeIdsKey].join(ID_KEY_SEPARATOR);
+type BoardAssetStorageTarget = "indexeddb" | "postgres";
+
+function boardAssetScopeKey(
+  boardId: string,
+  referencedAssetIdsKey: string,
+  boardNodeIdsKey: string,
+  storageTarget: BoardAssetStorageTarget,
+): string {
+  return [storageTarget, boardId, referencedAssetIdsKey, boardNodeIdsKey].join(ID_KEY_SEPARATOR);
 }
 
 async function hydrateAssetPreviews(metas: StorageItemMeta[]): Promise<StorageItem[]> {
@@ -63,12 +71,44 @@ async function hydrateAssetPreviews(metas: StorageItemMeta[]): Promise<StorageIt
   return hydrated;
 }
 
-export function useBoardAssetStore(boardId: string, nodes: BoardNode[]): UseBoardAssetStoreResult {
+function storageItemToMeta(item: StorageItem): StorageItemMeta {
+  const { url, ...meta } = item;
+  return {
+    ...meta,
+    url: url && (url.startsWith("http://") || url.startsWith("https://")) ? url : undefined,
+  };
+}
+
+async function loadTeamBoardAssetItems(
+  boardId: string,
+  referencedAssetIds: string[],
+): Promise<{ items: StorageItem[]; metas: StorageItemMeta[] }> {
+  const [boardAssets, referencedAssets] = await Promise.all([
+    fetchTeamAssets({ boardId, limit: 200 }),
+    referencedAssetIds.length > 0
+      ? fetchTeamAssets({ ids: referencedAssetIds, limit: Math.max(100, Math.min(200, referencedAssetIds.length)) })
+      : Promise.resolve(null),
+  ]);
+  const items = mergeStorageItems(
+    boardAssets.assets.map(teamAssetRecordToStorageItem),
+    referencedAssets?.assets.map(teamAssetRecordToStorageItem) ?? [],
+  );
+  return {
+    items,
+    metas: items.map(storageItemToMeta),
+  };
+}
+
+export function useBoardAssetStore(
+  boardId: string,
+  nodes: BoardNode[],
+  storageTarget: BoardAssetStorageTarget = "indexeddb",
+): UseBoardAssetStoreResult {
   const referencedAssetIdsKey = useMemo(() => assetIdKey(collectBoardAssetIdsFromNodes(nodes)), [nodes]);
   const boardNodeIdsKey = useMemo(() => assetIdKey(collectBoardNodeIdsFromNodes(nodes)), [nodes]);
   const scopeKey = useMemo(
-    () => boardAssetScopeKey(boardId, referencedAssetIdsKey, boardNodeIdsKey),
-    [boardId, boardNodeIdsKey, referencedAssetIdsKey],
+    () => boardAssetScopeKey(boardId, referencedAssetIdsKey, boardNodeIdsKey, storageTarget),
+    [boardId, boardNodeIdsKey, referencedAssetIdsKey, storageTarget],
   );
   const referencedAssetIds = useMemo(() => idsFromKey(referencedAssetIdsKey), [referencedAssetIdsKey]);
   const boardNodeIds = useMemo(() => idsFromKey(boardNodeIdsKey), [boardNodeIdsKey]);
@@ -86,6 +126,14 @@ export function useBoardAssetStore(boardId: string, nodes: BoardNode[]): UseBoar
     activeReloadTokenRef.current = reloadToken;
     setLoading(true);
     try {
+      if (storageTarget === "postgres") {
+        const scoped = await loadTeamBoardAssetItems(boardId, referencedAssetIds);
+        if (activeReloadTokenRef.current !== reloadToken) return;
+        setMetas(scoped.metas);
+        setItems(scoped.items);
+        didLoadScope = true;
+        return;
+      }
       const scopedMetas = await listBoardScopedAssetMetas(boardId, referencedAssetIds, boardNodeIds);
       if (activeReloadTokenRef.current !== reloadToken) return;
       setMetas(scopedMetas);
@@ -101,7 +149,7 @@ export function useBoardAssetStore(boardId: string, nodes: BoardNode[]): UseBoar
         setLoading(false);
       }
     }
-  }, [boardId, boardNodeIds, referencedAssetIds, scopeKey]);
+  }, [boardId, boardNodeIds, referencedAssetIds, scopeKey, storageTarget]);
 
   const upsertItem = useCallback((item: StorageItem) => {
     const { url: _url, ...meta } = item;

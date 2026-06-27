@@ -1661,7 +1661,7 @@ export default function BoardPage({ boardId = DEFAULT_BOARD_ID }: BoardPageProps
     loading: boardAssetsLoading,
     reload: reloadBoardAssets,
     setItems,
-  } = useBoardAssetStore(resolvedBoardId, boardController.board.nodes);
+  } = useBoardAssetStore(resolvedBoardId, boardController.board.nodes, boardStorageTarget);
   const updateBoardAssetReferenceUrls = boardController.updateAssetReferenceUrls;
   const { generationTasks, setGenerationTasks } = useGenerationTaskStore({ boardId: resolvedBoardId });
   const [boardSummaries, setBoardSummaries] = useState<BoardSummary[]>([]);
@@ -2187,8 +2187,10 @@ export default function BoardPage({ boardId = DEFAULT_BOARD_ID }: BoardPageProps
   }, [resolvedBoardId]);
 
   useEffect(() => {
-    void reloadBoardAssets();
-  }, [reloadBoardAssets, resolvedBoardId]);
+    void reloadBoardAssets().catch(error => {
+      pushWorkspaceNotice("error", toErrorMessage(error, "Board assets read failed"));
+    });
+  }, [pushWorkspaceNotice, reloadBoardAssets, resolvedBoardId]);
 
   useEffect(() => {
     const videoPreviewUpdates = items
