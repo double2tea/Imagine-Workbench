@@ -184,7 +184,7 @@ return Response.json({
 - Service: `getTeamWorkspaceDataSummary(queryable, config, request): Promise<TeamWorkspaceDataSummaryResult>`.
 - Client: `fetchTeamWorkspaceDataSummary(): Promise<WorkspaceDataSummary>`.
 - Runtime branch: `fetchWorkspaceStorageRuntimeStatus()` decides whether Settings -> Data calls `getWorkspaceDataSummary()` or `fetchTeamWorkspaceDataSummary()`.
-- Shared type extension: `WorkspaceDataSummary.teamStorage?: { assetLibraryRecords; generationTasks; mediaBytes; mediaConsistency; mediaUsageWarning; mediaUsageWarningBytes?; payloadBytes; payloadRefs; promptTemplates; providerTargets; secretSettings; settings; voiceProfiles }`.
+- Shared type extension: `WorkspaceDataSummary.teamStorage?: { assetLibraryRecords; failedGenerationTasks; generationTasks; mediaBytes; mediaConsistency; mediaUsageWarning; mediaUsageWarningBytes?; payloadBytes; payloadRefs; promptTemplates; providerTargets; secretSettings; settings; voiceProfiles }`.
 - Team media consistency shape: `mediaConsistency: { missingPayloadFiles; missingPreviewFiles; orphanedPayloadFiles; orphanedPreviewFiles; tmpFiles; trashFiles }`.
 
 #### 3. Contracts
@@ -192,7 +192,7 @@ return Response.json({
 - `GET /api/storage/team/data-summary` requires at least viewer access through `createTeamWorkspaceStorageContext`.
 - Public response shape is `{ summary, targetKind: "postgres", workspaceId }`.
 - `summary` must reuse `WorkspaceDataSummary` so Settings -> Data can render browser and PostgreSQL summaries through one UI component.
-- Team summary must report database-proven counts: asset totals by type/status, board/node totals, payload ref count/bytes, asset library count, generation task count, prompt template count, provider target count, setting/secret count, voice profile count, and latest safety snapshot public summary.
+- Team summary must report database-proven counts: asset totals by type/status, board/node totals, payload ref count/bytes, asset library count, total and failed generation task counts, prompt template count, provider target count, setting/secret count, voice profile count, and latest safety snapshot public summary.
 - Team summary must also inspect the configured server media volume for known local-file refs and return only aggregate consistency counts:
   - DB ref without file: `missingPayloadFiles`, `missingPreviewFiles`
   - File without DB ref: `orphanedPayloadFiles`, `orphanedPreviewFiles`
@@ -1458,6 +1458,7 @@ if (storageTarget === "postgres") await resetTeamBoards(readTeamCsrfToken());
 - Unit: Postgres config parsing requires explicit `postgres` mode, private database/media config, max media payload bytes, optional media usage warning bytes, and setup token for migration routes.
 - Unit: Postgres migration status reports all migrations pending when `schema_migrations` is absent, flags unsupported newer schemas, and records a non-secret `team_migrations.apply` audit event when applying pending migrations.
 - Unit: team data summary reports aggregate media directory bytes and sets `mediaUsageWarning` when the configured media warning threshold is reached.
+- Unit: team data summary reports total and failed PostgreSQL generation task counts separately from failed asset counts.
 - Unit: initial PostgreSQL migration SQL contains the team foundation tables listed in this scenario.
 - Unit: localStorage inventory covers every current managed key, including provider selection/custom providers, default generation models, image-edit feature models, custom prompt templates, price visibility, RunningHub saved targets, Resolve toggle, Agent/board preferences, and board generated-media viewed markers as local/per-user state.
 - Unit: team-storage client parses browser status, surfaces health errors, requires setup token for migrations/bootstrap, and sends the setup token only as a request header.

@@ -1530,6 +1530,7 @@ function isWorkspaceDataSummaryTeamStorage(value: unknown): boolean {
   if (!isRecord(value)) return false;
   return (
     typeof value.assetLibraryRecords === "number" &&
+    typeof value.failedGenerationTasks === "number" &&
     typeof value.generationTasks === "number" &&
     typeof value.mediaBytes === "number" &&
     isWorkspaceDataSummaryTeamMediaConsistency(value.mediaConsistency) &&

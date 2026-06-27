@@ -64,6 +64,8 @@ test("getTeamWorkspaceDataSummary returns PostgreSQL workspace data health stats
     assert.deepEqual(result.summary.integrity.missingBoardReferences.map(reference => reference.assetId), ["asset_missing"]);
     assert.equal(result.summary.teamStorage?.payloadRefs, 1);
     assert.equal(result.summary.teamStorage?.payloadBytes, 1024);
+    assert.equal(result.summary.teamStorage?.generationTasks, 2);
+    assert.equal(result.summary.teamStorage?.failedGenerationTasks, 1);
     assert.equal(result.summary.teamStorage?.mediaBytes, 30);
     assert.equal(result.summary.teamStorage?.mediaUsageWarning, true);
     assert.equal(result.summary.teamStorage?.mediaUsageWarningBytes, 25);
@@ -132,7 +134,8 @@ function createTeamDataSummaryQueryable(
       if (text.includes("(select count(*)::int from asset_library")) {
         return typedQueryResult<T>([{
           asset_library_records: 1,
-          generation_tasks: 1,
+          failed_generation_tasks: 1,
+          generation_tasks: 2,
           prompt_templates: 1,
           provider_targets: 1,
           secret_settings: 1,
@@ -142,7 +145,9 @@ function createTeamDataSummaryQueryable(
       }
       if (text.includes("from safety_snapshots")) return typedQueryResult<T>([SNAPSHOT_ROW]);
       if (text.includes("select record from asset_library")) return typedQueryResult<T>([{ record: LIBRARY_RECORD }]);
-      if (text.includes("select task from generation_tasks")) return typedQueryResult<T>([{ task: GENERATION_TASK }]);
+      if (text.includes("select task from generation_tasks")) {
+        return typedQueryResult<T>([{ task: GENERATION_TASK }, { task: FAILED_GENERATION_TASK }]);
+      }
       if (text.includes("select profile from voice_profiles")) return typedQueryResult<T>([{ profile: VOICE_PROFILE }]);
       return typedQueryResult<T>([]);
     },
@@ -244,6 +249,16 @@ const GENERATION_TASK: GenerationTask = {
   source: { surface: "workspace" },
   status: "complete",
   updatedAt: CREATED_AT,
+};
+
+const FAILED_GENERATION_TASK: GenerationTask = {
+  ...GENERATION_TASK,
+  canCancelRemote: false,
+  errorMessage: "Provider failed",
+  id: "task_failed",
+  progress: 0,
+  resultAssetIds: [],
+  status: "failed",
 };
 
 const VOICE_PROFILE: VoiceProfile = {

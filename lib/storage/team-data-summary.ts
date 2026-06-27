@@ -45,6 +45,7 @@ interface PayloadRow extends QueryResultRow {
 
 interface TeamSummaryCountRow extends QueryResultRow {
   asset_library_records: number;
+  failed_generation_tasks: number;
   generation_tasks: number;
   prompt_templates: number;
   provider_targets: number;
@@ -94,6 +95,7 @@ export async function getTeamWorkspaceDataSummary(
     context.queryable.query<TeamSummaryCountRow>(
       `select
         (select count(*)::int from asset_library where workspace_id = $1) as asset_library_records,
+        (select count(*)::int from generation_tasks where workspace_id = $1 and status = 'failed') as failed_generation_tasks,
         (select count(*)::int from generation_tasks where workspace_id = $1) as generation_tasks,
         (select count(*)::int from settings where workspace_id = $1 and is_secret = false) as settings,
         (select count(*)::int from settings where workspace_id = $1 and is_secret = true) as secret_settings,
@@ -204,6 +206,7 @@ export async function getTeamWorkspaceDataSummary(
       },
       teamStorage: {
         assetLibraryRecords: counts.asset_library_records,
+        failedGenerationTasks: counts.failed_generation_tasks,
         generationTasks: counts.generation_tasks,
         mediaBytes,
         mediaConsistency,
@@ -238,6 +241,7 @@ function withTeamMediaConsistencyIssues(
 function emptyCounts(): TeamSummaryCountRow {
   return {
     asset_library_records: 0,
+    failed_generation_tasks: 0,
     generation_tasks: 0,
     prompt_templates: 0,
     provider_targets: 0,

@@ -281,6 +281,7 @@ export interface WorkspaceDataSummary {
   };
   teamStorage?: {
     assetLibraryRecords: number;
+    failedGenerationTasks: number;
     generationTasks: number;
     mediaBytes: number;
     mediaConsistency: {

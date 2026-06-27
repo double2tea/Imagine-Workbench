@@ -200,6 +200,7 @@ test("fetchTeamWorkspaceDataSummary parses PostgreSQL data summary", async () =>
 
   assert.equal(summary.assets.total, 2);
   assert.equal(summary.teamStorage?.payloadBytes, 2048);
+  assert.equal(summary.teamStorage?.failedGenerationTasks, 1);
   assert.equal(summary.teamStorage?.mediaBytes, 4096);
   assert.equal(summary.teamStorage?.mediaUsageWarning, true);
 
@@ -1201,6 +1202,7 @@ function createWorkspaceDataSummary() {
     },
     teamStorage: {
       assetLibraryRecords: 1,
+      failedGenerationTasks: 1,
       generationTasks: 1,
       mediaBytes: 4096,
       mediaConsistency: {
