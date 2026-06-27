@@ -120,6 +120,7 @@ Completed in the latest continuation:
 * Migrated pnpm build-script approvals from ignored `package.json.pnpm.onlyBuiltDependencies` to `pnpm-workspace.yaml` `allowBuilds`, restoring clean pnpm 11 installs/checks after dependency rebuilds.
 * Added a compact active storage-mode badge to the main workspace and board top bars so users can see whether the current workspace is using IndexedDB or PostgreSQL without opening Settings -> Data.
 * Restored Cloudflare Pages verification for the current checkpoint. `scripts/build-cloudflare-pages.mjs` now hides all `runtime = "nodejs"` route entry files during the adapter build, restores them in `finally`, avoids recursive deletion of heavy `.next` standalone output, and `CI=true pnpm run pages:build` passes with only edge/static routes in the Pages output.
+* Added migration-preview coverage for all currently known persisted `localStorage` sources. `tests/data-management-diagnostics.test.ts` now proves `buildBrowserToPostgresMigrationPreview` classifies default generation models, image-edit feature models, price visibility, Agent orb/chat/auto-execute state, RunningHub saved targets, Resolve toggle, custom prompt templates, board UI preferences, provider settings, model caches, and credential-bearing keys without unknown-source blockers.
 
 Still remaining before the full PRD can be considered complete:
 
@@ -184,9 +185,9 @@ Still remaining before the full PRD can be considered complete:
 * [x] Team deployment templates are included and documented: Dockerfile, Docker Compose, team env example, media volume mapping, PostgreSQL volume mapping, and first-run bootstrap instructions.
 * [x] Deployment templates do not change the default local/browser workflow and are opt-in.
 * [ ] PostgreSQL mode reads/writes assets, asset payload refs, previews, asset library records, boards, generation tasks, managed settings, safety snapshots, and voice profiles, or any exclusions are explicitly documented before implementation.
-* [ ] Migration coverage includes custom prompt templates and any other user-created localStorage data, or explicitly reports them as excluded before migration.
-* [ ] Migration preview reports all detected persistent sources: asset DB, board DB, voice-profile DB, safety snapshot DB, managed localStorage, and known currently-unmanaged localStorage keys.
-* [ ] The implementation updates `lib/data-management.ts` so current persisted keys such as default generation models, image-edit feature models, price visibility, Agent orb position, RunningHub saved targets, Resolve toggle, and custom prompt templates are classified before PostgreSQL migration preview uses them.
+* [x] Migration coverage includes custom prompt templates and any other user-created localStorage data, or explicitly reports them as excluded before migration.
+* [x] Migration preview reports all detected persistent sources: asset DB, board DB, voice-profile DB, safety snapshot DB, managed localStorage, and known currently-unmanaged localStorage keys.
+* [x] The implementation updates `lib/data-management.ts` so current persisted keys such as default generation models, image-edit feature models, price visibility, Agent orb position, RunningHub saved targets, Resolve toggle, and custom prompt templates are classified before PostgreSQL migration preview uses them.
 * [x] Implementation context includes the refreshed `.trellis/spec/frontend/state-management.md` storage contract so future agents see `browser` + `postgres`, not the superseded SQLite/local-database direction.
 * [ ] PostgreSQL migrations create versioned tables and indexes deterministically.
 * [ ] Future schema changes can be applied through ordered migrations; the app reports current/required schema version and refuses unsupported newer schemas.
@@ -201,7 +202,7 @@ Still remaining before the full PRD can be considered complete:
 * [ ] Team-mode provider credentials and workspace secrets are encrypted at rest, are never returned to the browser after save, and show masked status only.
 * [ ] Team members share workspace assets, generated results, boards, asset library records, and generation tasks through PostgreSQL-backed queries.
 * [ ] Team-mode storage preserves current asset/generation fields, including cinematic profiles, reference media snapshots, board/result-stack source links, crop derivative metadata, library backing links, preview status, voice profile asset refs, and transcript assets.
-* [ ] Board generated-media viewed markers are classified as local/per-user UX state. They are not written into shared board documents or asset rows unless a later per-user attention-state feature explicitly adds server-side support.
+* [x] Board generated-media viewed markers are classified as local/per-user UX state. They are not written into shared board documents or asset rows unless a later per-user attention-state feature explicitly adds server-side support.
 * [ ] Browser mode remains login-free unless a later task explicitly changes public/single-user behavior.
 * [ ] No code path dual-writes workspace data to IndexedDB and PostgreSQL.
 * [ ] Board/settings updates use version checks or equivalent optimistic concurrency; conflicting edits produce a visible reload/merge prompt rather than silently overwriting another user.

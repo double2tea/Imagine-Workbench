@@ -361,6 +361,68 @@ test("buildBrowserToPostgresMigrationPreview allows fully classified browser sou
   assert.equal(preview.localOnlyLocalStorageKeyCount, 0);
 });
 
+test("buildBrowserToPostgresMigrationPreview classifies all current persisted localStorage sources", () => {
+  const localStorageEntries = {
+    imagine_12ai_api_key: "twelve-key",
+    imagine_agent_chat: "[]",
+    "imagine_agent_chat:board_1": "[]",
+    imagine_agent_orb_position: "{\"x\":1,\"y\":2}",
+    imagine_ai_provider: "grok2api",
+    imagine_audio_model_options: "{}",
+    imagine_auto_execute: "false",
+    imagine_board_handles_hint_seen: "1",
+    imagine_board_last_insert: "image-generate",
+    imagine_board_side_collapsed: "0",
+    imagine_board_side_tab: "assets",
+    "imagine_board_viewed_generated_asset_ids:board_1": "[\"asset_1\"]",
+    imagine_chat_model: "grok2api:grok-4-image",
+    imagine_chat_model_options: "{}",
+    imagine_custom_api_base_url: "https://custom.example.test",
+    imagine_custom_api_key: "custom-key",
+    imagine_custom_prompt_templates: "[]",
+    imagine_custom_providers: "[]",
+    imagine_default_audio_model: "mimo:speech-02",
+    imagine_default_image_model: "grok2api:grok-4-image",
+    imagine_default_video_model: "runninghub:api:/openapi/v2/example",
+    imagine_grok2api_api_key: "grok-key",
+    imagine_grok2api_base_url: "https://grok.example.test",
+    imagine_image_edit_feature_models: "{}",
+    imagine_image_model_options: "{}",
+    imagine_language: "zh",
+    imagine_provider_credentials: "{}",
+    imagine_resolve_integration_enabled: "1",
+    imagine_runninghub_saved_targets: "[]",
+    imagine_show_price: "false",
+    imagine_theme_mode: "dark",
+    imagine_video_model_options: "{}",
+  };
+
+  const preview = buildBrowserToPostgresMigrationPreview({
+    assetCount: 2,
+    assetPayloadRecordCount: 2,
+    assetPreviewRecordCount: 1,
+    boardCount: 1,
+    generationTaskCount: 1,
+    indexedDbIntrospectionAvailable: true,
+    libraryAssetCount: 1,
+    localStorageEntries,
+    safetySnapshotCount: 1,
+    unknownIndexedDbSources: [],
+    unknownLocalStorageKeys: [],
+    voiceProfileCount: 1,
+  });
+
+  assert.equal(preview.canImport, true);
+  assert.equal(preview.blockingIssueCount, 0);
+  assert.equal(preview.managedLocalStorageKeyCount, Object.keys(localStorageEntries).length);
+  assert.equal(preview.requiredLocalStorageKeyCount, 20);
+  assert.equal(preview.optionalLocalStorageKeyCount, 10);
+  assert.equal(preview.optionalCredentialLocalStorageKeyCount, 7);
+  assert.equal(preview.localOnlyLocalStorageKeyCount, 2);
+  assert.deepEqual(preview.unknownLocalStorageKeys, []);
+  assert.deepEqual(preview.unknownIndexedDbSources, []);
+});
+
 test("buildBrowserToPostgresMigrationPreview requires IndexedDB introspection", () => {
   const preview = buildBrowserToPostgresMigrationPreview({
     assetCount: 0,
