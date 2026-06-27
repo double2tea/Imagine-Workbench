@@ -9,7 +9,9 @@ import type {
   TeamAssetClearResult,
   TeamAssetListResult,
   TeamAssetMutationResult,
+  TeamAssetSourceRepairResult,
 } from "@/lib/storage/team-asset-types";
+import type { BoardDocument } from "@/lib/board/types";
 import type { PostgresStorageConfig } from "@/lib/storage/postgres/config";
 import type { PostgresQueryable } from "@/lib/storage/postgres/connection";
 import type { WorkspaceAssetListOptions } from "@/lib/storage/repository";
@@ -77,6 +79,42 @@ export async function clearTeamAssets(
     await context.queryable.query("rollback");
     throw error;
   }
+}
+
+export async function repairTeamAssetSourceLinks(
+  queryable: PostgresQueryable,
+  config: PostgresStorageConfig,
+  request: Request,
+): Promise<TeamAssetSourceRepairResult> {
+  const context = await createTeamWorkspaceStorageContext(queryable, config, request, { minimumRole: "admin" });
+  const [assets, boards] = await Promise.all([
+    context.repository.assets.list({ limit: 10000 }),
+    context.repository.boards.list({ limit: 10000 }),
+  ]);
+  const boardNodeIds = collectBoardNodeIds(boards.map(record => record.board));
+  const staleAssets = assets.filter(record =>
+    record.meta.sourceBoardNodeId && !boardNodeIds.has(record.meta.sourceBoardNodeId)
+  );
+
+  for (const record of staleAssets) {
+    await context.repository.assets.put({
+      ...record,
+      meta: { ...record.meta, sourceBoardNodeId: undefined },
+    });
+  }
+
+  const repairedIds = staleAssets.map(record => record.meta.id);
+  await recordTeamAuditEvent(context.queryable, {
+    eventType: "team_assets.repair_source_links",
+    metadata: { repairedCount: repairedIds.length },
+    userId: context.session.userId,
+    workspaceId: context.session.workspaceId,
+  });
+  return {
+    repairedIds,
+    targetKind: "postgres",
+    workspaceId: context.session.workspaceId,
+  };
 }
 
 export async function saveTeamAsset(
@@ -150,6 +188,14 @@ function numberFromDatabase(value: string | number | undefined): number {
   if (typeof value === "number") return value;
   if (typeof value === "string") return Number(value);
   return 0;
+}
+
+function collectBoardNodeIds(boards: BoardDocument[]): Set<string> {
+  const ids = new Set<string>();
+  for (const board of boards) {
+    for (const node of board.nodes) ids.add(node.id);
+  }
+  return ids;
 }
 
 function publicPayload(ref: WorkspaceAssetPayloadRef): PublicTeamAssetPayload {

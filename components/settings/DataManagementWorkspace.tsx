@@ -486,12 +486,12 @@ export default function DataManagementWorkspace({
         title: t("dataManagement.issueGroups.staleSourceLinks"),
         count: integrity.staleAssetSourceLinks.length,
         tone: "attention",
-        action: isTeamStorageMode ? undefined : {
+        action: !isTeamStorageMode || canManageTeamMembers ? {
           label: t("dataManagement.issueGroups.repairSources"),
           busyLabel: t("dataManagement.issueGroups.repairSourcesBusy"),
           confirmRequest: buildRepairSourcesConfirmRequest(t),
           run: onRepairAssetSources,
-        },
+        } : undefined,
         details: integrity.staleAssetSourceLinks.map(link =>
           `${link.assetId} / board:${link.boardId || "workspace"} / source:${link.sourceBoardNodeId} / ${link.status}`,
         ),
@@ -559,7 +559,7 @@ export default function DataManagementWorkspace({
         },
       ] : []),
     ];
-  }, [integrity, isTeamStorageMode, onCleanupAssets, onCleanupTeamMediaMaintenance, onRepairAssetSources, t, teamStorageSummary]);
+  }, [canManageTeamMembers, integrity, isTeamStorageMode, onCleanupAssets, onCleanupTeamMediaMaintenance, onRepairAssetSources, t, teamStorageSummary]);
 
   const toggleGroup = (key: string) => {
     setExpandedGroups(current => ({ ...current, [key]: !current[key] }));

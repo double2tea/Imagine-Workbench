@@ -5,11 +5,23 @@ import path from "node:path";
 import test from "node:test";
 import type { QueryResult, QueryResultRow } from "pg";
 
+import type { BoardDocument } from "../lib/board/types";
 import type { StorageItem, StorageItemMeta } from "../lib/db";
 import type { PostgresQueryable } from "../lib/storage/postgres/connection";
 import { hashTeamSessionToken } from "../lib/storage/team-auth";
-import { clearTeamAssets, deleteTeamAsset, listTeamAssets, saveTeamAsset } from "../lib/storage/team-assets";
-import { DELETE as clearTeamAssetsRoute, GET as getTeamAssets, POST as postTeamAsset } from "../app/api/storage/team/assets/route";
+import {
+  clearTeamAssets,
+  deleteTeamAsset,
+  listTeamAssets,
+  repairTeamAssetSourceLinks,
+  saveTeamAsset,
+} from "../lib/storage/team-assets";
+import {
+  DELETE as clearTeamAssetsRoute,
+  GET as getTeamAssets,
+  PATCH as patchTeamAssets,
+  POST as postTeamAsset,
+} from "../app/api/storage/team/assets/route";
 import { DELETE as deleteTeamAssetRoute } from "../app/api/storage/team/assets/[assetId]/route";
 
 const RAW_SESSION_TOKEN = "raw-session-token";
@@ -148,6 +160,51 @@ test("clearTeamAssets rejects viewers before deleting workspace data", async () 
     /admin role is required/,
   );
   assert.equal(queries.some(query => query.text.startsWith("delete from")), false);
+});
+
+test("repairTeamAssetSourceLinks clears stale source links with audit", async () => {
+  const staleMeta = createAssetMeta({ id: "asset_stale", sourceBoardNodeId: "missing_node" });
+  const linkedMeta = createAssetMeta({ id: "asset_linked", sourceBoardNodeId: "node_1" });
+  const queries: Array<{ text: string; values?: readonly unknown[] }> = [];
+  const result = await repairTeamAssetSourceLinks(
+    createTeamAssetsQueryable(queries, {
+      assetMetas: [staleMeta, linkedMeta],
+      boards: [createBoardDocument(["node_1"])],
+      role: "admin",
+    }),
+    { databaseUrl: "postgres://localhost/imagine", mediaDir: "/srv/imagine/media" },
+    requestWithSession(),
+  );
+
+  const assetWrites = queries.filter(query => query.text.includes("insert into assets"));
+  const savedMeta = assetWrites[0]?.values?.[2] as StorageItemMeta | undefined;
+
+  assert.deepEqual(result, {
+    repairedIds: ["asset_stale"],
+    targetKind: "postgres",
+    workspaceId: WORKSPACE_ID,
+  });
+  assert.equal(assetWrites.length, 1);
+  assert.equal(savedMeta?.id, "asset_stale");
+  assert.equal(savedMeta?.sourceBoardNodeId, undefined);
+  const audit = queries.find(query => query.text.startsWith("insert into audit_events"));
+  assert.deepEqual(audit?.values?.slice(0, 3), [WORKSPACE_ID, "user_1", "team_assets.repair_source_links"]);
+  assert.deepEqual(JSON.parse(String(audit?.values?.[3])) as unknown, {
+    repairedCount: 1,
+  });
+});
+
+test("repairTeamAssetSourceLinks rejects viewers before updating metadata", async () => {
+  const queries: Array<{ text: string; values?: readonly unknown[] }> = [];
+  await assert.rejects(
+    repairTeamAssetSourceLinks(
+      createTeamAssetsQueryable(queries, { role: "viewer" }),
+      { databaseUrl: "postgres://localhost/imagine", mediaDir: "/srv/imagine/media" },
+      requestWithSession(),
+    ),
+    /admin role is required/,
+  );
+  assert.equal(queries.some(query => query.text.includes("insert into assets")), false);
 });
 
 test("saveTeamAsset writes an editor-scoped asset payload and metadata", async () => {
@@ -314,6 +371,40 @@ test("team assets clear route rejects missing CSRF before opening a database cli
   }
 });
 
+test("team asset patch route rejects missing CSRF before opening a database client", async () => {
+  const originalEnv = {
+    APP_URL: process.env.APP_URL,
+    DATABASE_URL: process.env.DATABASE_URL,
+    IMAGINE_MEDIA_DIR: process.env.IMAGINE_MEDIA_DIR,
+    IMAGINE_STORAGE_TARGET: process.env.IMAGINE_STORAGE_TARGET,
+  };
+  try {
+    process.env.APP_URL = "http://localhost:3000";
+    process.env.DATABASE_URL = "postgres://localhost/imagine";
+    process.env.IMAGINE_MEDIA_DIR = "/srv/imagine/media";
+    process.env.IMAGINE_STORAGE_TARGET = "postgres";
+
+    const response = await patchTeamAssets(new Request("http://localhost:3000/api/storage/team/assets", {
+      body: JSON.stringify({ action: "repair-stale-source-links" }),
+      headers: {
+        "content-type": "application/json",
+        origin: "http://localhost:3000",
+      },
+      method: "PATCH",
+    }));
+    assert.equal(response.status, 403);
+    assert.deepEqual(await response.json(), {
+      code: "invalid_csrf",
+      error: "Valid CSRF token is required",
+    });
+  } finally {
+    restoreEnv("APP_URL", originalEnv.APP_URL);
+    restoreEnv("DATABASE_URL", originalEnv.DATABASE_URL);
+    restoreEnv("IMAGINE_MEDIA_DIR", originalEnv.IMAGINE_MEDIA_DIR);
+    restoreEnv("IMAGINE_STORAGE_TARGET", originalEnv.IMAGINE_STORAGE_TARGET);
+  }
+});
+
 function requestWithSession(): Request {
   return new Request("http://localhost:3000/api/storage/team/assets", {
     headers: { cookie: `imagine_team_session=${RAW_SESSION_TOKEN}` },
@@ -322,7 +413,11 @@ function requestWithSession(): Request {
 
 function createTeamAssetsQueryable(
   queries: Array<{ text: string; values?: readonly unknown[] }> = [],
-  options: { role?: "owner" | "admin" | "editor" | "viewer" } = {},
+  options: {
+    assetMetas?: StorageItemMeta[];
+    boards?: BoardDocument[];
+    role?: "owner" | "admin" | "editor" | "viewer";
+  } = {},
 ): PostgresQueryable {
   return {
     query: async <T extends QueryResultRow = QueryResultRow>(text: string, values?: readonly unknown[]) => {
@@ -346,7 +441,10 @@ function createTeamAssetsQueryable(
         }]);
       }
       if (text.startsWith("select meta from assets")) {
-        return typedQueryResult<T>([{ meta: createAssetMeta() }]);
+        return typedQueryResult<T>((options.assetMetas ?? [createAssetMeta()]).map(meta => ({ meta })));
+      }
+      if (text.startsWith("select boards.board")) {
+        return typedQueryResult<T>((options.boards ?? []).map(board => ({ board, summary: null })));
       }
       if (text.includes("from asset_payloads")) {
         return typedQueryResult<T>([{
@@ -366,7 +464,30 @@ function assetRouteContext(assetId = ASSET_ID): { params: Promise<{ assetId: str
   return { params: Promise.resolve({ assetId }) };
 }
 
-function createAssetMeta(): StorageItemMeta {
+function createBoardDocument(nodeIds: string[]): BoardDocument {
+  const now = "2026-06-26T00:00:00.000Z";
+  return {
+    config: { showGrid: true, showMiniMap: false, snapToGrid: true },
+    createdAt: now,
+    edges: [],
+    id: "board_1",
+    nodes: nodeIds.map(id => ({
+      createdAt: now,
+      id,
+      kind: "prompt",
+      position: { x: 0, y: 0 },
+      prompt: "",
+      size: { height: 100, width: 160 },
+      title: id,
+      updatedAt: now,
+    })),
+    title: "Board 1",
+    updatedAt: now,
+    viewport: { x: 0, y: 0, zoom: 1 },
+  };
+}
+
+function createAssetMeta(overrides: Partial<StorageItemMeta> = {}): StorageItemMeta {
   return {
     aspectRatio: "1:1",
     boardId: "board_1",
@@ -379,6 +500,7 @@ function createAssetMeta(): StorageItemMeta {
     scope: "workspace",
     status: "complete",
     type: "image",
+    ...overrides,
   };
 }
 

@@ -37,3 +37,9 @@ export interface TeamAssetClearResult {
   targetKind: "postgres";
   workspaceId: string;
 }
+
+export interface TeamAssetSourceRepairResult {
+  repairedIds: string[];
+  targetKind: "postgres";
+  workspaceId: string;
+}

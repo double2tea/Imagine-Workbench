@@ -33,6 +33,7 @@ import {
   loginTeamSession,
   logoutTeamSession,
   readTeamCsrfToken,
+  repairTeamAssetSourceLinks,
   resetTeamBoards,
   saveTeamBoardDocument,
   saveTeamAsset,
@@ -615,6 +616,32 @@ test("clearTeamAssets sends CSRF header to team asset collection route", async (
   assert.equal(result.deletedLibraryAssetCount, 1);
   await assert.rejects(
     clearTeamAssets(" "),
+    /CSRF token is required/,
+  );
+});
+
+test("repairTeamAssetSourceLinks sends PATCH request to team asset collection route", async () => {
+  let requestedUrl = "";
+  let csrfHeader: string | null = null;
+  let requestBody: unknown = null;
+  const result = await repairTeamAssetSourceLinks("csrf-token", async (input, init) => {
+    requestedUrl = String(input);
+    assert.equal(init?.method, "PATCH");
+    csrfHeader = new Headers(init?.headers).get("x-imagine-csrf-token");
+    requestBody = JSON.parse(String(init?.body));
+    return jsonResponse({
+      repairedIds: ["asset_1"],
+      targetKind: "postgres",
+      workspaceId: "workspace_1",
+    });
+  });
+
+  assert.equal(requestedUrl, "/api/storage/team/assets");
+  assert.equal(csrfHeader, "csrf-token");
+  assert.deepEqual(requestBody, { action: "repair-stale-source-links" });
+  assert.deepEqual(result.repairedIds, ["asset_1"]);
+  await assert.rejects(
+    repairTeamAssetSourceLinks(" "),
     /CSRF token is required/,
   );
 });

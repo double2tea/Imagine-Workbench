@@ -18,6 +18,7 @@ import type {
   TeamAssetClearResult,
   TeamAssetListResult,
   TeamAssetMutationResult,
+  TeamAssetSourceRepairResult,
 } from "@/lib/storage/team-asset-types";
 import type {
   PublicTeamAssetLibraryEntry,
@@ -698,6 +699,29 @@ export async function clearTeamAssets(
   return parseTeamAssetClearResult(body);
 }
 
+export async function repairTeamAssetSourceLinks(
+  csrfToken: string,
+  fetcher: Fetcher = fetch,
+): Promise<TeamAssetSourceRepairResult> {
+  const token = csrfToken.trim();
+  if (!token) throw new Error("CSRF token is required");
+  const response = await fetcher(API_ROUTES.storage.teamAssets, {
+    cache: "no-store",
+    body: JSON.stringify({ action: "repair-stale-source-links" }),
+    headers: {
+      "content-type": "application/json",
+      "x-imagine-csrf-token": token,
+    },
+    method: "PATCH",
+  });
+  const body: unknown = await response.json();
+  if (!response.ok) {
+    const error = readStringField(body, "error") ?? "Team asset source repair failed";
+    throw new Error(error);
+  }
+  return parseTeamAssetSourceRepairResult(body);
+}
+
 export async function saveTeamAsset(
   item: StorageItem,
   csrfToken: string,
@@ -1141,6 +1165,11 @@ function parseTeamAssetClearResult(value: unknown): TeamAssetClearResult {
   return value;
 }
 
+function parseTeamAssetSourceRepairResult(value: unknown): TeamAssetSourceRepairResult {
+  if (!isTeamAssetSourceRepairResult(value)) throw new Error("Team asset source repair response is invalid");
+  return value;
+}
+
 function parseTeamProviderTargetListResult(value: unknown): TeamProviderTargetListResult {
   if (!isTeamProviderTargetListResult(value)) throw new Error("Team provider target list response is invalid");
   return value;
@@ -1540,6 +1569,16 @@ function isTeamAssetClearResult(value: unknown): value is TeamAssetClearResult {
     Number.isInteger(value.deletedAssetCount) &&
     Number.isInteger(value.deletedGenerationTaskCount) &&
     Number.isInteger(value.deletedLibraryAssetCount)
+  );
+}
+
+function isTeamAssetSourceRepairResult(value: unknown): value is TeamAssetSourceRepairResult {
+  if (!isRecord(value)) return false;
+  return (
+    value.targetKind === "postgres" &&
+    typeof value.workspaceId === "string" &&
+    Array.isArray(value.repairedIds) &&
+    value.repairedIds.every(item => typeof item === "string")
   );
 }
 

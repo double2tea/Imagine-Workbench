@@ -6,7 +6,13 @@ import {
   assertTeamCsrf,
   assertTrustedTeamRequestOrigin,
 } from "@/lib/storage/team-auth";
-import { clearTeamAssets, listTeamAssets, saveTeamAsset, type TeamAssetSaveInput } from "@/lib/storage/team-assets";
+import {
+  clearTeamAssets,
+  listTeamAssets,
+  repairTeamAssetSourceLinks,
+  saveTeamAsset,
+  type TeamAssetSaveInput,
+} from "@/lib/storage/team-assets";
 import type { WorkspaceAssetListOptions } from "@/lib/storage/repository";
 
 export const runtime = "nodejs";
@@ -59,6 +65,25 @@ export async function DELETE(request: Request): Promise<Response> {
     return Response.json(result);
   } catch (error) {
     const response = apiErrorResponse(error, "Team assets clear failed");
+    return Response.json(response.body, {
+      status: error instanceof PostgresStorageConfigError ? 400 : response.status,
+    });
+  }
+}
+
+export async function PATCH(request: Request): Promise<Response> {
+  try {
+    assertTrustedTeamRequestOrigin(request, {
+      APP_URL: process.env.APP_URL,
+      IMAGINE_TRUSTED_ORIGINS: process.env.IMAGINE_TRUSTED_ORIGINS,
+    });
+    assertTeamCsrf(request);
+    await readTeamAssetPatchRequestJson(request);
+    const config = resolvePostgresStorageConfig(process.env);
+    const result = await withPostgresClient(config, client => repairTeamAssetSourceLinks(client, config, request));
+    return Response.json(result);
+  } catch (error) {
+    const response = apiErrorResponse(error, "Team asset update failed");
     return Response.json(response.body, {
       status: error instanceof PostgresStorageConfigError ? 400 : response.status,
     });
@@ -121,6 +146,19 @@ async function readTeamAssetSaveRequestJson(request: Request): Promise<TeamAsset
     throw badRequest("Invalid team asset request", "invalid_team_asset_request");
   }
   return { item: body.asset };
+}
+
+async function readTeamAssetPatchRequestJson(request: Request): Promise<{ action: "repair-stale-source-links" }> {
+  let body: unknown;
+  try {
+    body = await request.json();
+  } catch {
+    throw badRequest("Invalid team asset request", "invalid_team_asset_request");
+  }
+  if (!isRecord(body) || body.action !== "repair-stale-source-links") {
+    throw badRequest("Invalid team asset request", "invalid_team_asset_request");
+  }
+  return { action: body.action };
 }
 
 function isStorageItem(value: unknown): value is StorageItem {
