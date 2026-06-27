@@ -143,10 +143,13 @@
       "teamCleanMaintenanceFiles": "清理文件",
       "teamCleanMaintenanceFilesBusy": "清理文件中",
       "teamDeleteMissingPayloadAssets": "删除缺失资产记录",
-      "teamDeleteMissingPayloadAssetsBusy": "删除记录中"
+      "teamDeleteMissingPayloadAssetsBusy": "删除记录中",
+      "teamDeleteMissingPreviewRefs": "删除缺失预览引用",
+      "teamDeleteMissingPreviewRefsBusy": "删除预览引用中"
     },
     "teamMediaMaintenanceConfirm": "删除未被 PostgreSQL 引用的团队媒体文件，包括临时文件和回收站文件。数据库记录和缺失的已引用文件不会被修改。",
     "teamMissingPayloadAssetsConfirm": "删除 payload 文件已缺失的 PostgreSQL 资产记录。预览缺失记录不会被修改，媒体文件不会被恢复。",
+    "teamMissingPreviewRefsConfirm": "删除预览文件已缺失的 PostgreSQL 预览引用。资产记录和原始媒体负载不会被修改。",
     "browserMigrationPreview": "浏览器迁移预览",
     "browserMigrationPreviewWaiting": "等待读取当前浏览器工作区",
     "browserMigrationPreviewReady": "当前浏览器工作区没有发现未知持久化源，可以导入到 PostgreSQL 团队工作区。",

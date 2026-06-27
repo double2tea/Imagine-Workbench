@@ -234,6 +234,14 @@ function buildTeamMissingPayloadAssetsConfirmRequest(t: TranslateFn): ConfirmReq
   };
 }
 
+function buildTeamMissingPreviewRefsConfirmRequest(t: TranslateFn): ConfirmRequest {
+  return {
+    message: t("dataManagement.teamMissingPreviewRefsConfirm"),
+    tone: "danger",
+    confirmLabel: t("dataManagement.issueGroups.teamDeleteMissingPreviewRefs"),
+  };
+}
+
 function buildBrowserMigrationImportConfirmRequest(preview: WorkspaceBrowserMigrationPreview, t: TranslateFn): ConfirmRequest {
   return {
     message: t("dataManagement.browserMigrationImportConfirm", {
@@ -458,6 +466,21 @@ export default function DataManagementWorkspace({
   const issueGroups = useMemo<HealthIssueGroup[]>(() => {
     if (!integrity) return [];
     const mediaConsistency = teamStorageSummary?.mediaConsistency;
+    const missingTeamMediaAction = mediaConsistency?.missingPayloadFiles
+      ? {
+          label: t("dataManagement.issueGroups.teamDeleteMissingPayloadAssets"),
+          busyLabel: t("dataManagement.issueGroups.teamDeleteMissingPayloadAssetsBusy"),
+          confirmRequest: buildTeamMissingPayloadAssetsConfirmRequest(t),
+          run: () => onCleanupTeamMediaMaintenance("missing-payload-assets"),
+        }
+      : mediaConsistency?.missingPreviewFiles
+        ? {
+            label: t("dataManagement.issueGroups.teamDeleteMissingPreviewRefs"),
+            busyLabel: t("dataManagement.issueGroups.teamDeleteMissingPreviewRefsBusy"),
+            confirmRequest: buildTeamMissingPreviewRefsConfirmRequest(t),
+            run: () => onCleanupTeamMediaMaintenance("missing-preview-refs"),
+          }
+        : undefined;
     return [
       {
         key: "missing-references",
@@ -528,12 +551,7 @@ export default function DataManagementWorkspace({
           title: t("dataManagement.issueGroups.teamMissingMediaFiles"),
           count: mediaConsistency.missingPayloadFiles + mediaConsistency.missingPreviewFiles,
           tone: "critical" as const,
-          action: mediaConsistency.missingPayloadFiles > 0 ? {
-            label: t("dataManagement.issueGroups.teamDeleteMissingPayloadAssets"),
-            busyLabel: t("dataManagement.issueGroups.teamDeleteMissingPayloadAssetsBusy"),
-            confirmRequest: buildTeamMissingPayloadAssetsConfirmRequest(t),
-            run: () => onCleanupTeamMediaMaintenance("missing-payload-assets"),
-          } : undefined,
+          action: missingTeamMediaAction,
           details: [
             t("dataManagement.issueGroups.teamMissingPayloadFiles", { count: mediaConsistency.missingPayloadFiles }),
             t("dataManagement.issueGroups.teamMissingPreviewFiles", { count: mediaConsistency.missingPreviewFiles }),

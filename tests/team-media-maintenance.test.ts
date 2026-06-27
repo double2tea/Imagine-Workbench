@@ -46,6 +46,7 @@ test("cleanupTeamMediaMaintenance requires admin and removes only maintenance fi
     assert.deepEqual(result, {
       deletedFiles: 4,
       deletedMissingPayloadAssets: 0,
+      deletedMissingPreviewRefs: 0,
       deletedOrphanedPayloadFiles: 1,
       deletedOrphanedPreviewFiles: 1,
       deletedTmpFiles: 1,
@@ -88,6 +89,7 @@ test("cleanupTeamMediaMaintenance deletes asset rows with missing payload files"
     assert.deepEqual(result, {
       deletedFiles: 0,
       deletedMissingPayloadAssets: 1,
+      deletedMissingPreviewRefs: 0,
       deletedOrphanedPayloadFiles: 0,
       deletedOrphanedPreviewFiles: 0,
       deletedTmpFiles: 0,
@@ -106,6 +108,54 @@ test("cleanupTeamMediaMaintenance deletes asset rows with missing payload files"
     assert.deepEqual(
       queries.find(query => query.text.startsWith("insert into audit_events"))?.values?.slice(0, 3),
       [WORKSPACE_ID, "user_1", "team_media.cleanup"],
+    );
+  });
+});
+
+test("cleanupTeamMediaMaintenance deletes missing preview refs without deleting assets", async () => {
+  await withTempMediaDir(async mediaDir => {
+    await writeMediaFile(mediaDir, "previews/image/kept.webp");
+
+    const queries: Array<{ text: string; values?: readonly unknown[] }> = [];
+    const result = await cleanupTeamMediaMaintenance(
+      createTeamMediaMaintenanceQueryable(
+        queries,
+        "admin",
+        [{ asset_id: "asset_kept", storage_key: "originals/image/kept.png", storage_kind: "local-file" }],
+        [
+          { asset_id: "asset_kept", storage_key: "previews/image/kept.webp", storage_kind: "local-file" },
+          { asset_id: "asset_missing_preview", storage_key: "previews/image/missing.webp", storage_kind: "local-file" },
+          { asset_id: "asset_remote_preview", storage_key: "https://example.com/preview.webp", storage_kind: "remote-url" },
+        ],
+      ),
+      { databaseUrl: "postgres://localhost/imagine", mediaDir },
+      requestWithSession(),
+      "missing-preview-refs",
+    );
+
+    assert.deepEqual(result, {
+      deletedFiles: 0,
+      deletedMissingPayloadAssets: 0,
+      deletedMissingPreviewRefs: 1,
+      deletedOrphanedPayloadFiles: 0,
+      deletedOrphanedPreviewFiles: 0,
+      deletedTmpFiles: 0,
+      deletedTrashFiles: 0,
+      target: "missing-preview-refs",
+      targetKind: "postgres",
+      workspaceId: WORKSPACE_ID,
+    });
+    assert.ok(queries.some(query => query.text === "begin"));
+    assert.ok(queries.some(query => query.text === "commit"));
+    assert.equal(queries.some(query => query.text === "rollback"), false);
+    assert.deepEqual(
+      queries.filter(query => query.text.startsWith("delete from asset_previews")).map(query => query.values),
+      [[WORKSPACE_ID, "asset_missing_preview"]],
+    );
+    assert.equal(queries.some(query => query.text.startsWith("delete from assets")), false);
+    assert.deepEqual(
+      JSON.parse(String(queries.find(query => query.text.startsWith("insert into audit_events"))?.values?.[3])) as unknown,
+      { deletedMissingPreviewRefs: 1, target: "missing-preview-refs" },
     );
   });
 });
@@ -166,6 +216,7 @@ function createTeamMediaMaintenanceQueryable(
     storage_kind: "local-file",
   }],
   previewRows: QueryResultRow[] = [{
+    asset_id: "asset_kept",
     storage_key: "previews/image/kept.webp",
     storage_kind: "local-file",
   }],

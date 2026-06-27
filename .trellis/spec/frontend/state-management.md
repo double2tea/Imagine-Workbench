@@ -199,6 +199,7 @@ return Response.json({
   - Maintenance directories: `tmpFiles`, `trashFiles`
 - Public summary must not include payload `uri`, `IMAGINE_MEDIA_DIR`, database URLs, absolute file paths, setup tokens, session secrets, or decrypted provider secrets.
 - Public media consistency counts must not include `storage_key`, relative file paths, or absolute media paths; cleanup and repair actions must use separate authenticated maintenance mutation APIs.
+- PostgreSQL media maintenance uses `POST /api/storage/team/media-maintenance`, `runtime = "nodejs"`, body `{ target: "maintenance-files" | "missing-payload-assets" | "missing-preview-refs" }`.
 - In team mode, Settings -> Data may show diagnostic issue groups but must not wire those buttons to browser IndexedDB/localStorage cleanup handlers. Team-mode buttons may only call explicit team APIs, such as media maintenance cleanup or stale source-link repair.
 - Stale asset source-link repair in PostgreSQL mode uses `PATCH /api/storage/team/assets` with body `{ action: "repair-stale-source-links" }`, requires trusted origin, CSRF, and at least `admin`, clears only stale `StorageItemMeta.sourceBoardNodeId` values, returns `{ repairedIds, targetKind: "postgres", workspaceId }`, and writes `team_assets.repair_source_links` with aggregate non-secret audit metadata.
 
@@ -216,12 +217,14 @@ return Response.json({
 - Unreferenced files under `originals/` or `previews/` -> orphaned media consistency counts increase.
 - Files under `tmp/` or `trash/` -> maintenance counts increase; Settings -> Data displays them without offering browser cleanup actions.
 - Stale `sourceBoardNodeId` in PostgreSQL mode -> Settings -> Data shows the existing stale-source issue group; owner/admin can run the team PATCH repair action, while viewer/editor can only inspect the issue details.
+- Missing local-file preview in PostgreSQL mode -> Settings -> Data can call `"missing-preview-refs"` after owner/admin confirmation; the service deletes only missing `asset_previews` rows and leaves assets plus original payload refs intact.
 
 #### 5. Good/Base/Bad Cases
 
 - Good: PostgreSQL mode opens Settings -> Data, shows `PostgreSQL` as the storage target, renders Team Settings / Team Media cards, and displays payload/library/task/setting slots from the server summary.
 - Good: a missing payload file increments issue count, marks integrity critical, and shows only aggregate missing-file counts in Settings -> Data.
 - Good: an owner/admin repairs stale source links in PostgreSQL mode; the API clears only invalid `sourceBoardNodeId` metadata, records a non-secret audit count, and the UI refreshes the team summary.
+- Good: an owner/admin repairs missing preview refs in PostgreSQL mode; the API removes only stale preview DB refs, records a non-secret count, and the UI refreshes the team summary.
 - Base: browser mode still renders IndexedDB stats, browser quota, local settings inventory, and local safety snapshots without making team summary calls.
 - Bad: returning `storage_key`/media paths to the browser, treating orphaned media files as browser IndexedDB cleanup targets, repairing PostgreSQL stale source links through IndexedDB, or importing browser-only data-management runtime into the Node route.
 
@@ -231,6 +234,7 @@ return Response.json({
 - Service: media consistency uses a temporary media dir in tests and asserts missing preview refs, orphaned original/preview files, tmp files, and trash files.
 - Client: `fetchTeamWorkspaceDataSummary()` calls `/api/storage/team/data-summary`, parses a valid envelope, and rejects malformed summaries.
 - Client/service: `repairTeamAssetSourceLinks()` sends PATCH with CSRF, rejects blank CSRF before fetch, clears only stale workspace-scoped source links, rejects viewers, and rejects missing CSRF before opening a database client.
+- Client/service: `cleanupTeamMediaMaintenance("missing-preview-refs")` sends CSRF, validates the target, deletes only workspace-scoped preview refs whose local-file preview is missing, rejects viewers, records `team_media.cleanup`, and rejects malformed responses.
 - UI/manual: Settings -> Data renders in browser mode; when team mode is active or mocked, labels switch to Team Settings / Team Media and storage slots switch to payload/library/task/settings counts.
 - Quality gates: `pnpm run typecheck`, `pnpm run lint`, `pnpm run test:providers`, `pnpm run check`, and `pnpm run build`.
 

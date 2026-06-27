@@ -87,10 +87,13 @@ Completed in the latest continuation:
 * Team stale-source repair requires admin, CSRF, trusted origin, scopes assets/boards through the authenticated workspace repository, writes a `team_assets.repair_source_links` audit event with a non-secret repaired count, returns repaired asset ids to the caller, and refreshes the team data summary.
 * Added service, route, and client tests covering stale-source repair filtering, viewer rejection, audit metadata, missing-CSRF rejection before database access, and PATCH client request shape.
 * Refreshed local team deployment docs to match current implementation: Docker Compose remains opt-in, backup/restore verification is documented, upgrade/rollback steps are explicit, and the current scope now includes team backup/restore, direct browser import, provider/RunningHub team settings, clear/reset, media maintenance, missing-payload cleanup, and stale source-link repair.
+* Extended `POST /api/storage/team/media-maintenance` with a `"missing-preview-refs"` target that deletes PostgreSQL `asset_previews` rows whose local-file preview files are missing, while leaving assets and original payload refs untouched.
+* Updated Settings -> Data so PostgreSQL missing-preview diagnostics can trigger an explicit owner/admin repair action when no missing-payload action takes priority.
+* Added service/client tests covering missing-preview ref cleanup, workspace-scoped delete SQL, transaction behavior, non-secret audit metadata, target response validation, and preservation of asset rows.
 
 Still remaining before the full PRD can be considered complete:
 
-* Remaining PostgreSQL/media repair mutation APIs for stale previews and DB-row-level maintenance beyond missing-payload asset deletion and stale source-link repair.
+* Remaining PostgreSQL/media repair mutation APIs for DB-row-level maintenance beyond missing-payload asset deletion, stale source-link repair, and missing-preview ref cleanup.
 * Broader operational hardening beyond basic login/bootstrap rate limiting.
 * Residual team settings surfaces outside Provider Settings, audit coverage for all sensitive operations, and deployment/upgrade/rollback automation depth.
 

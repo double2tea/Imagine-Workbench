@@ -143,10 +143,13 @@
       "teamCleanMaintenanceFiles": "Clean files",
       "teamCleanMaintenanceFilesBusy": "Cleaning files...",
       "teamDeleteMissingPayloadAssets": "Delete missing asset records",
-      "teamDeleteMissingPayloadAssetsBusy": "Deleting records..."
+      "teamDeleteMissingPayloadAssetsBusy": "Deleting records...",
+      "teamDeleteMissingPreviewRefs": "Delete missing preview refs",
+      "teamDeleteMissingPreviewRefsBusy": "Deleting preview refs..."
     },
     "teamMediaMaintenanceConfirm": "Delete team media files that are not referenced by PostgreSQL, including tmp and trash files. Database records and missing referenced files will not be changed.",
     "teamMissingPayloadAssetsConfirm": "Delete PostgreSQL asset records whose payload files are missing. Missing preview records will not be changed, and media files will not be restored.",
+    "teamMissingPreviewRefsConfirm": "Delete PostgreSQL preview refs whose preview files are missing. Asset records and original payload media will not be changed.",
     "browserMigrationPreview": "Browser Migration Preview",
     "browserMigrationPreviewWaiting": "Waiting to read the current browser workspace",
     "browserMigrationPreviewReady": "No unknown persisted browser sources were found. This workspace can be imported into the PostgreSQL team workspace.",

@@ -220,6 +220,7 @@ test("cleanupTeamMediaMaintenance posts target and CSRF token", async () => {
     return jsonResponse({
       deletedFiles: 4,
       deletedMissingPayloadAssets: 0,
+      deletedMissingPreviewRefs: 0,
       deletedOrphanedPayloadFiles: 1,
       deletedOrphanedPreviewFiles: 1,
       deletedTmpFiles: 1,
@@ -236,6 +237,26 @@ test("cleanupTeamMediaMaintenance posts target and CSRF token", async () => {
   assert.equal((requestedInit.headers as Record<string, string>)["x-imagine-csrf-token"], "csrf-token");
   assert.deepEqual(JSON.parse(String(requestedInit.body)), { target: "maintenance-files" });
   assert.equal(result.deletedFiles, 4);
+
+  const previewResult = await cleanupTeamMediaMaintenance("missing-preview-refs", "csrf-token", async (input, init) => {
+    requestedUrl = String(input);
+    requestedInit = init;
+    return jsonResponse({
+      deletedFiles: 0,
+      deletedMissingPayloadAssets: 0,
+      deletedMissingPreviewRefs: 2,
+      deletedOrphanedPayloadFiles: 0,
+      deletedOrphanedPreviewFiles: 0,
+      deletedTmpFiles: 0,
+      deletedTrashFiles: 0,
+      target: "missing-preview-refs",
+      targetKind: "postgres",
+      workspaceId: "workspace_1",
+    });
+  });
+  assert.equal(requestedUrl, "/api/storage/team/media-maintenance");
+  assert.deepEqual(JSON.parse(String(requestedInit?.body)), { target: "missing-preview-refs" });
+  assert.equal(previewResult.deletedMissingPreviewRefs, 2);
 
   await assert.rejects(
     cleanupTeamMediaMaintenance("maintenance-files", "", async () => jsonResponse({})),

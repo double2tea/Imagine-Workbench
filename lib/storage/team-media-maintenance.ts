@@ -22,6 +22,7 @@ interface PayloadStorageKeyRow extends QueryResultRow {
 }
 
 interface PreviewStorageKeyRow extends QueryResultRow {
+  asset_id: string;
   storage_key: string | null;
   storage_kind: string | null;
 }
@@ -58,6 +59,42 @@ export async function cleanupTeamMediaMaintenance(
       return {
         deletedFiles: 0,
         deletedMissingPayloadAssets,
+        deletedMissingPreviewRefs: 0,
+        deletedOrphanedPayloadFiles: 0,
+        deletedOrphanedPreviewFiles: 0,
+        deletedTmpFiles: 0,
+        deletedTrashFiles: 0,
+        target,
+        targetKind: "postgres",
+        workspaceId: context.session.workspaceId,
+      };
+    } catch (error) {
+      await context.queryable.query("rollback");
+      throw error;
+    }
+  }
+  if (target === "missing-preview-refs") {
+    await context.queryable.query("begin");
+    try {
+      const deletedMissingPreviewRefs = await deleteMissingPreviewRefs(
+        context.queryable,
+        config.mediaDir,
+        context.session.workspaceId,
+      );
+      await recordTeamAuditEvent(context.queryable, {
+        eventType: "team_media.cleanup",
+        metadata: {
+          deletedMissingPreviewRefs,
+          target,
+        },
+        userId: context.session.userId,
+        workspaceId: context.session.workspaceId,
+      });
+      await context.queryable.query("commit");
+      return {
+        deletedFiles: 0,
+        deletedMissingPayloadAssets: 0,
+        deletedMissingPreviewRefs,
         deletedOrphanedPayloadFiles: 0,
         deletedOrphanedPreviewFiles: 0,
         deletedTmpFiles: 0,
@@ -90,10 +127,40 @@ export async function cleanupTeamMediaMaintenance(
   return {
     ...cleanup,
     deletedMissingPayloadAssets: 0,
+    deletedMissingPreviewRefs: 0,
     target,
     targetKind: "postgres",
     workspaceId: context.session.workspaceId,
   };
+}
+
+async function deleteMissingPreviewRefs(
+  queryable: PostgresQueryable,
+  mediaDir: string,
+  workspaceId: string,
+): Promise<number> {
+  const previews = await readTeamPreviewStorageKeyRows(queryable, workspaceId);
+  const localPreviews = previews.filter(row => row.storage_kind === "local-file" && row.storage_key);
+  const missingStorageKeys = new Set(await listMissingTeamMediaStorageKeys(
+    mediaDir,
+    localPreviews.map(row => row.storage_key ?? ""),
+  ));
+  const missingAssetIds = [...new Set(
+    localPreviews
+      .filter(row => row.storage_key && missingStorageKeys.has(row.storage_key))
+      .map(row => row.asset_id),
+  )];
+  for (const assetId of missingAssetIds) {
+    await queryable.query(
+      `delete from asset_previews
+       using assets
+       where asset_previews.asset_id = assets.id
+         and assets.workspace_id = $1
+         and asset_previews.asset_id = $2`,
+      [workspaceId, assetId],
+    );
+  }
+  return missingAssetIds.length;
 }
 
 async function deleteMissingPayloadAssets(
@@ -117,6 +184,20 @@ async function deleteMissingPayloadAssets(
     await deleteAsset(assetId);
   }
   return missingAssetIds.length;
+}
+
+async function readTeamPreviewStorageKeyRows(
+  queryable: PostgresQueryable,
+  workspaceId: string,
+): Promise<PreviewStorageKeyRow[]> {
+  const result = await queryable.query<PreviewStorageKeyRow>(
+    `select asset_previews.asset_id, asset_previews.storage_kind, asset_previews.storage_key
+     from asset_previews
+     inner join assets on assets.id = asset_previews.asset_id
+     where assets.workspace_id = $1`,
+    [workspaceId],
+  );
+  return result.rows;
 }
 
 async function readTeamPayloadStorageKeyRows(
@@ -146,7 +227,7 @@ async function readTeamMediaConsistencyRefs(
       [workspaceId],
     ),
     queryable.query<PreviewStorageKeyRow>(
-      `select asset_previews.storage_kind, asset_previews.storage_key
+      `select asset_previews.asset_id, asset_previews.storage_kind, asset_previews.storage_key
        from asset_previews
        inner join assets on assets.id = asset_previews.asset_id
        where assets.workspace_id = $1`,
