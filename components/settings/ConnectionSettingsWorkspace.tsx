@@ -484,6 +484,7 @@ export function ConnectionSettingsWorkspace({
             title={t("connections.credentialCardTitleTemplate", { label: selectedProviderMeta.label })}
             onClear={onClearCredentials}
             onCommitApiKey={provider => onCommitCredential(provider, "apiKey")}
+            onCommitBaseUrl={provider => onCommitCredential(provider, "baseUrl")}
             onSaveApiKey={(provider, value) => onSaveCredential(provider, "apiKey", value)}
             onSaveBaseUrl={(provider, value) => onSaveCredential(provider, "baseUrl", value)}
             onTest={testProviderConnection}

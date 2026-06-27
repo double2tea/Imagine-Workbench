@@ -19,6 +19,7 @@ interface ProviderCredentialCardProps {
   title: string;
   onClear: (provider: AiProvider) => void;
   onCommitApiKey?: (provider: AiProvider) => void;
+  onCommitBaseUrl?: (provider: AiProvider) => void;
   onSaveApiKey: (provider: AiProvider, value: string) => void;
   onSaveBaseUrl: (provider: AiProvider, value: string) => void;
   onTest: (provider: AiProvider) => void;
@@ -40,6 +41,7 @@ export function ProviderCredentialCard({
   title,
   onClear,
   onCommitApiKey,
+  onCommitBaseUrl,
   onSaveApiKey,
   onSaveBaseUrl,
   onTest,
@@ -68,6 +70,7 @@ export function ProviderCredentialCard({
           <input
             type="url"
             value={baseUrl}
+            onBlur={() => onCommitBaseUrl?.(provider)}
             onChange={event => onSaveBaseUrl(provider, event.target.value)}
             placeholder={baseUrlPlaceholder}
             className="imagine-input font-mono"

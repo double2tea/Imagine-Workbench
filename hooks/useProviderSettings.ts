@@ -26,9 +26,12 @@ import { readFetchError, toErrorMessage } from "@/lib/client-fetch-error";
 import {
   deleteTeamSecret,
   fetchTeamSecrets,
+  fetchTeamSettings,
   fetchWorkspaceStorageRuntimeStatus,
   readTeamCsrfToken,
   saveTeamSecret,
+  saveTeamSetting,
+  deleteTeamSetting,
 } from "@/lib/storage/team-client";
 
 type ModelCategory = "chat" | "image" | "video" | "audio";
@@ -128,9 +131,29 @@ function providerApiKeySecretKey(provider: AiProvider): string {
   return `provider:${provider}:apiKey`;
 }
 
+function providerBaseUrlSettingKey(provider: AiProvider): string {
+  return `provider:${provider}:baseUrl`;
+}
+
+const PROVIDER_SELECTED_SETTING_KEY = "provider:selected";
+const PROVIDER_CHAT_MODEL_SETTING_KEY = "provider:chatModel";
+const PROVIDER_CUSTOM_PROVIDERS_SETTING_KEY = "provider:customProviders";
+
+function providerModelOptionsSettingKey(category: ModelCategory): string {
+  return `provider:modelOptions:${category}`;
+}
+
 function providerFromApiKeySecretKey(key: string): AiProvider | null {
   const prefix = "provider:";
   const suffix = ":apiKey";
+  if (!key.startsWith(prefix) || !key.endsWith(suffix)) return null;
+  const provider = key.slice(prefix.length, -suffix.length);
+  return isProviderKey(provider) ? provider : null;
+}
+
+function providerFromBaseUrlSettingKey(key: string): AiProvider | null {
+  const prefix = "provider:";
+  const suffix = ":baseUrl";
   if (!key.startsWith(prefix) || !key.endsWith(suffix)) return null;
   const provider = key.slice(prefix.length, -suffix.length);
   return isProviderKey(provider) ? provider : null;
@@ -251,6 +274,21 @@ export function useProviderSettings({
     });
   }, [isResolveIntegrationEnabled, pushWorkspaceNotice]);
 
+  const saveTeamProviderSetting = useCallback((key: string, value: string): void => {
+    if (credentialStorageTarget !== "postgres") return;
+    const csrfToken = readTeamCsrfToken();
+    if (!csrfToken) {
+      pushWorkspaceNotice("error", t("common.notices.providerCredentialCsrfMissing"));
+      return;
+    }
+    void (value
+      ? saveTeamSetting({ group: "provider", key, value }, csrfToken)
+      : deleteTeamSetting(key, csrfToken)
+    ).catch(error => {
+      pushWorkspaceNotice("error", toErrorMessage(error, t("common.notices.providerCredentialSaveFailed")));
+    });
+  }, [credentialStorageTarget, pushWorkspaceNotice]);
+
   const handleSaveCredential = useCallback((provider: AiProvider, field: keyof ProviderCredentials, value: string) => {
     setProviderCredentials(prev => {
       const current = prev[provider] ?? { apiKey: "", baseUrl: "" };
@@ -265,10 +303,21 @@ export function useProviderSettings({
   }, [credentialStorageTarget, getProviderLabel, setProviderCredentials, syncResolveProviderCredentialIfEnabled]);
 
   const commitProviderCredential = useCallback((provider: AiProvider, field: keyof ProviderCredentials) => {
-    if (credentialStorageTarget !== "postgres" || field !== "apiKey") return;
+    if (credentialStorageTarget !== "postgres") return;
     const csrfToken = readTeamCsrfToken();
     if (!csrfToken) {
       pushWorkspaceNotice("error", t("common.notices.providerCredentialCsrfMissing"));
+      return;
+    }
+    if (field === "baseUrl") {
+      const baseUrl = providerCredentials[provider]?.baseUrl.trim() ?? "";
+      const key = providerBaseUrlSettingKey(provider);
+      void (baseUrl || customProviderByKey.has(provider)
+        ? saveTeamSetting({ group: "provider", key, value: baseUrl }, csrfToken)
+        : deleteTeamSetting(key, csrfToken)
+      ).catch(error => {
+        pushWorkspaceNotice("error", toErrorMessage(error, t("common.notices.providerCredentialSaveFailed")));
+      });
       return;
     }
     const apiKey = providerCredentials[provider]?.apiKey.trim() ?? "";
@@ -284,7 +333,7 @@ export function useProviderSettings({
     }).catch(error => {
       pushWorkspaceNotice("error", toErrorMessage(error, t("common.notices.providerCredentialSaveFailed")));
     });
-  }, [credentialStorageTarget, providerCredentials, pushWorkspaceNotice]);
+  }, [credentialStorageTarget, customProviderByKey, providerCredentials, pushWorkspaceNotice]);
 
   const clearProviderCredentials = useCallback((provider: AiProvider) => {
     setProviderCredentials(prev => {
@@ -301,7 +350,13 @@ export function useProviderSettings({
       pushWorkspaceNotice("error", t("common.notices.providerCredentialCsrfMissing"));
       return;
     }
-    void deleteTeamSecret(providerApiKeySecretKey(provider), csrfToken)
+    const baseUrlSettingKey = providerBaseUrlSettingKey(provider);
+    void Promise.all([
+      deleteTeamSecret(providerApiKeySecretKey(provider), csrfToken),
+      customProviderByKey.has(provider)
+        ? saveTeamSetting({ group: "provider", key: baseUrlSettingKey, value: "" }, csrfToken)
+        : deleteTeamSetting(baseUrlSettingKey, csrfToken),
+    ])
       .then(() => {
         setProviderCredentialStatus(prev => ({
           ...prev,
@@ -311,11 +366,15 @@ export function useProviderSettings({
       .catch(error => {
         pushWorkspaceNotice("error", toErrorMessage(error, t("common.notices.providerCredentialClearFailed")));
       });
-  }, [credentialStorageTarget, pushWorkspaceNotice, setProviderCredentials, syncResolveProviderCredentialIfEnabled]);
+  }, [credentialStorageTarget, customProviderByKey, pushWorkspaceNotice, setProviderCredentials, syncResolveProviderCredentialIfEnabled]);
 
   const handleSelectProvider = (provider: AiProvider) => {
     setSelectedProvider(provider);
-    try { localStorage.setItem("imagine_ai_provider", provider); } catch { /* storage unavailable */ }
+    if (credentialStorageTarget === "postgres") {
+      saveTeamProviderSetting(PROVIDER_SELECTED_SETTING_KEY, provider);
+    } else {
+      try { localStorage.setItem("imagine_ai_provider", provider); } catch { /* storage unavailable */ }
+    }
   };
 
   const addCustomProvider = useCallback((label: string, baseUrl: string): boolean => {
@@ -335,7 +394,11 @@ export function useProviderSettings({
     const nextProvider = { key, label: cleanLabel, baseUrl: cleanBaseUrl };
     setCustomProviders(prev => {
       const next = [...prev, nextProvider];
-      try { localStorage.setItem(CUSTOM_PROVIDERS_STORAGE_KEY, JSON.stringify(next)); } catch { /* storage unavailable */ }
+      if (credentialStorageTarget === "postgres") {
+        saveTeamProviderSetting(PROVIDER_CUSTOM_PROVIDERS_SETTING_KEY, JSON.stringify(next));
+      } else {
+        try { localStorage.setItem(CUSTOM_PROVIDERS_STORAGE_KEY, JSON.stringify(next)); } catch { /* storage unavailable */ }
+      }
       return next;
     });
     setProviderCredentials(prev => {
@@ -356,10 +419,14 @@ export function useProviderSettings({
       [key]: { chat: [], image: [], video: [], audio: [] },
     }));
     setSelectedProvider(key);
-    try { localStorage.setItem("imagine_ai_provider", key); } catch { /* storage unavailable */ }
+    if (credentialStorageTarget === "postgres") {
+      saveTeamProviderSetting(PROVIDER_SELECTED_SETTING_KEY, key);
+    } else {
+      try { localStorage.setItem("imagine_ai_provider", key); } catch { /* storage unavailable */ }
+    }
     pushWorkspaceNotice("success", t("common.notices.providerAdded", { name: cleanLabel }));
     return true;
-  }, [credentialStorageTarget, providerKeys, pushWorkspaceNotice, syncResolveProviderCredentialIfEnabled]);
+  }, [credentialStorageTarget, providerKeys, pushWorkspaceNotice, saveTeamProviderSetting, syncResolveProviderCredentialIfEnabled]);
 
   const deleteCustomProvider = useCallback((provider: AiProvider) => {
     if (isKnownProvider(provider)) return;
@@ -368,7 +435,12 @@ export function useProviderSettings({
     const selectedChatProvider = tryParseProviderModel(selectedChatModel, selectedProvider)?.provider;
     setCustomProviders(prev => {
       const next = prev.filter(item => item.key !== provider);
-      try { localStorage.setItem(CUSTOM_PROVIDERS_STORAGE_KEY, JSON.stringify(next)); } catch { /* storage unavailable */ }
+      if (credentialStorageTarget === "postgres") {
+        saveTeamProviderSetting(PROVIDER_CUSTOM_PROVIDERS_SETTING_KEY, JSON.stringify(next));
+        saveTeamProviderSetting(providerBaseUrlSettingKey(provider), "");
+      } else {
+        try { localStorage.setItem(CUSTOM_PROVIDERS_STORAGE_KEY, JSON.stringify(next)); } catch { /* storage unavailable */ }
+      }
       return next;
     });
     setProviderCredentials(prev => {
@@ -387,12 +459,16 @@ export function useProviderSettings({
     });
     if (selectedChatProvider === provider) {
       setSelectedChatModel(DEFAULT_CHAT_MODEL);
-      try { localStorage.setItem("imagine_chat_model", DEFAULT_CHAT_MODEL); } catch { /* storage unavailable */ }
+      if (credentialStorageTarget === "postgres") {
+        saveTeamProviderSetting(PROVIDER_CHAT_MODEL_SETTING_KEY, DEFAULT_CHAT_MODEL);
+      } else {
+        try { localStorage.setItem("imagine_chat_model", DEFAULT_CHAT_MODEL); } catch { /* storage unavailable */ }
+      }
     }
-    removeProviderModelOptions(provider, "chat", setChatModelOptions);
-    removeProviderModelOptions(provider, "image", setImageModelOptions);
-    removeProviderModelOptions(provider, "video", setVideoModelOptions);
-    removeProviderModelOptions(provider, "audio", setAudioModelOptions);
+    removeProviderModelOptions(provider, "chat", setChatModelOptions, saveTeamProviderSetting, credentialStorageTarget);
+    removeProviderModelOptions(provider, "image", setImageModelOptions, saveTeamProviderSetting, credentialStorageTarget);
+    removeProviderModelOptions(provider, "video", setVideoModelOptions, saveTeamProviderSetting, credentialStorageTarget);
+    removeProviderModelOptions(provider, "audio", setAudioModelOptions, saveTeamProviderSetting, credentialStorageTarget);
     setFetchedModelOptions(prev => {
       const next = { ...prev };
       delete next[provider];
@@ -400,19 +476,31 @@ export function useProviderSettings({
     });
     if (selectedProvider === provider) {
       setSelectedProvider("12ai");
-      try { localStorage.setItem("imagine_ai_provider", "12ai"); } catch { /* storage unavailable */ }
+      if (credentialStorageTarget === "postgres") {
+        saveTeamProviderSetting(PROVIDER_SELECTED_SETTING_KEY, "12ai");
+      } else {
+        try { localStorage.setItem("imagine_ai_provider", "12ai"); } catch { /* storage unavailable */ }
+      }
     }
     pushWorkspaceNotice("success", t("common.notices.providerDeleted", { name: customProvider.label }));
-  }, [credentialStorageTarget, customProviderByKey, pushWorkspaceNotice, selectedChatModel, selectedProvider, syncResolveProviderCredentialIfEnabled]);
+  }, [credentialStorageTarget, customProviderByKey, pushWorkspaceNotice, saveTeamProviderSetting, selectedChatModel, selectedProvider, syncResolveProviderCredentialIfEnabled]);
 
   const handleSelectChatModel = (model: string) => {
     setSelectedChatModel(model);
-    try { localStorage.setItem("imagine_chat_model", model); } catch { /* storage unavailable */ }
+    if (credentialStorageTarget === "postgres") {
+      saveTeamProviderSetting(PROVIDER_CHAT_MODEL_SETTING_KEY, model);
+    } else {
+      try { localStorage.setItem("imagine_chat_model", model); } catch { /* storage unavailable */ }
+    }
     const parsed = tryParseProviderModel(model, selectedProvider);
     if (!parsed) return;
     if (parsed.provider !== selectedProvider) {
       setSelectedProvider(parsed.provider);
-      try { localStorage.setItem("imagine_ai_provider", parsed.provider); } catch { /* storage unavailable */ }
+      if (credentialStorageTarget === "postgres") {
+        saveTeamProviderSetting(PROVIDER_SELECTED_SETTING_KEY, parsed.provider);
+      } else {
+        try { localStorage.setItem("imagine_ai_provider", parsed.provider); } catch { /* storage unavailable */ }
+      }
     }
   };
 
@@ -422,7 +510,11 @@ export function useProviderSettings({
     options: Record<AiProvider, ModelOption[]>,
   ) => {
     setter(options);
-    try { localStorage.setItem(modelOptionsStorageKey(category), JSON.stringify(options)); } catch { /* storage unavailable */ }
+    if (credentialStorageTarget === "postgres") {
+      saveTeamProviderSetting(providerModelOptionsSettingKey(category), JSON.stringify(options));
+    } else {
+      try { localStorage.setItem(modelOptionsStorageKey(category), JSON.stringify(options)); } catch { /* storage unavailable */ }
+    }
   };
 
   const addManualModels = (category: ModelCategory, rawInput: string) => {
@@ -562,11 +654,23 @@ export function useProviderSettings({
         if (!isActive) return;
         setCredentialStorageTarget(storageTarget);
 
-        const storedCreds = localStorage.getItem("imagine_provider_credentials");
-        const storedCustomProviders = localStorage.getItem(CUSTOM_PROVIDERS_STORAGE_KEY);
-        const restoredCustomProviders = storedCustomProviders
-          ? readStoredCustomProviders(storedCustomProviders)
-          : [];
+        let teamSettingsByKey = new Map<string, string>();
+        let restoredCustomProviders: CustomProviderDefinition[] = [];
+        if (storageTarget === "postgres") {
+          try {
+            const teamSettings = await fetchTeamSettings({ groups: ["provider"] });
+            if (!isActive) return;
+            teamSettingsByKey = new Map(teamSettings.settings.map(setting => [setting.key, setting.value]));
+            restoredCustomProviders = readStoredCustomProviders(teamSettingsByKey.get(PROVIDER_CUSTOM_PROVIDERS_SETTING_KEY) ?? "");
+          } catch {
+            // Non-secret provider settings are admin-scoped. Non-admin sessions keep defaults without localStorage fallback.
+          }
+        } else {
+          const storedCustomProviders = localStorage.getItem(CUSTOM_PROVIDERS_STORAGE_KEY);
+          restoredCustomProviders = storedCustomProviders
+            ? readStoredCustomProviders(storedCustomProviders)
+            : [];
+        }
         const restoredProviderKeys = [...PROVIDER_KEYS, ...restoredCustomProviders.map(provider => provider.key)];
         setCustomProviders(restoredCustomProviders);
 
@@ -575,6 +679,12 @@ export function useProviderSettings({
           const merged = defaultProviderCredentials(restoredProviderKeys);
           for (const provider of restoredCustomProviders) {
             merged[provider.key].baseUrl = provider.baseUrl;
+          }
+          for (const [key, value] of teamSettingsByKey) {
+            const provider = providerFromBaseUrlSettingKey(key);
+            if (provider && restoredProviderKeys.includes(provider)) {
+              merged[provider].baseUrl = value;
+            }
           }
           setProviderCredentials(merged);
           try {
@@ -589,6 +699,7 @@ export function useProviderSettings({
           }
           setProviderCredentialStatus(restoredCredentialStatus);
         } else {
+          const storedCreds = localStorage.getItem("imagine_provider_credentials");
           if (storedCreds) {
             try {
               const parsed = JSON.parse(storedCreds) as Record<string, Partial<ProviderCredentials> | undefined>;
@@ -629,16 +740,19 @@ export function useProviderSettings({
           setProviderCredentialStatus(restoredCredentialStatus);
         }
 
-        const storedProvider = localStorage.getItem("imagine_ai_provider");
+        const storedProvider = storageTarget === "postgres"
+          ? teamSettingsByKey.get(PROVIDER_SELECTED_SETTING_KEY) ?? null
+          : localStorage.getItem("imagine_ai_provider");
         if (storedProvider && restoredProviderKeys.includes(storedProvider)) setSelectedProvider(storedProvider);
 
         const restoreModelOptions = (
+          settingKey: string,
           key: string,
           setter: Dispatch<SetStateAction<Record<AiProvider, ModelOption[]>>>,
           defaults: Record<AiProvider, ModelOption[]>,
           filterFn?: (option: ModelOption) => boolean,
         ): Record<AiProvider, ModelOption[]> => {
-          const stored = localStorage.getItem(key);
+          const stored = storageTarget === "postgres" ? teamSettingsByKey.get(settingKey) ?? null : localStorage.getItem(key);
           const base = ensureProviderOptions(defaults, restoredProviderKeys);
           if (!stored) {
             setter(base);
@@ -657,16 +771,20 @@ export function useProviderSettings({
           }
         };
 
-        const restoredChatOptions = restoreModelOptions("imagine_chat_model_options", setChatModelOptions, CHAT_MODEL_OPTIONS, isSelectableChatModel);
-        restoreModelOptions("imagine_image_model_options", setImageModelOptions, IMAGE_MODEL_OPTIONS, isSelectableImageModel);
-        restoreModelOptions("imagine_video_model_options", setVideoModelOptions, VIDEO_MODEL_OPTIONS, option => isSelectableModelOptionForKind(option, "video"));
-        restoreModelOptions("imagine_audio_model_options", setAudioModelOptions, AUDIO_MODEL_OPTIONS, option => isSelectableModelOptionForKind(option, "audio"));
+        const restoredChatOptions = restoreModelOptions(providerModelOptionsSettingKey("chat"), "imagine_chat_model_options", setChatModelOptions, CHAT_MODEL_OPTIONS, isSelectableChatModel);
+        restoreModelOptions(providerModelOptionsSettingKey("image"), "imagine_image_model_options", setImageModelOptions, IMAGE_MODEL_OPTIONS, isSelectableImageModel);
+        restoreModelOptions(providerModelOptionsSettingKey("video"), "imagine_video_model_options", setVideoModelOptions, VIDEO_MODEL_OPTIONS, option => isSelectableModelOptionForKind(option, "video"));
+        restoreModelOptions(providerModelOptionsSettingKey("audio"), "imagine_audio_model_options", setAudioModelOptions, AUDIO_MODEL_OPTIONS, option => isSelectableModelOptionForKind(option, "audio"));
 
-        const storedChatModel = localStorage.getItem("imagine_chat_model");
+        const storedChatModel = storageTarget === "postgres"
+          ? teamSettingsByKey.get(PROVIDER_CHAT_MODEL_SETTING_KEY) ?? null
+          : localStorage.getItem("imagine_chat_model");
         setFetchedModelOptions(emptyFetchedModelOptions(restoredProviderKeys));
 
         if (storedChatModel === "12ai:gemini-3.1-flash" || (storedChatModel && !hasChatModel(storedChatModel, restoredChatOptions, restoredProviderKeys))) {
-          try { localStorage.setItem("imagine_chat_model", DEFAULT_CHAT_MODEL); } catch { /* storage unavailable */ }
+          if (storageTarget !== "postgres") {
+            try { localStorage.setItem("imagine_chat_model", DEFAULT_CHAT_MODEL); } catch { /* storage unavailable */ }
+          }
         } else if (storedChatModel) {
           setSelectedChatModel(storedChatModel);
         }
@@ -852,11 +970,17 @@ function removeProviderModelOptions(
   provider: AiProvider,
   category: ModelCategory,
   setter: Dispatch<SetStateAction<Record<AiProvider, ModelOption[]>>>,
+  saveTeamProviderSetting: (key: string, value: string) => void,
+  storageTarget: ProviderCredentialStorageTarget,
 ): void {
   setter(prev => {
     const next = { ...prev };
     delete next[provider];
-    try { localStorage.setItem(modelOptionsStorageKey(category), JSON.stringify(next)); } catch { /* storage unavailable */ }
+    if (storageTarget === "postgres") {
+      saveTeamProviderSetting(providerModelOptionsSettingKey(category), JSON.stringify(next));
+    } else {
+      try { localStorage.setItem(modelOptionsStorageKey(category), JSON.stringify(next)); } catch { /* storage unavailable */ }
+    }
     return next;
   });
 }
