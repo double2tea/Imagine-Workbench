@@ -177,7 +177,7 @@ test("createTeamBoardDocument rejects existing boards and deleteTeamBoardDocumen
   );
 });
 
-test("deleteTeamBoardDocument deletes an editor-scoped board", async () => {
+test("deleteTeamBoardDocument deletes an editor-scoped board with audit", async () => {
   const queries: Array<{ text: string; values?: readonly unknown[] }> = [];
   await deleteTeamBoardDocument(
     createTeamBoardsQueryable(queries, { deleteFound: true, role: "editor" }),
@@ -188,6 +188,16 @@ test("deleteTeamBoardDocument deletes an editor-scoped board", async () => {
 
   const deleteQuery = queries.find(query => query.text.startsWith("delete from boards"));
   assert.deepEqual(deleteQuery?.values, [WORKSPACE_ID, BOARD_ID]);
+  assert.ok(queries.some(query => query.text === "begin"));
+  assert.ok(queries.some(query => query.text === "commit"));
+  assert.equal(queries.some(query => query.text === "rollback"), false);
+  const audit = queries.find(query => query.text.trim().startsWith("insert into audit_events"));
+  assert.deepEqual(audit?.values, [
+    WORKSPACE_ID,
+    "user_1",
+    "team_board.delete",
+    JSON.stringify({ boardId: BOARD_ID }),
+  ]);
 });
 
 test("resetTeamBoards deletes workspace boards, recreates the default board, and records an audit event", async () => {

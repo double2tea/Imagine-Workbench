@@ -159,11 +159,24 @@ export async function deleteTeamBoardDocument(
   boardId: string,
 ): Promise<void> {
   const context = await createTeamWorkspaceStorageContext(queryable, config, request, { minimumRole: "editor" });
-  const result = await context.queryable.query<TeamBoardExistsRow>(
-    "delete from boards where workspace_id = $1 and id = $2 returning id",
-    [context.session.workspaceId, boardId],
-  );
-  if (!result.rows[0]) throw new ApiError(404, "team_board_not_found", "Team board was not found");
+  await context.queryable.query("begin");
+  try {
+    const result = await context.queryable.query<TeamBoardExistsRow>(
+      "delete from boards where workspace_id = $1 and id = $2 returning id",
+      [context.session.workspaceId, boardId],
+    );
+    if (!result.rows[0]) throw new ApiError(404, "team_board_not_found", "Team board was not found");
+    await recordTeamAuditEvent(context.queryable, {
+      eventType: "team_board.delete",
+      metadata: { boardId },
+      userId: context.session.userId,
+      workspaceId: context.session.workspaceId,
+    });
+    await context.queryable.query("commit");
+  } catch (error) {
+    await context.queryable.query("rollback");
+    throw error;
+  }
 }
 
 export async function resetTeamBoards(
