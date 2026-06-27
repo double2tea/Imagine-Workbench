@@ -67,8 +67,38 @@ For destructive migrations or restore operations, stop writes first by taking th
 
 Restore the database dump and media volume from the same backup point. Do not mix a newer database dump with an older media archive, or payload refs may point to missing files.
 
+After restoring, start the stack and verify Settings -> Data:
+
+- Storage Target shows PostgreSQL.
+- Migration status is current.
+- Data Health does not report missing payload files.
+- Asset, board, library, task, settings, and media counts match the expected backup point.
+
+## Update And Rollback
+
+Before updating the app image or running pending migrations, take a database and media backup from the same quiet point.
+
+Update flow:
+
+```bash
+docker compose --env-file .env.team -f docker-compose.team.yml pull
+docker compose --env-file .env.team -f docker-compose.team.yml up --build -d
+```
+
+If Settings -> Data reports pending migrations after the new app starts, run them from the same panel with the setup token. If migrations fail, stop the stack, restore the previous database dump and media archive, then restart the previous app image or checkout.
+
+Rollback flow:
+
+```bash
+docker compose --env-file .env.team -f docker-compose.team.yml down
+# restore the matching database dump and media archive here
+docker compose --env-file .env.team -f docker-compose.team.yml up -d
+```
+
+Do not roll back only the app while keeping a newer migrated database unless that app version explicitly supports the newer schema.
+
 ## Current Scope
 
-The current team-storage foundation includes PostgreSQL configuration, health/migration APIs, schema migrations, repository foundations, local media payload storage, team auth/session/member APIs, shared asset/board/generation-task APIs, encrypted workspace-secret storage APIs, and the Settings -> Data status/migration/session/member surfaces.
+The current team-storage foundation includes PostgreSQL configuration, health/migration APIs, schema migrations, repository foundations, local media payload storage, team auth/session/member APIs, shared asset/board/generation-task APIs, prompt templates, voice profiles, encrypted workspace-secret storage APIs, provider/RunningHub team settings, Settings -> Data status/migration/session/member surfaces, team backup/restore, explicit browser IndexedDB -> PostgreSQL import, clear-assets/reset-boards, media maintenance cleanup, missing-payload asset deletion, and stale source-link repair.
 
-Provider/RunningHub settings migration to encrypted team secrets, team-mode settings/backup/restore/clear/cleanup routing, explicit IndexedDB -> PostgreSQL import, and deeper backup/restore automation are later implementation slices. Do not expose a team deployment to untrusted networks until the remaining operational slices are complete.
+Remaining hardening includes deeper automated backup orchestration, reverse-proxy examples, configurable disk/media limits, stale-preview repair, and production-grade monitoring. Keep team mode behind trusted self-hosted access until those operational slices are complete.

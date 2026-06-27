@@ -86,6 +86,7 @@ Completed in the latest continuation:
 * Added `PATCH /api/storage/team/assets` with `action: "repair-stale-source-links"` plus `repairTeamAssetSourceLinks()` service/client wiring so PostgreSQL Settings -> Data can explicitly clear stale asset `sourceBoardNodeId` metadata without mutating browser IndexedDB.
 * Team stale-source repair requires admin, CSRF, trusted origin, scopes assets/boards through the authenticated workspace repository, writes a `team_assets.repair_source_links` audit event with a non-secret repaired count, returns repaired asset ids to the caller, and refreshes the team data summary.
 * Added service, route, and client tests covering stale-source repair filtering, viewer rejection, audit metadata, missing-CSRF rejection before database access, and PATCH client request shape.
+* Refreshed local team deployment docs to match current implementation: Docker Compose remains opt-in, backup/restore verification is documented, upgrade/rollback steps are explicit, and the current scope now includes team backup/restore, direct browser import, provider/RunningHub team settings, clear/reset, media maintenance, missing-payload cleanup, and stale source-link repair.
 
 Still remaining before the full PRD can be considered complete:
 
@@ -148,8 +149,8 @@ Still remaining before the full PRD can be considered complete:
 * [ ] With no PostgreSQL/team environment variables configured, the app behaves like the current project: no login prompt, no team setup prompt, no required migration, and no visible disruption to existing creation/board/gallery/settings workflows.
 * [ ] Team/PostgreSQL UI, auth bootstrap, and PostgreSQL routes are shown or enabled only when team mode is explicitly configured.
 * [ ] Storage-mode code exposes only `browser` and `postgres` for this task; stale SQLite/local-database/local-folder/remote-api planned targets are removed or made non-product-facing.
-* [ ] Team deployment templates are included and documented: Dockerfile, Docker Compose, team env example, media volume mapping, PostgreSQL volume mapping, and first-run bootstrap instructions.
-* [ ] Deployment templates do not change the default local/browser workflow and are opt-in.
+* [x] Team deployment templates are included and documented: Dockerfile, Docker Compose, team env example, media volume mapping, PostgreSQL volume mapping, and first-run bootstrap instructions.
+* [x] Deployment templates do not change the default local/browser workflow and are opt-in.
 * [ ] PostgreSQL mode reads/writes assets, asset payload refs, previews, asset library records, boards, generation tasks, managed settings, safety snapshots, and voice profiles, or any exclusions are explicitly documented before implementation.
 * [ ] Migration coverage includes custom prompt templates and any other user-created localStorage data, or explicitly reports them as excluded before migration.
 * [ ] Migration preview reports all detected persistent sources: asset DB, board DB, voice-profile DB, safety snapshot DB, managed localStorage, and known currently-unmanaged localStorage keys.
@@ -178,12 +179,12 @@ Still remaining before the full PRD can be considered complete:
 * [ ] Generated results, imported assets, and asset-library items all resolve through `assets` + `asset_payloads`; `asset_library` records reference backing assets instead of storing separate files.
 * [ ] Browser clients can view/download media through app routes without seeing `IMAGINE_MEDIA_DIR`, database credentials, or raw filesystem paths.
 * [ ] Server-side media writes are staged before metadata commit; failed writes/commits clean staged files or mark them for explicit cleanup.
-* [ ] IndexedDB -> PostgreSQL migration is explicit, refuses unsafe/ambiguous targets, leaves source IndexedDB unchanged, and cleans up staged media files on failure.
-* [ ] Import refuses to proceed if it detects an unknown persisted data source that is not classified as migrate/optional/exclude.
-* [ ] Backup/export/restore uses the active storage target and preserves provider credential opt-in semantics.
+* [x] IndexedDB -> PostgreSQL migration is explicit, refuses unsafe/ambiguous targets, leaves source IndexedDB unchanged, and cleans up staged media files on failure.
+* [x] Import refuses to proceed if it detects an unknown persisted data source that is not classified as migrate/optional/exclude.
+* [x] Backup/export/restore uses the active storage target and preserves provider credential opt-in semantics.
 * [ ] PostgreSQL/media backups use a documented consistent snapshot mechanism so database refs and media files match after restore.
-* [ ] Team deployment docs include backup/restore for PostgreSQL and media volume together, plus restore verification steps.
-* [ ] Upgrade docs explain when migrations run, how to back up before upgrade, and how to roll back app/database/media when migration fails.
+* [x] Team deployment docs include backup/restore for PostgreSQL and media volume together, plus restore verification steps.
+* [x] Upgrade docs explain when migrations run, how to back up before upgrade, and how to roll back app/database/media when migration fails.
 * [ ] Audit events are stored for login, logout, bootstrap, member/role changes, provider credential changes, destructive cleanup/delete, backup/export, restore/import, and migration.
 * [ ] Configurable media/upload limits protect local disk usage and produce visible errors when exceeded.
 * [ ] Data health detects PostgreSQL/media consistency issues: DB ref without file, file without DB ref, stale tmp, stale trash, stale preview, and failed task records.
@@ -509,7 +510,7 @@ LAN/self-hosted mode should provide a simple local deployment path:
 * Local media volume configured by an environment variable, such as `IMAGINE_MEDIA_DIR`.
 * Recommended first team deployment package: Docker Compose with `app`, `postgres`, and persistent media/database volumes.
 * Optional reverse proxy profile, such as Caddy or nginx, can expose the LAN hostname/HTTPS in front of the app.
-* Current repository has `next.config.ts` `output: 'standalone'`, Cloudflare Pages scripts, and local dev scripts, but no `Dockerfile`, `docker-compose.yml`, or team deployment package yet. Team mode requires adding these packaging artifacts.
+* Current repository has `next.config.ts` `output: 'standalone'`, Cloudflare Pages scripts, local dev scripts, `Dockerfile`, `docker-compose.team.yml`, `.env.team.example`, and `docs/deployment/team-local.md`. Team mode remains an explicit opt-in deployment path.
 
 Cloudflare Pages/public deployment remains browser mode. It should not require PostgreSQL or local media volumes.
 
