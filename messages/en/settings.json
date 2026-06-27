@@ -123,7 +123,7 @@
     "localSettingsDetailTemplate": "{agentKeys} Agent / {modelCacheKeys} model / {providerSettingKeys} provider / {credentialKeys} credential",
     "browserStorageDetailTemplate": "Quota {quota} · {percent}",
     "teamSettingsDetailTemplate": "{settings} settings / {secretSettings} secrets / {promptTemplates} templates / {providerTargets} targets / {voiceProfiles} voices",
-    "teamMediaDetailTemplate": "{payloads} payload refs / {library} library / {tasks} tasks",
+    "teamMediaDetailTemplate": "{payloads} payload refs / {library} library / {tasks} tasks / {missing} missing / {stale} maintenance",
     "metadataEstimate": "metadata estimate",
     "integrityDiagnosis": "Integrity Diagnosis",
     "issueGroups": {
@@ -131,7 +131,15 @@
       "cleanBrokenRecords": "Clean broken", "cleanBrokenRecordsBusy": "Cleaning broken...",
       "staleSourceLinks": "Stale source node links", "repairSources": "Repair sources", "repairSourcesBusy": "Repairing sources...",
       "staleProcessing": "Stale in-progress tasks", "cleanStale": "Clean stale", "cleanStaleBusy": "Cleaning stale...",
-      "failedAssets": "Failed records", "cleanFailed": "Clean failed", "cleanFailedBusy": "Cleaning failed..."
+      "failedAssets": "Failed records", "cleanFailed": "Clean failed", "cleanFailedBusy": "Cleaning failed...",
+      "teamMissingMediaFiles": "Team media database refs without files",
+      "teamMissingPayloadFiles": "{count} missing payload files",
+      "teamMissingPreviewFiles": "{count} missing preview files",
+      "teamOrphanedMediaFiles": "Team media files needing maintenance",
+      "teamOrphanedPayloadFiles": "{count} orphaned payload files",
+      "teamOrphanedPreviewFiles": "{count} orphaned preview files",
+      "teamTmpFiles": "{count} tmp files",
+      "teamTrashFiles": "{count} trash files"
     },
     "storageStructure": "Storage Structure", "storageStructureDescription": "Asset meta, shared payload, preview cache, and legacy format migration status", "teamStorageStructureDescription": "PostgreSQL workspace records, media payload references, library entries, and team settings",
     "backupAndSafety": "Backup & Safety", "backupSourcePrefix": "Source: {origin}",

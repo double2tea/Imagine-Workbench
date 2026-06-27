@@ -1310,6 +1310,7 @@ function isWorkspaceDataSummaryTeamStorage(value: unknown): boolean {
   return (
     typeof value.assetLibraryRecords === "number" &&
     typeof value.generationTasks === "number" &&
+    isWorkspaceDataSummaryTeamMediaConsistency(value.mediaConsistency) &&
     typeof value.payloadBytes === "number" &&
     typeof value.payloadRefs === "number" &&
     typeof value.promptTemplates === "number" &&
@@ -1317,6 +1318,18 @@ function isWorkspaceDataSummaryTeamStorage(value: unknown): boolean {
     typeof value.secretSettings === "number" &&
     typeof value.settings === "number" &&
     typeof value.voiceProfiles === "number"
+  );
+}
+
+function isWorkspaceDataSummaryTeamMediaConsistency(value: unknown): boolean {
+  if (!isRecord(value)) return false;
+  return (
+    typeof value.missingPayloadFiles === "number" &&
+    typeof value.missingPreviewFiles === "number" &&
+    typeof value.orphanedPayloadFiles === "number" &&
+    typeof value.orphanedPreviewFiles === "number" &&
+    typeof value.tmpFiles === "number" &&
+    typeof value.trashFiles === "number"
   );
 }
 

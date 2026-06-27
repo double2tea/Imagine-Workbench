@@ -1,3 +1,5 @@
+import { readdir, stat } from "node:fs/promises";
+import path from "node:path";
 import type { QueryResultRow } from "pg";
 import type { BoardDocument, BoardNode } from "@/lib/board/types";
 import { collectBoardAssetIdsFromNodes } from "@/lib/assets/board-scope";
@@ -33,6 +35,8 @@ interface BoardRow extends QueryResultRow {
 interface PayloadRow extends QueryResultRow {
   asset_id: string;
   size_bytes: string | number | null;
+  storage_key: string;
+  storage_kind: string;
 }
 
 interface TeamSummaryCountRow extends QueryResultRow {
@@ -45,8 +49,18 @@ interface TeamSummaryCountRow extends QueryResultRow {
   voice_profiles: number;
 }
 
-interface PreviewCountRow extends QueryResultRow {
-  count: number;
+interface PreviewRow extends QueryResultRow {
+  storage_key: string | null;
+  storage_kind: string | null;
+}
+
+interface TeamMediaConsistencySummary {
+  missingPayloadFiles: number;
+  missingPreviewFiles: number;
+  orphanedPayloadFiles: number;
+  orphanedPreviewFiles: number;
+  tmpFiles: number;
+  trashFiles: number;
 }
 
 export async function getTeamWorkspaceDataSummary(
@@ -61,7 +75,7 @@ export async function getTeamWorkspaceDataSummary(
     boardsResult,
     payloadsResult,
     countsResult,
-    previewCountResult,
+    previewsResult,
     latestSnapshot,
     libraryRecords,
     generationTasks,
@@ -76,7 +90,7 @@ export async function getTeamWorkspaceDataSummary(
       [workspaceId],
     ),
     context.queryable.query<PayloadRow>(
-      `select asset_payloads.asset_id, asset_payloads.size_bytes
+      `select asset_payloads.asset_id, asset_payloads.size_bytes, asset_payloads.storage_kind, asset_payloads.storage_key
        from asset_payloads
        inner join assets on assets.id = asset_payloads.asset_id
        where assets.workspace_id = $1`,
@@ -93,8 +107,8 @@ export async function getTeamWorkspaceDataSummary(
         (select count(*)::int from voice_profiles where workspace_id = $1) as voice_profiles`,
       [workspaceId],
     ),
-    context.queryable.query<PreviewCountRow>(
-      `select count(*)::int as count
+    context.queryable.query<PreviewRow>(
+      `select asset_previews.storage_kind, asset_previews.storage_key
        from asset_previews
        inner join assets on assets.id = asset_previews.asset_id
        where assets.workspace_id = $1`,
@@ -109,6 +123,12 @@ export async function getTeamWorkspaceDataSummary(
   const assets = assetsResult.rows.map(row => row.meta);
   const boards = boardsResult.rows.map(row => row.board);
   const payloadAssetIds = new Set(payloadsResult.rows.map(row => row.asset_id));
+  const payloadStorageKeys = payloadsResult.rows
+    .filter(row => row.storage_kind === "local-file")
+    .map(row => row.storage_key);
+  const previewStorageKeys = previewsResult.rows
+    .filter(row => row.storage_kind === "local-file" && row.storage_key)
+    .map(row => row.storage_key ?? "");
   const counts = countsResult.rows[0] ?? emptyCounts();
   const boardAssetIds = collectBoardAssetIds(boards);
   const protectedAssetIds = collectProtectedAssetIds({
@@ -122,7 +142,7 @@ export async function getTeamWorkspaceDataSummary(
     legacyBlobRecords: 0,
     libraryRecords: counts.asset_library_records,
     metaRecords: assets.length,
-    previewRecords: previewCountResult.rows[0]?.count ?? 0,
+    previewRecords: previewsResult.rows.length,
     sharedBlobRecords: payloadAssetIds.size,
     version: 1,
   };
@@ -133,26 +153,31 @@ export async function getTeamWorkspaceDataSummary(
     Date.now(),
     protectedAssetIds,
   );
+  const mediaConsistency = await inspectTeamMediaConsistency(config.mediaDir, {
+    payloadStorageKeys,
+    previewStorageKeys,
+  });
+  const summaryIntegrity = withTeamMediaConsistencyIssues(integrity, mediaConsistency);
   const payloadBytes = payloadsResult.rows.reduce((total, row) => total + numberFromDatabase(row.size_bytes), 0);
 
   return {
     summary: {
       assets: {
         audio: assets.filter(item => item.type === "audio").length,
-        brokenComplete: integrity.brokenCompleteAssetIds.length,
+        brokenComplete: summaryIntegrity.brokenCompleteAssetIds.length,
         estimatedBytes: assets.reduce((total, item) => total + textByteSize(JSON.stringify(item)), 0),
-        failed: integrity.failedAssetIds.length,
+        failed: summaryIntegrity.failedAssetIds.length,
         image: assets.filter(item => item.type === "image").length,
         largest: assets
           .map(item => ({ id: item.id, label: item.prompt || item.model || item.id, bytes: textByteSize(JSON.stringify(item)) }))
           .sort((left, right) => right.bytes - left.bytes)
           .slice(0, 5),
-        missingBoardReferences: integrity.missingBoardReferences.length,
-        orphaned: integrity.orphanedAssetIds.length,
+        missingBoardReferences: summaryIntegrity.missingBoardReferences.length,
+        orphaned: summaryIntegrity.orphanedAssetIds.length,
         pending: assets.filter(item => item.status === "pending").length,
         processing: assets.filter(item => item.status === "processing").length,
         referencedByBoards: boardAssetIds.size,
-        staleProcessing: integrity.staleProcessingAssetIds.length,
+        staleProcessing: summaryIntegrity.staleProcessingAssetIds.length,
         stores,
         total: assets.length,
         transcript: assets.filter(item => item.type === "transcript").length,
@@ -163,7 +188,7 @@ export async function getTeamWorkspaceDataSummary(
         nodes: boards.reduce((total, board) => total + board.nodes.length, 0),
         total: boards.length,
       },
-      integrity,
+      integrity: summaryIntegrity,
       localStorage: {
         agentKeys: 0,
         credentialKeys: counts.secret_settings,
@@ -180,6 +205,7 @@ export async function getTeamWorkspaceDataSummary(
       teamStorage: {
         assetLibraryRecords: counts.asset_library_records,
         generationTasks: counts.generation_tasks,
+        mediaConsistency,
         payloadBytes,
         payloadRefs: payloadAssetIds.size,
         promptTemplates: counts.prompt_templates,
@@ -192,6 +218,122 @@ export async function getTeamWorkspaceDataSummary(
     targetKind: "postgres",
     workspaceId,
   };
+}
+
+async function inspectTeamMediaConsistency(
+  mediaDir: string,
+  input: { payloadStorageKeys: string[]; previewStorageKeys: string[] },
+): Promise<TeamMediaConsistencySummary> {
+  const payloadStorageKeys = new Set(input.payloadStorageKeys);
+  const previewStorageKeys = new Set(input.previewStorageKeys);
+  const [
+    missingPayloadFiles,
+    missingPreviewFiles,
+    originalFiles,
+    previewFiles,
+    tmpFiles,
+    trashFiles,
+  ] = await Promise.all([
+    countMissingStorageKeys(mediaDir, payloadStorageKeys),
+    countMissingStorageKeys(mediaDir, previewStorageKeys),
+    collectStorageKeysUnder(mediaDir, "originals"),
+    collectStorageKeysUnder(mediaDir, "previews"),
+    collectStorageKeysUnder(mediaDir, "tmp"),
+    collectStorageKeysUnder(mediaDir, "trash"),
+  ]);
+
+  return {
+    missingPayloadFiles,
+    missingPreviewFiles,
+    orphanedPayloadFiles: originalFiles.filter(storageKey => !payloadStorageKeys.has(storageKey)).length,
+    orphanedPreviewFiles: previewFiles.filter(storageKey => !previewStorageKeys.has(storageKey)).length,
+    tmpFiles: tmpFiles.length,
+    trashFiles: trashFiles.length,
+  };
+}
+
+function countTeamMediaConsistencyIssues(summary: TeamMediaConsistencySummary): number {
+  return summary.missingPayloadFiles +
+    summary.missingPreviewFiles +
+    summary.orphanedPayloadFiles +
+    summary.orphanedPreviewFiles +
+    summary.tmpFiles +
+    summary.trashFiles;
+}
+
+function withTeamMediaConsistencyIssues(
+  integrity: WorkspaceIntegrityDiagnostics,
+  mediaConsistency: TeamMediaConsistencySummary,
+): WorkspaceIntegrityDiagnostics {
+  const issueCount = integrity.issueCount + countTeamMediaConsistencyIssues(mediaConsistency);
+  const status = mediaConsistency.missingPayloadFiles > 0 || integrity.status === "critical"
+    ? "critical"
+    : issueCount > 0 ? "attention" : "healthy";
+  return { ...integrity, issueCount, status };
+}
+
+async function countMissingStorageKeys(mediaDir: string, storageKeys: ReadonlySet<string>): Promise<number> {
+  let missing = 0;
+  for (const storageKey of storageKeys) {
+    if (!await storageKeyExists(mediaDir, storageKey)) missing += 1;
+  }
+  return missing;
+}
+
+async function storageKeyExists(mediaDir: string, storageKey: string): Promise<boolean> {
+  try {
+    const stats = await stat(resolveMediaStorageKey(mediaDir, storageKey));
+    return stats.isFile();
+  } catch (error) {
+    if (isNodeErrorCode(error, "ENOENT")) return false;
+    throw error;
+  }
+}
+
+async function collectStorageKeysUnder(mediaDir: string, relativeDir: "originals" | "previews" | "tmp" | "trash"): Promise<string[]> {
+  const absoluteDir = resolveMediaStorageKey(mediaDir, relativeDir);
+  return collectStorageKeys(mediaDir, absoluteDir);
+}
+
+async function collectStorageKeys(mediaDir: string, absoluteDir: string): Promise<string[]> {
+  let entries: import("node:fs").Dirent<string>[];
+  try {
+    entries = await readdir(absoluteDir, { encoding: "utf8", withFileTypes: true });
+  } catch (error) {
+    if (isNodeErrorCode(error, "ENOENT")) return [];
+    throw error;
+  }
+
+  const storageKeys: string[] = [];
+  for (const entry of entries) {
+    const absolutePath = path.join(absoluteDir, entry.name);
+    if (entry.isDirectory()) {
+      storageKeys.push(...await collectStorageKeys(mediaDir, absolutePath));
+    } else if (entry.isFile()) {
+      storageKeys.push(relativeMediaStorageKey(mediaDir, absolutePath));
+    }
+  }
+  return storageKeys;
+}
+
+function resolveMediaStorageKey(mediaDir: string, storageKey: string): string {
+  if (path.isAbsolute(storageKey)) throw new Error("Invalid team media storage key");
+  const parts = storageKey.split(/[\\/]+/);
+  if (parts.includes("..") || parts.includes("")) throw new Error("Invalid team media storage key");
+  const resolvedMediaDir = path.resolve(mediaDir);
+  const resolved = path.resolve(resolvedMediaDir, ...parts);
+  if (resolved !== resolvedMediaDir && !resolved.startsWith(`${resolvedMediaDir}${path.sep}`)) {
+    throw new Error("Invalid team media storage key");
+  }
+  return resolved;
+}
+
+function relativeMediaStorageKey(mediaDir: string, absolutePath: string): string {
+  return path.relative(path.resolve(mediaDir), absolutePath).split(path.sep).join(path.posix.sep);
+}
+
+function isNodeErrorCode(error: unknown, code: string): boolean {
+  return error instanceof Error && "code" in error && error.code === code;
 }
 
 function emptyCounts(): TeamSummaryCountRow {

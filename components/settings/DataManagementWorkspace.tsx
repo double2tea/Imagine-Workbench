@@ -404,6 +404,7 @@ export default function DataManagementWorkspace({
 
   const issueGroups = useMemo<HealthIssueGroup[]>(() => {
     if (!integrity) return [];
+    const mediaConsistency = teamStorageSummary?.mediaConsistency;
     return [
       {
         key: "missing-references",
@@ -468,8 +469,32 @@ export default function DataManagementWorkspace({
         },
         details: integrity.failedAssetIds,
       },
+      ...(isTeamStorageMode && mediaConsistency ? [
+        {
+          key: "team-missing-media-files",
+          title: t("dataManagement.issueGroups.teamMissingMediaFiles"),
+          count: mediaConsistency.missingPayloadFiles + mediaConsistency.missingPreviewFiles,
+          tone: "critical" as const,
+          details: [
+            t("dataManagement.issueGroups.teamMissingPayloadFiles", { count: mediaConsistency.missingPayloadFiles }),
+            t("dataManagement.issueGroups.teamMissingPreviewFiles", { count: mediaConsistency.missingPreviewFiles }),
+          ],
+        },
+        {
+          key: "team-orphaned-media-files",
+          title: t("dataManagement.issueGroups.teamOrphanedMediaFiles"),
+          count: mediaConsistency.orphanedPayloadFiles + mediaConsistency.orphanedPreviewFiles + mediaConsistency.tmpFiles + mediaConsistency.trashFiles,
+          tone: "attention" as const,
+          details: [
+            t("dataManagement.issueGroups.teamOrphanedPayloadFiles", { count: mediaConsistency.orphanedPayloadFiles }),
+            t("dataManagement.issueGroups.teamOrphanedPreviewFiles", { count: mediaConsistency.orphanedPreviewFiles }),
+            t("dataManagement.issueGroups.teamTmpFiles", { count: mediaConsistency.tmpFiles }),
+            t("dataManagement.issueGroups.teamTrashFiles", { count: mediaConsistency.trashFiles }),
+          ],
+        },
+      ] : []),
     ];
-  }, [integrity, isTeamStorageMode, onCleanupAssets, onRepairAssetSources, t]);
+  }, [integrity, isTeamStorageMode, onCleanupAssets, onRepairAssetSources, t, teamStorageSummary]);
 
   const toggleGroup = (key: string) => {
     setExpandedGroups(current => ({ ...current, [key]: !current[key] }));
@@ -925,8 +950,13 @@ export default function DataManagementWorkspace({
           secondary={isTeamStorageMode
             ? teamStorageSummary
               ? t("dataManagement.teamMediaDetailTemplate", {
+                  missing: teamStorageSummary.mediaConsistency.missingPayloadFiles + teamStorageSummary.mediaConsistency.missingPreviewFiles,
                   library: teamStorageSummary.assetLibraryRecords,
                   payloads: teamStorageSummary.payloadRefs,
+                  stale: teamStorageSummary.mediaConsistency.orphanedPayloadFiles +
+                    teamStorageSummary.mediaConsistency.orphanedPreviewFiles +
+                    teamStorageSummary.mediaConsistency.tmpFiles +
+                    teamStorageSummary.mediaConsistency.trashFiles,
                   tasks: teamStorageSummary.generationTasks,
                 })
               : t("dataManagement.statCards.waitingStats")

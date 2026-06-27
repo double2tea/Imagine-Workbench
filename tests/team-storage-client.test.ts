@@ -899,6 +899,14 @@ function createWorkspaceDataSummary() {
     teamStorage: {
       assetLibraryRecords: 1,
       generationTasks: 1,
+      mediaConsistency: {
+        missingPayloadFiles: 0,
+        missingPreviewFiles: 0,
+        orphanedPayloadFiles: 0,
+        orphanedPreviewFiles: 0,
+        tmpFiles: 0,
+        trashFiles: 0,
+      },
       payloadBytes: 2048,
       payloadRefs: 2,
       promptTemplates: 1,

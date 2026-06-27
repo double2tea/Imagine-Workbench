@@ -1,4 +1,7 @@
 import assert from "node:assert/strict";
+import { mkdir, mkdtemp, rm, writeFile } from "node:fs/promises";
+import os from "node:os";
+import path from "node:path";
 import test from "node:test";
 import type { QueryResult, QueryResultRow } from "pg";
 
@@ -14,6 +17,7 @@ import type { VoiceProfile } from "../lib/voice-profiles";
 const RAW_SESSION_TOKEN = "raw-session-token";
 const WORKSPACE_ID = "workspace_1";
 const CREATED_AT = "2026-06-27T00:00:00.000Z";
+const PAYLOAD_STORAGE_KEY = "originals/image/ok.png";
 
 function queryResult<T extends QueryResultRow>(rows: T[]): QueryResult<T> {
   return {
@@ -30,36 +34,68 @@ function typedQueryResult<T extends QueryResultRow>(rows: QueryResultRow[]): Que
 }
 
 test("getTeamWorkspaceDataSummary returns PostgreSQL workspace data health stats", async () => {
-  const queries: Array<{ text: string; values?: readonly unknown[] }> = [];
-  const result = await getTeamWorkspaceDataSummary(
-    createTeamDataSummaryQueryable(queries),
-    { databaseUrl: "postgres://localhost/imagine", mediaDir: "/srv/imagine/media" },
-    requestWithSession(),
-  );
+  await withTempMediaDir(async mediaDir => {
+    await writeMediaFile(mediaDir, PAYLOAD_STORAGE_KEY);
+    await writeMediaFile(mediaDir, "originals/image/orphan.png");
+    await writeMediaFile(mediaDir, "previews/image/orphan.webp");
+    await writeMediaFile(mediaDir, "tmp/staged.part");
+    await writeMediaFile(mediaDir, "trash/old.png");
 
-  assert.equal(result.targetKind, "postgres");
-  assert.equal(result.workspaceId, WORKSPACE_ID);
-  assert.equal(result.summary.assets.total, 5);
-  assert.equal(result.summary.assets.referencedByBoards, 2);
-  assert.equal(result.summary.assets.missingBoardReferences, 1);
-  assert.equal(result.summary.assets.brokenComplete, 1);
-  assert.equal(result.summary.assets.failed, 1);
-  assert.equal(result.summary.assets.staleProcessing, 1);
-  assert.equal(result.summary.assets.orphaned, 2);
-  assert.equal(result.summary.integrity.status, "critical");
-  assert.deepEqual(result.summary.integrity.brokenCompleteAssetIds, ["asset_missing_payload"]);
-  assert.deepEqual(result.summary.integrity.missingBoardReferences.map(reference => reference.assetId), ["asset_missing"]);
-  assert.equal(result.summary.teamStorage?.payloadRefs, 1);
-  assert.equal(result.summary.teamStorage?.payloadBytes, 1024);
-  assert.equal(result.summary.teamStorage?.settings, 2);
-  assert.equal(result.summary.teamStorage?.secretSettings, 1);
-  assert.equal(result.summary.safety.latestSnapshot?.id, "latest");
-  assert.equal("payload" in (result.summary.safety.latestSnapshot ?? {}), false);
-  assert.deepEqual(
-    queries.find(query => query.text.includes("select meta from assets"))?.values,
-    [WORKSPACE_ID],
-  );
+    const queries: Array<{ text: string; values?: readonly unknown[] }> = [];
+    const result = await getTeamWorkspaceDataSummary(
+      createTeamDataSummaryQueryable(queries),
+      { databaseUrl: "postgres://localhost/imagine", mediaDir },
+      requestWithSession(),
+    );
+
+    assert.equal(result.targetKind, "postgres");
+    assert.equal(result.workspaceId, WORKSPACE_ID);
+    assert.equal(result.summary.assets.total, 5);
+    assert.equal(result.summary.assets.referencedByBoards, 2);
+    assert.equal(result.summary.assets.missingBoardReferences, 1);
+    assert.equal(result.summary.assets.brokenComplete, 1);
+    assert.equal(result.summary.assets.failed, 1);
+    assert.equal(result.summary.assets.staleProcessing, 1);
+    assert.equal(result.summary.assets.orphaned, 2);
+    assert.equal(result.summary.integrity.status, "critical");
+    assert.equal(result.summary.integrity.issueCount, 9);
+    assert.deepEqual(result.summary.integrity.brokenCompleteAssetIds, ["asset_missing_payload"]);
+    assert.deepEqual(result.summary.integrity.missingBoardReferences.map(reference => reference.assetId), ["asset_missing"]);
+    assert.equal(result.summary.teamStorage?.payloadRefs, 1);
+    assert.equal(result.summary.teamStorage?.payloadBytes, 1024);
+    assert.deepEqual(result.summary.teamStorage?.mediaConsistency, {
+      missingPayloadFiles: 0,
+      missingPreviewFiles: 1,
+      orphanedPayloadFiles: 1,
+      orphanedPreviewFiles: 1,
+      tmpFiles: 1,
+      trashFiles: 1,
+    });
+    assert.equal(result.summary.teamStorage?.settings, 2);
+    assert.equal(result.summary.teamStorage?.secretSettings, 1);
+    assert.equal(result.summary.safety.latestSnapshot?.id, "latest");
+    assert.equal("payload" in (result.summary.safety.latestSnapshot ?? {}), false);
+    assert.deepEqual(
+      queries.find(query => query.text.includes("select meta from assets"))?.values,
+      [WORKSPACE_ID],
+    );
+  });
 });
+
+async function withTempMediaDir<T>(run: (mediaDir: string) => Promise<T>): Promise<T> {
+  const mediaDir = await mkdtemp(path.join(os.tmpdir(), "imagine-team-summary-media-"));
+  try {
+    return await run(mediaDir);
+  } finally {
+    await rm(mediaDir, { force: true, recursive: true });
+  }
+}
+
+async function writeMediaFile(mediaDir: string, storageKey: string): Promise<void> {
+  const filePath = path.join(mediaDir, ...storageKey.split("/"));
+  await mkdir(path.dirname(filePath), { recursive: true });
+  await writeFile(filePath, "media");
+}
 
 function requestWithSession(): Request {
   return new Request("http://localhost:3000/api/storage/team/data-summary", {
@@ -79,9 +115,16 @@ function createTeamDataSummaryQueryable(
       }
       if (text.includes("select board from boards")) return typedQueryResult<T>([{ board: BOARD }]);
       if (text.includes("asset_payloads.asset_id")) {
-        return typedQueryResult<T>([{ asset_id: "asset_ok", size_bytes: "1024" }]);
+        return typedQueryResult<T>([{
+          asset_id: "asset_ok",
+          size_bytes: "1024",
+          storage_key: PAYLOAD_STORAGE_KEY,
+          storage_kind: "local-file",
+        }]);
       }
-      if (text.includes("select count(*)::int as count")) return typedQueryResult<T>([{ count: 1 }]);
+      if (text.includes("from asset_previews")) {
+        return typedQueryResult<T>([{ storage_key: "previews/image/missing.webp", storage_kind: "local-file" }]);
+      }
       if (text.includes("(select count(*)::int from asset_library")) {
         return typedQueryResult<T>([{
           asset_library_records: 1,

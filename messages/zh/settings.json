@@ -123,7 +123,7 @@
     "localSettingsDetailTemplate": "{agentKeys} Agent / {modelCacheKeys} 模型 / {providerSettingKeys} 服务商 / {credentialKeys} 密钥",
     "browserStorageDetailTemplate": "配额 {quota} · {percent}",
     "teamSettingsDetailTemplate": "{settings} 设置 / {secretSettings} 密钥 / {promptTemplates} 模板 / {providerTargets} 目标 / {voiceProfiles} 音色",
-    "teamMediaDetailTemplate": "{payloads} 负载引用 / {library} 素材 / {tasks} 任务",
+    "teamMediaDetailTemplate": "{payloads} 负载引用 / {library} 素材 / {tasks} 任务 / {missing} 缺文件 / {stale} 待维护",
     "metadataEstimate": "元数据估算",
     "integrityDiagnosis": "完整性诊断",
     "issueGroups": {
@@ -131,7 +131,15 @@
       "cleanBrokenRecords": "清坏记录", "cleanBrokenRecordsBusy": "清坏记录中",
       "staleSourceLinks": "过期来源节点链接", "repairSources": "修复来源", "repairSourcesBusy": "修复来源中",
       "staleProcessing": "过期进行中任务", "cleanStale": "清过期", "cleanStaleBusy": "清过期中",
-      "failedAssets": "失败记录", "cleanFailed": "清失败", "cleanFailedBusy": "清失败中"
+      "failedAssets": "失败记录", "cleanFailed": "清失败", "cleanFailedBusy": "清失败中",
+      "teamMissingMediaFiles": "团队媒体数据库引用缺少文件",
+      "teamMissingPayloadFiles": "{count} 个负载文件缺失",
+      "teamMissingPreviewFiles": "{count} 个预览文件缺失",
+      "teamOrphanedMediaFiles": "团队媒体文件待维护",
+      "teamOrphanedPayloadFiles": "{count} 个孤立负载文件",
+      "teamOrphanedPreviewFiles": "{count} 个孤立预览文件",
+      "teamTmpFiles": "{count} 个临时文件",
+      "teamTrashFiles": "{count} 个回收站文件"
     },
     "storageStructure": "存储结构", "storageStructureDescription": "资产元数据、共享负载、预览缓存与旧格式迁移状态", "teamStorageStructureDescription": "PostgreSQL 工作区记录、媒体负载引用、素材库条目与团队设置",
     "backupAndSafety": "备份与安全", "backupSourcePrefix": "来源 {origin}",

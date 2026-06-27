@@ -323,6 +323,14 @@ export interface WorkspaceDataSummary {
   teamStorage?: {
     assetLibraryRecords: number;
     generationTasks: number;
+    mediaConsistency: {
+      missingPayloadFiles: number;
+      missingPreviewFiles: number;
+      orphanedPayloadFiles: number;
+      orphanedPreviewFiles: number;
+      tmpFiles: number;
+      trashFiles: number;
+    };
     payloadBytes: number;
     payloadRefs: number;
     promptTemplates: number;
