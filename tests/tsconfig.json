@@ -69,6 +69,7 @@
     "./team-media-consistency.test.ts",
     "./team-media-maintenance.test.ts",
     "./team-members.test.ts",
+    "./team-migrations.test.ts",
     "./team-prompt-templates.test.ts",
     "./team-provider-config.test.ts",
     "./team-provider-targets.test.ts",

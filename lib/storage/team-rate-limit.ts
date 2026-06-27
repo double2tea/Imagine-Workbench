@@ -18,11 +18,13 @@ export const TEAM_LOGIN_RATE_LIMIT: TeamRateLimitPolicy = {
   windowMs: 15 * 60 * 1000,
 };
 
-export const TEAM_BOOTSTRAP_RATE_LIMIT: TeamRateLimitPolicy = {
+export const TEAM_SETUP_TOKEN_RATE_LIMIT: TeamRateLimitPolicy = {
   lockoutMs: 30 * 60 * 1000,
   maxAttempts: 5,
   windowMs: 30 * 60 * 1000,
 };
+export const TEAM_BOOTSTRAP_RATE_LIMIT = TEAM_SETUP_TOKEN_RATE_LIMIT;
+export const TEAM_MIGRATION_RATE_LIMIT = TEAM_SETUP_TOKEN_RATE_LIMIT;
 
 const attempts = new Map<string, TeamRateLimitEntry>();
 

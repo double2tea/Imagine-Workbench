@@ -1,22 +1,32 @@
 import { APP_VERSION } from "@/lib/app-version";
+import { ApiError, apiErrorResponse } from "@/lib/api/errors";
 import { withPostgresClient } from "@/lib/storage/postgres/connection";
 import {
   PostgresStorageConfigError,
-  requireTeamSetupToken,
   resolvePostgresStorageConfig,
 } from "@/lib/storage/postgres/config";
 import { applyPostgresMigrations } from "@/lib/storage/postgres/migrations";
+import {
+  assertTeamRateLimit,
+  clearTeamRateLimit,
+  recordTeamRateLimitFailure,
+  teamRequestRateLimitKey,
+  TEAM_MIGRATION_RATE_LIMIT,
+} from "@/lib/storage/team-rate-limit";
 
 export const runtime = "nodejs";
 export const dynamic = "force-dynamic";
 
 export async function POST(request: Request): Promise<Response> {
   try {
-    requireTeamSetupToken(process.env, request.headers.get("x-imagine-setup-token"));
+    const rateLimitKey = teamRequestRateLimitKey(request, "team-migrations");
+    assertTeamRateLimit(rateLimitKey, TEAM_MIGRATION_RATE_LIMIT);
+    assertMigrationSetupToken(process.env.IMAGINE_TEAM_SETUP_TOKEN, request.headers.get("x-imagine-setup-token"), rateLimitKey);
     const config = resolvePostgresStorageConfig(process.env);
     const migrationStatus = await withPostgresClient(config, client =>
       applyPostgresMigrations(client, APP_VERSION),
     );
+    clearTeamRateLimit(rateLimitKey);
 
     return Response.json({
       appVersion: APP_VERSION,
@@ -25,14 +35,22 @@ export async function POST(request: Request): Promise<Response> {
       targetKind: "postgres",
     });
   } catch (error) {
-    const message = error instanceof Error ? error.message : "PostgreSQL migration failed";
+    const response = apiErrorResponse(error, "PostgreSQL migration failed");
     return Response.json(
-      {
-        error: message,
-        mode: "postgres",
-        targetKind: "postgres",
-      },
-      { status: error instanceof PostgresStorageConfigError ? 400 : 500 },
+      { ...response.body, mode: "postgres", targetKind: "postgres" },
+      { status: error instanceof PostgresStorageConfigError ? 400 : response.status },
     );
   }
+}
+
+function assertMigrationSetupToken(
+  expectedToken: string | undefined,
+  requestToken: string | null,
+  rateLimitKey: string,
+): void {
+  const setupToken = expectedToken?.trim();
+  if (!setupToken) throw new PostgresStorageConfigError("IMAGINE_TEAM_SETUP_TOKEN is required for team storage migrations");
+  if (requestToken === setupToken) return;
+  recordTeamRateLimitFailure(rateLimitKey, TEAM_MIGRATION_RATE_LIMIT);
+  throw new ApiError(401, "team_migration_failed", "PostgreSQL migration failed");
 }

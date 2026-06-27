@@ -113,10 +113,11 @@ Completed in the latest continuation:
 * Added explicit PostgreSQL pool and timeout configuration. Team mode now parses `IMAGINE_POSTGRES_POOL_MAX`, `IMAGINE_POSTGRES_CONNECTION_TIMEOUT_MS`, `IMAGINE_POSTGRES_IDLE_TIMEOUT_MS`, and `IMAGINE_POSTGRES_QUERY_TIMEOUT_MS`, uses a shared bounded `pg` pool instead of per-request pools, documents the defaults, and tests the resulting Pool config.
 * Hardened PostgreSQL health checks for media-volume access. `/api/storage/team/health` now verifies `IMAGINE_MEDIA_DIR` exists, is a directory, and is readable/writable before reporting `reachable: true`, while keeping absolute media paths out of error responses.
 * Added a consistent snapshot boundary for PostgreSQL team ZIP export. `/api/storage/team/backup` now builds the export inside a `repeatable read read only` transaction, records `team_backup.export` only after the snapshot commits, and deployment docs distinguish this in-app snapshot from manual `pg_dump` + media archive backups that still require a quiet point.
+* Extended setup-token brute-force protection to PostgreSQL migrations. `/api/storage/team/migrations` now rate-limits invalid `x-imagine-setup-token` attempts with generic errors before database access, using a separate migrations scope from first-owner bootstrap.
 
 Still remaining before the full PRD can be considered complete:
 
-* Broader operational hardening beyond basic login/bootstrap rate limiting.
+* Broader operational hardening beyond setup-token/login rate limiting.
 * Residual team settings surfaces outside Provider Settings, audit coverage for all sensitive operations, and deployment/upgrade/rollback automation depth.
 
 ## Requirements
