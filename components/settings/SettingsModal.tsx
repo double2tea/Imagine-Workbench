@@ -6,7 +6,7 @@ import type { AiProvider, ModelOption } from "@/lib/providers/model-catalog";
 import { ConnectionSettingsWorkspace } from "@/components/settings/ConnectionSettingsWorkspace";
 import DataManagementWorkspace from "@/components/settings/DataManagementWorkspace";
 import { FeatureModelSettingsWorkspace } from "@/components/settings/FeatureModelSettingsWorkspace";
-import type { ProviderTestState } from "@/components/settings/provider-settings-types";
+import type { ProviderCredentialStatus, ProviderTestState } from "@/components/settings/provider-settings-types";
 import type { ImageEditFeature, ImageEditFeatureModels } from "@/hooks/useImageEditFeatureModels";
 import type { ResolveCheckStatus } from "@/hooks/useResolveIntegrationSettings";
 import type { CustomProviderDefinition } from "@/lib/providers/registry";
@@ -58,6 +58,7 @@ interface SettingsModalProps {
   open: boolean;
   customProviders: CustomProviderDefinition[];
   providerCredentials: Record<AiProvider, ProviderCredentials>;
+  providerCredentialStatus: Record<AiProvider, ProviderCredentialStatus>;
   providerKeys: AiProvider[];
   providerTest: ProviderTestState;
   resolveCheckStatus?: ResolveCheckStatus;
@@ -74,6 +75,7 @@ interface SettingsModalProps {
   onAddCustomProvider: (label: string, baseUrl: string) => boolean;
   onCleanupAssets: (kind: WorkspaceCleanupKind) => Promise<void>;
   onClearCredentials: (provider: AiProvider) => void;
+  onCommitCredential: (provider: AiProvider, field: keyof ProviderCredentials) => void;
   onClearLocalStorage: (kind: LocalStorageCleanupKind) => Promise<void>;
   onClose: () => void;
   onClearAssets: () => Promise<void>;
@@ -121,6 +123,7 @@ export default function SettingsModal({
   open,
   customProviders,
   providerCredentials,
+  providerCredentialStatus,
   providerKeys,
   providerTest,
   resolveCheckStatus = "idle",
@@ -137,6 +140,7 @@ export default function SettingsModal({
   onAddCustomProvider,
   onCleanupAssets,
   onClearCredentials,
+  onCommitCredential,
   onClearLocalStorage,
   onClearAssets,
   onClose,
@@ -504,6 +508,7 @@ export default function SettingsModal({
                   isLoadingModels={isLoadingModels}
                   modelListMessage={modelListMessage}
                   providerCredentials={providerCredentials}
+                  providerCredentialStatus={providerCredentialStatus}
                   providerKeys={providerKeys}
                   providerTest={providerTest}
                   resolveCheckStatus={resolveCheckStatus}
@@ -519,6 +524,7 @@ export default function SettingsModal({
                   onAddFetchedModels={onAddFetchedModels}
                   onAddManualModels={onAddManualModels}
                   onClearCredentials={onClearCredentials}
+                  onCommitCredential={onCommitCredential}
                   onSaveCredential={onSaveCredential}
                   onSelectChatModel={onSelectChatModel}
                   onSelectDefaultAudioModel={onSelectDefaultAudioModel}

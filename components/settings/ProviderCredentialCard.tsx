@@ -5,6 +5,7 @@ import type { ProviderTestState } from "@/components/settings/provider-settings-
 
 interface ProviderCredentialCardProps {
   apiKey: string;
+  apiKeyConfigured?: boolean;
   apiPlaceholder: string;
   baseUrl: string;
   baseUrlPlaceholder: string;
@@ -17,6 +18,7 @@ interface ProviderCredentialCardProps {
   showBaseUrl: boolean;
   title: string;
   onClear: (provider: AiProvider) => void;
+  onCommitApiKey?: (provider: AiProvider) => void;
   onSaveApiKey: (provider: AiProvider, value: string) => void;
   onSaveBaseUrl: (provider: AiProvider, value: string) => void;
   onTest: (provider: AiProvider) => void;
@@ -24,6 +26,7 @@ interface ProviderCredentialCardProps {
 
 export function ProviderCredentialCard({
   apiKey,
+  apiKeyConfigured = false,
   apiPlaceholder,
   baseUrl,
   baseUrlPlaceholder,
@@ -36,6 +39,7 @@ export function ProviderCredentialCard({
   showBaseUrl,
   title,
   onClear,
+  onCommitApiKey,
   onSaveApiKey,
   onSaveBaseUrl,
   onTest,
@@ -47,13 +51,14 @@ export function ProviderCredentialCard({
     <div className="imagine-settings-card">
       <div className="mb-3 flex items-center justify-between">
         <h4 className="imagine-settings-card-title">{title}</h4>
-        {apiKey ? <span className="imagine-tone-icon text-[10px] font-semibold" data-tone="success">{t("providers.keySaved")}</span> : null}
+        {apiKey || apiKeyConfigured ? <span className="imagine-tone-icon text-[10px] font-semibold" data-tone="success">{t("providers.keySaved")}</span> : null}
       </div>
       <label className="imagine-settings-label">API Key</label>
       <input
         type="password"
         value={apiKey}
         onChange={event => onSaveApiKey(provider, event.target.value)}
+        onBlur={() => onCommitApiKey?.(provider)}
         placeholder={apiPlaceholder}
         className="imagine-input font-mono"
       />

@@ -1,6 +1,6 @@
 import { t } from "@/lib/i18n";
 import { useCallback, useEffect, useMemo, useRef, useState, type Dispatch, type SetStateAction } from "react";
-import type { ProviderTestState } from "@/components/settings/provider-settings-types";
+import type { ProviderCredentialStatus, ProviderTestState } from "@/components/settings/provider-settings-types";
 import {
   createCustomProviderKey,
   CUSTOM_PROVIDERS_STORAGE_KEY,
@@ -23,10 +23,18 @@ import { getProviderMeta, isKnownProvider, isProviderKey, PROVIDER_KEYS, type Cu
 import type { ProviderCredentials } from "@/lib/providers/types";
 import { API_ROUTES } from "@/lib/api/routes";
 import { readFetchError, toErrorMessage } from "@/lib/client-fetch-error";
+import {
+  deleteTeamSecret,
+  fetchTeamSecrets,
+  fetchWorkspaceStorageRuntimeStatus,
+  readTeamCsrfToken,
+  saveTeamSecret,
+} from "@/lib/storage/team-client";
 
 type ModelCategory = "chat" | "image" | "video" | "audio";
 type NoticeType = "error" | "info" | "success";
 type FetchedModelOptions = Record<AiProvider, Record<ModelCategory, ModelOption[]>>;
+type ProviderCredentialStorageTarget = "indexeddb" | "postgres";
 
 interface UseProviderSettingsParams {
   isResolveIntegrationEnabled?: boolean;
@@ -116,6 +124,24 @@ function hasChatModel(value: string, options: Record<AiProvider, ModelOption[]>,
   return providerKeys.some(provider => (options[provider] ?? []).some(option => option.value === value));
 }
 
+function providerApiKeySecretKey(provider: AiProvider): string {
+  return `provider:${provider}:apiKey`;
+}
+
+function providerFromApiKeySecretKey(key: string): AiProvider | null {
+  const prefix = "provider:";
+  const suffix = ":apiKey";
+  if (!key.startsWith(prefix) || !key.endsWith(suffix)) return null;
+  const provider = key.slice(prefix.length, -suffix.length);
+  return isProviderKey(provider) ? provider : null;
+}
+
+function defaultProviderCredentialStatus(providerKeys: readonly AiProvider[]): Record<AiProvider, ProviderCredentialStatus> {
+  const record = {} as Record<AiProvider, ProviderCredentialStatus>;
+  for (const provider of providerKeys) record[provider] = { apiKeyConfigured: false };
+  return record;
+}
+
 async function syncResolveProviderCredential(
   provider: AiProvider,
   credentials: ProviderCredentials,
@@ -167,6 +193,10 @@ export function useProviderSettings({
   const [providerCredentials, setProviderCredentials] = useState<Record<AiProvider, ProviderCredentials>>(
     defaultProviderCredentials(PROVIDER_KEYS),
   );
+  const [providerCredentialStatus, setProviderCredentialStatus] = useState<Record<AiProvider, ProviderCredentialStatus>>(
+    defaultProviderCredentialStatus(PROVIDER_KEYS),
+  );
+  const [credentialStorageTarget, setCredentialStorageTarget] = useState<ProviderCredentialStorageTarget>("indexeddb");
   const [selectedProvider, setSelectedProvider] = useState<AiProvider>("12ai");
   const [selectedChatModel, setSelectedChatModel] = useState(DEFAULT_CHAT_MODEL);
   const [chatModelOptions, setChatModelOptions] = useState<Record<AiProvider, ModelOption[]>>(CHAT_MODEL_OPTIONS);
@@ -226,20 +256,62 @@ export function useProviderSettings({
       const current = prev[provider] ?? { apiKey: "", baseUrl: "" };
       const nextCredentials = { ...current, [field]: value.trim() };
       const next = { ...prev, [provider]: nextCredentials };
-      try { localStorage.setItem("imagine_provider_credentials", JSON.stringify(next)); } catch { /* storage unavailable */ }
-      syncResolveProviderCredentialIfEnabled(provider, nextCredentials, getProviderLabel(provider));
+      if (credentialStorageTarget !== "postgres") {
+        try { localStorage.setItem("imagine_provider_credentials", JSON.stringify(next)); } catch { /* storage unavailable */ }
+        syncResolveProviderCredentialIfEnabled(provider, nextCredentials, getProviderLabel(provider));
+      }
       return next;
     });
-  }, [getProviderLabel, setProviderCredentials, syncResolveProviderCredentialIfEnabled]);
+  }, [credentialStorageTarget, getProviderLabel, setProviderCredentials, syncResolveProviderCredentialIfEnabled]);
+
+  const commitProviderCredential = useCallback((provider: AiProvider, field: keyof ProviderCredentials) => {
+    if (credentialStorageTarget !== "postgres" || field !== "apiKey") return;
+    const csrfToken = readTeamCsrfToken();
+    if (!csrfToken) {
+      pushWorkspaceNotice("error", t("common.notices.providerCredentialCsrfMissing"));
+      return;
+    }
+    const apiKey = providerCredentials[provider]?.apiKey.trim() ?? "";
+    const key = providerApiKeySecretKey(provider);
+    void (apiKey
+      ? saveTeamSecret({ group: "provider", key, value: apiKey }, csrfToken)
+      : deleteTeamSecret(key, csrfToken)
+    ).then(() => {
+      setProviderCredentialStatus(prev => ({
+        ...prev,
+        [provider]: { apiKeyConfigured: Boolean(apiKey) },
+      }));
+    }).catch(error => {
+      pushWorkspaceNotice("error", toErrorMessage(error, t("common.notices.providerCredentialSaveFailed")));
+    });
+  }, [credentialStorageTarget, providerCredentials, pushWorkspaceNotice]);
 
   const clearProviderCredentials = useCallback((provider: AiProvider) => {
     setProviderCredentials(prev => {
       const next = { ...prev, [provider]: { apiKey: "", baseUrl: "" } };
-      try { localStorage.setItem("imagine_provider_credentials", JSON.stringify(next)); } catch { /* storage unavailable */ }
-      syncResolveProviderCredentialIfEnabled(provider, next[provider]);
+      if (credentialStorageTarget !== "postgres") {
+        try { localStorage.setItem("imagine_provider_credentials", JSON.stringify(next)); } catch { /* storage unavailable */ }
+        syncResolveProviderCredentialIfEnabled(provider, next[provider]);
+      }
       return next;
     });
-  }, [setProviderCredentials, syncResolveProviderCredentialIfEnabled]);
+    if (credentialStorageTarget !== "postgres") return;
+    const csrfToken = readTeamCsrfToken();
+    if (!csrfToken) {
+      pushWorkspaceNotice("error", t("common.notices.providerCredentialCsrfMissing"));
+      return;
+    }
+    void deleteTeamSecret(providerApiKeySecretKey(provider), csrfToken)
+      .then(() => {
+        setProviderCredentialStatus(prev => ({
+          ...prev,
+          [provider]: { apiKeyConfigured: false },
+        }));
+      })
+      .catch(error => {
+        pushWorkspaceNotice("error", toErrorMessage(error, t("common.notices.providerCredentialClearFailed")));
+      });
+  }, [credentialStorageTarget, pushWorkspaceNotice, setProviderCredentials, syncResolveProviderCredentialIfEnabled]);
 
   const handleSelectProvider = (provider: AiProvider) => {
     setSelectedProvider(provider);
@@ -268,10 +340,13 @@ export function useProviderSettings({
     });
     setProviderCredentials(prev => {
       const next = { ...prev, [key]: { apiKey: "", baseUrl: cleanBaseUrl } };
-      try { localStorage.setItem("imagine_provider_credentials", JSON.stringify(next)); } catch { /* storage unavailable */ }
-      syncResolveProviderCredentialIfEnabled(key, next[key], cleanLabel);
+      if (credentialStorageTarget !== "postgres") {
+        try { localStorage.setItem("imagine_provider_credentials", JSON.stringify(next)); } catch { /* storage unavailable */ }
+        syncResolveProviderCredentialIfEnabled(key, next[key], cleanLabel);
+      }
       return next;
     });
+    setProviderCredentialStatus(prev => ({ ...prev, [key]: { apiKeyConfigured: false } }));
     setChatModelOptions(prev => ({ ...prev, [key]: [] }));
     setImageModelOptions(prev => ({ ...prev, [key]: [] }));
     setVideoModelOptions(prev => ({ ...prev, [key]: [] }));
@@ -284,7 +359,7 @@ export function useProviderSettings({
     try { localStorage.setItem("imagine_ai_provider", key); } catch { /* storage unavailable */ }
     pushWorkspaceNotice("success", t("common.notices.providerAdded", { name: cleanLabel }));
     return true;
-  }, [providerKeys, pushWorkspaceNotice, syncResolveProviderCredentialIfEnabled]);
+  }, [credentialStorageTarget, providerKeys, pushWorkspaceNotice, syncResolveProviderCredentialIfEnabled]);
 
   const deleteCustomProvider = useCallback((provider: AiProvider) => {
     if (isKnownProvider(provider)) return;
@@ -299,8 +374,15 @@ export function useProviderSettings({
     setProviderCredentials(prev => {
       const next = { ...prev };
       delete next[provider];
-      try { localStorage.setItem("imagine_provider_credentials", JSON.stringify(next)); } catch { /* storage unavailable */ }
-      syncResolveProviderCredentialIfEnabled(provider, { apiKey: "", baseUrl: "" });
+      if (credentialStorageTarget !== "postgres") {
+        try { localStorage.setItem("imagine_provider_credentials", JSON.stringify(next)); } catch { /* storage unavailable */ }
+        syncResolveProviderCredentialIfEnabled(provider, { apiKey: "", baseUrl: "" });
+      }
+      return next;
+    });
+    setProviderCredentialStatus(prev => {
+      const next = { ...prev };
+      delete next[provider];
       return next;
     });
     if (selectedChatProvider === provider) {
@@ -321,7 +403,7 @@ export function useProviderSettings({
       try { localStorage.setItem("imagine_ai_provider", "12ai"); } catch { /* storage unavailable */ }
     }
     pushWorkspaceNotice("success", t("common.notices.providerDeleted", { name: customProvider.label }));
-  }, [customProviderByKey, pushWorkspaceNotice, selectedChatModel, selectedProvider, syncResolveProviderCredentialIfEnabled]);
+  }, [credentialStorageTarget, customProviderByKey, pushWorkspaceNotice, selectedChatModel, selectedProvider, syncResolveProviderCredentialIfEnabled]);
 
   const handleSelectChatModel = (model: string) => {
     setSelectedChatModel(model);
@@ -471,98 +553,135 @@ export function useProviderSettings({
   };
 
   useEffect(() => {
+    let isActive = true;
     const restoreSettings = setTimeout(() => {
-      setHasRestoredSettings(false);
-      const storedCreds = localStorage.getItem("imagine_provider_credentials");
-      const storedCustomProviders = localStorage.getItem(CUSTOM_PROVIDERS_STORAGE_KEY);
-      const restoredCustomProviders = storedCustomProviders
-        ? readStoredCustomProviders(storedCustomProviders)
-        : [];
-      const restoredProviderKeys = [...PROVIDER_KEYS, ...restoredCustomProviders.map(provider => provider.key)];
-      setCustomProviders(restoredCustomProviders);
-      if (storedCreds) {
-        try {
-          const parsed = JSON.parse(storedCreds) as Record<string, Partial<ProviderCredentials> | undefined>;
+      void (async () => {
+        setHasRestoredSettings(false);
+        const runtimeStatus = await fetchWorkspaceStorageRuntimeStatus();
+        const storageTarget = runtimeStatus.targetKind === "postgres" ? "postgres" : "indexeddb";
+        if (!isActive) return;
+        setCredentialStorageTarget(storageTarget);
+
+        const storedCreds = localStorage.getItem("imagine_provider_credentials");
+        const storedCustomProviders = localStorage.getItem(CUSTOM_PROVIDERS_STORAGE_KEY);
+        const restoredCustomProviders = storedCustomProviders
+          ? readStoredCustomProviders(storedCustomProviders)
+          : [];
+        const restoredProviderKeys = [...PROVIDER_KEYS, ...restoredCustomProviders.map(provider => provider.key)];
+        setCustomProviders(restoredCustomProviders);
+
+        const restoredCredentialStatus = defaultProviderCredentialStatus(restoredProviderKeys);
+        if (storageTarget === "postgres") {
           const merged = defaultProviderCredentials(restoredProviderKeys);
           for (const provider of restoredCustomProviders) {
             merged[provider.key].baseUrl = provider.baseUrl;
           }
-          for (const provider of restoredProviderKeys) {
-            if (typeof parsed[provider]?.apiKey === "string") merged[provider].apiKey = parsed[provider].apiKey;
-            if (typeof parsed[provider]?.baseUrl === "string") merged[provider].baseUrl = parsed[provider].baseUrl;
-          }
           setProviderCredentials(merged);
-        } catch { /* ignore corrupt data */ }
-      } else {
-        const defaults = defaultProviderCredentials(restoredProviderKeys);
-        for (const provider of restoredCustomProviders) {
-          defaults[provider.key].baseUrl = provider.baseUrl;
-        }
-        const legacy12AiKey = localStorage.getItem("imagine_12ai_api_key") ?? localStorage.getItem("imagine_custom_api_key");
-        const legacyGrokKey = localStorage.getItem("imagine_grok2api_api_key");
-        const legacyGrokBaseUrl = localStorage.getItem("imagine_grok2api_base_url") ?? localStorage.getItem("imagine_custom_api_base_url");
-        if (legacy12AiKey || legacyGrokKey || legacyGrokBaseUrl) {
-          const migrated = defaults;
-          if (legacy12AiKey) migrated["12ai"] = { ...migrated["12ai"], apiKey: legacy12AiKey };
-          if (legacyGrokKey) migrated["grok2api"] = { ...migrated["grok2api"], apiKey: legacyGrokKey };
-          if (legacyGrokBaseUrl) migrated["grok2api"] = { ...migrated["grok2api"], baseUrl: legacyGrokBaseUrl };
-          setProviderCredentials(migrated);
-          localStorage.removeItem("imagine_12ai_api_key");
-          localStorage.removeItem("imagine_custom_api_key");
-          localStorage.removeItem("imagine_grok2api_api_key");
-          localStorage.removeItem("imagine_grok2api_base_url");
-          localStorage.removeItem("imagine_custom_api_base_url");
-          try { localStorage.setItem("imagine_provider_credentials", JSON.stringify(migrated)); } catch { /* storage unavailable */ }
+          try {
+            const secretStatuses = await fetchTeamSecrets({ groups: ["provider"] });
+            if (!isActive) return;
+            for (const secret of secretStatuses.secrets) {
+              const provider = providerFromApiKeySecretKey(secret.key);
+              if (provider) restoredCredentialStatus[provider] = { apiKeyConfigured: true };
+            }
+          } catch {
+            // Secret visibility is role-gated; unauthenticated/non-admin sessions simply have no status to show.
+          }
+          setProviderCredentialStatus(restoredCredentialStatus);
         } else {
-          setProviderCredentials(defaults);
+          if (storedCreds) {
+            try {
+              const parsed = JSON.parse(storedCreds) as Record<string, Partial<ProviderCredentials> | undefined>;
+              const merged = defaultProviderCredentials(restoredProviderKeys);
+              for (const provider of restoredCustomProviders) {
+                merged[provider.key].baseUrl = provider.baseUrl;
+              }
+              for (const provider of restoredProviderKeys) {
+                if (typeof parsed[provider]?.apiKey === "string") merged[provider].apiKey = parsed[provider].apiKey;
+                if (typeof parsed[provider]?.baseUrl === "string") merged[provider].baseUrl = parsed[provider].baseUrl;
+              }
+              setProviderCredentials(merged);
+            } catch { /* ignore corrupt data */ }
+          } else {
+            const defaults = defaultProviderCredentials(restoredProviderKeys);
+            for (const provider of restoredCustomProviders) {
+              defaults[provider.key].baseUrl = provider.baseUrl;
+            }
+            const legacy12AiKey = localStorage.getItem("imagine_12ai_api_key") ?? localStorage.getItem("imagine_custom_api_key");
+            const legacyGrokKey = localStorage.getItem("imagine_grok2api_api_key");
+            const legacyGrokBaseUrl = localStorage.getItem("imagine_grok2api_base_url") ?? localStorage.getItem("imagine_custom_api_base_url");
+            if (legacy12AiKey || legacyGrokKey || legacyGrokBaseUrl) {
+              const migrated = defaults;
+              if (legacy12AiKey) migrated["12ai"] = { ...migrated["12ai"], apiKey: legacy12AiKey };
+              if (legacyGrokKey) migrated["grok2api"] = { ...migrated["grok2api"], apiKey: legacyGrokKey };
+              if (legacyGrokBaseUrl) migrated["grok2api"] = { ...migrated["grok2api"], baseUrl: legacyGrokBaseUrl };
+              setProviderCredentials(migrated);
+              localStorage.removeItem("imagine_12ai_api_key");
+              localStorage.removeItem("imagine_custom_api_key");
+              localStorage.removeItem("imagine_grok2api_api_key");
+              localStorage.removeItem("imagine_grok2api_base_url");
+              localStorage.removeItem("imagine_custom_api_base_url");
+              try { localStorage.setItem("imagine_provider_credentials", JSON.stringify(migrated)); } catch { /* storage unavailable */ }
+            } else {
+              setProviderCredentials(defaults);
+            }
+          }
+          setProviderCredentialStatus(restoredCredentialStatus);
         }
-      }
 
-      const storedProvider = localStorage.getItem("imagine_ai_provider");
-      if (storedProvider && restoredProviderKeys.includes(storedProvider)) setSelectedProvider(storedProvider);
+        const storedProvider = localStorage.getItem("imagine_ai_provider");
+        if (storedProvider && restoredProviderKeys.includes(storedProvider)) setSelectedProvider(storedProvider);
 
-      const restoreModelOptions = (
-        key: string,
-        setter: Dispatch<SetStateAction<Record<AiProvider, ModelOption[]>>>,
-        defaults: Record<AiProvider, ModelOption[]>,
-        filterFn?: (option: ModelOption) => boolean,
-      ): Record<AiProvider, ModelOption[]> => {
-        const stored = localStorage.getItem(key);
-        const base = ensureProviderOptions(defaults, restoredProviderKeys);
-        if (!stored) {
-          setter(base);
-          return base;
+        const restoreModelOptions = (
+          key: string,
+          setter: Dispatch<SetStateAction<Record<AiProvider, ModelOption[]>>>,
+          defaults: Record<AiProvider, ModelOption[]>,
+          filterFn?: (option: ModelOption) => boolean,
+        ): Record<AiProvider, ModelOption[]> => {
+          const stored = localStorage.getItem(key);
+          const base = ensureProviderOptions(defaults, restoredProviderKeys);
+          if (!stored) {
+            setter(base);
+            return base;
+          }
+          try {
+            const parsed = JSON.parse(stored) as unknown;
+            const restored = Array.isArray(parsed)
+              ? restoreFlatModelOptions(base, parsed, restoredProviderKeys, filterFn)
+              : mergeRecordModelOptions(base, parsed, restoredProviderKeys, filterFn);
+            setter(restored);
+            return restored;
+          } catch (err) {
+            console.warn(`Failed to restore model list (${key}):`, err);
+            return base;
+          }
+        };
+
+        const restoredChatOptions = restoreModelOptions("imagine_chat_model_options", setChatModelOptions, CHAT_MODEL_OPTIONS, isSelectableChatModel);
+        restoreModelOptions("imagine_image_model_options", setImageModelOptions, IMAGE_MODEL_OPTIONS, isSelectableImageModel);
+        restoreModelOptions("imagine_video_model_options", setVideoModelOptions, VIDEO_MODEL_OPTIONS, option => isSelectableModelOptionForKind(option, "video"));
+        restoreModelOptions("imagine_audio_model_options", setAudioModelOptions, AUDIO_MODEL_OPTIONS, option => isSelectableModelOptionForKind(option, "audio"));
+
+        const storedChatModel = localStorage.getItem("imagine_chat_model");
+        setFetchedModelOptions(emptyFetchedModelOptions(restoredProviderKeys));
+
+        if (storedChatModel === "12ai:gemini-3.1-flash" || (storedChatModel && !hasChatModel(storedChatModel, restoredChatOptions, restoredProviderKeys))) {
+          try { localStorage.setItem("imagine_chat_model", DEFAULT_CHAT_MODEL); } catch { /* storage unavailable */ }
+        } else if (storedChatModel) {
+          setSelectedChatModel(storedChatModel);
         }
-        try {
-          const parsed = JSON.parse(stored) as unknown;
-          const restored = Array.isArray(parsed)
-            ? restoreFlatModelOptions(base, parsed, restoredProviderKeys, filterFn)
-            : mergeRecordModelOptions(base, parsed, restoredProviderKeys, filterFn);
-          setter(restored);
-          return restored;
-        } catch (err) {
-          console.warn(`Failed to restore model list (${key}):`, err);
-          return base;
-        }
-      };
-
-      const restoredChatOptions = restoreModelOptions("imagine_chat_model_options", setChatModelOptions, CHAT_MODEL_OPTIONS, isSelectableChatModel);
-      restoreModelOptions("imagine_image_model_options", setImageModelOptions, IMAGE_MODEL_OPTIONS, isSelectableImageModel);
-      restoreModelOptions("imagine_video_model_options", setVideoModelOptions, VIDEO_MODEL_OPTIONS, option => isSelectableModelOptionForKind(option, "video"));
-      restoreModelOptions("imagine_audio_model_options", setAudioModelOptions, AUDIO_MODEL_OPTIONS, option => isSelectableModelOptionForKind(option, "audio"));
-
-      const storedChatModel = localStorage.getItem("imagine_chat_model");
-      setFetchedModelOptions(emptyFetchedModelOptions(restoredProviderKeys));
-
-      if (storedChatModel === "12ai:gemini-3.1-flash" || (storedChatModel && !hasChatModel(storedChatModel, restoredChatOptions, restoredProviderKeys))) {
-        try { localStorage.setItem("imagine_chat_model", DEFAULT_CHAT_MODEL); } catch { /* storage unavailable */ }
-      } else if (storedChatModel) {
-        setSelectedChatModel(storedChatModel);
-      }
-      setHasRestoredSettings(true);
+        setHasRestoredSettings(true);
+      })().catch(error => {
+        if (!isActive) return;
+        pushWorkspaceNotice("error", toErrorMessage(error, t("common.notices.providerSettingsRestoreFailed")));
+        setHasRestoredSettings(true);
+      });
     }, 0);
 
-    return () => clearTimeout(restoreSettings);
+    return () => {
+      isActive = false;
+      clearTimeout(restoreSettings);
+    };
   }, [pushWorkspaceNotice, setAudioModelOptions, setChatModelOptions, setImageModelOptions, setProviderCredentials, setSelectedChatModel, setSelectedProvider, setVideoModelOptions]);
 
   useEffect(() => {
@@ -583,6 +702,7 @@ export function useProviderSettings({
     chatModelOptions,
     clearProviderCredentials,
     addCustomProvider,
+    commitProviderCredential,
     customProviders,
     deleteCustomProvider,
     handleSaveCredential,
@@ -594,6 +714,7 @@ export function useProviderSettings({
     isLoadingModels,
     modelListMessage,
     providerCredentials,
+    providerCredentialStatus,
     providerKeys,
     providerTest,
     refreshProviderModels,

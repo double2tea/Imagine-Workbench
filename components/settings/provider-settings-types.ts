@@ -5,3 +5,7 @@ export interface ProviderTestState {
   status: "idle" | "testing" | "success" | "error";
   message: string;
 }
+
+export interface ProviderCredentialStatus {
+  apiKeyConfigured: boolean;
+}

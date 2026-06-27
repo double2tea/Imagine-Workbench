@@ -5,7 +5,7 @@ import { useTranslations } from "@/lib/i18n";
 import { Check, CheckCircle2, ListPlus, Plug, Plus, RefreshCw, Search, Trash2, X, XCircle } from "lucide-react";
 import { useConfirm } from "@/components/confirm/ConfirmProvider";
 import { ProviderCredentialCard } from "@/components/settings/ProviderCredentialCard";
-import type { ProviderTestState } from "@/components/settings/provider-settings-types";
+import type { ProviderCredentialStatus, ProviderTestState } from "@/components/settings/provider-settings-types";
 import { providerClearLabel, providerEndpointInfo } from "@/components/settings/provider-settings-utils";
 import type { ResolveCheckStatus } from "@/hooks/useResolveIntegrationSettings";
 import type { AiProvider, ModelOption } from "@/lib/providers/model-catalog";
@@ -38,6 +38,7 @@ export interface ConnectionSettingsWorkspaceProps {
   isLoadingModels: boolean;
   modelListMessage: string;
   providerCredentials: Record<AiProvider, ProviderCredentials>;
+  providerCredentialStatus: Record<AiProvider, ProviderCredentialStatus>;
   providerKeys: AiProvider[];
   providerTest: ProviderTestState;
   resolveCheckStatus: ResolveCheckStatus;
@@ -53,6 +54,7 @@ export interface ConnectionSettingsWorkspaceProps {
   onAddFetchedModels: (category: ModelCategory, values: string[]) => void;
   onAddManualModels: (category: ModelCategory, value: string) => void;
   onClearCredentials: (provider: AiProvider) => void;
+  onCommitCredential: (provider: AiProvider, field: keyof ProviderCredentials) => void;
   onRunResolveCheck?: () => void;
   onSaveCredential: (provider: AiProvider, field: keyof ProviderCredentials, value: string) => void;
   onSelectChatModel: (value: string) => void;
@@ -75,6 +77,7 @@ export function ConnectionSettingsWorkspace({
   isLoadingModels,
   modelListMessage,
   providerCredentials,
+  providerCredentialStatus,
   providerKeys,
   providerTest,
   resolveCheckStatus,
@@ -90,6 +93,7 @@ export function ConnectionSettingsWorkspace({
   onAddFetchedModels,
   onAddManualModels,
   onClearCredentials,
+  onCommitCredential,
   onRunResolveCheck,
   onSaveCredential,
   onSelectChatModel,
@@ -380,8 +384,9 @@ export function ConnectionSettingsWorkspace({
               filteredProviders.map(provider => {
                 const meta = getWorkspaceProviderMeta(provider);
                 const creds = providerCredentials[provider] ?? { apiKey: "", baseUrl: "" };
+                const credentialStatus = providerCredentialStatus[provider];
                 const isSelected = provider === selectedProvider;
-                const hasKey = Boolean(creds.apiKey.trim());
+                const hasKey = Boolean(creds.apiKey.trim()) || Boolean(credentialStatus?.apiKeyConfigured);
                 const testForProvider =
                   providerTest.provider === provider && providerTest.status !== "idle";
                 const countCategory: ModelCategory = section === "credentials" ? "chat" : section;
@@ -465,6 +470,7 @@ export function ConnectionSettingsWorkspace({
         {section === "credentials" ? (
           <ProviderCredentialCard
             apiKey={selectedProviderCreds.apiKey}
+            apiKeyConfigured={providerCredentialStatus[selectedProvider]?.apiKeyConfigured}
             apiPlaceholder={selectedProviderMeta.apiKeyPlaceholder}
             baseUrl={selectedProviderCreds.baseUrl}
             baseUrlPlaceholder={selectedProviderMeta.defaultBaseUrl}
@@ -477,6 +483,7 @@ export function ConnectionSettingsWorkspace({
             showBaseUrl={selectedProviderMeta.hasEditableBaseUrl}
             title={t("connections.credentialCardTitleTemplate", { label: selectedProviderMeta.label })}
             onClear={onClearCredentials}
+            onCommitApiKey={provider => onCommitCredential(provider, "apiKey")}
             onSaveApiKey={(provider, value) => onSaveCredential(provider, "apiKey", value)}
             onSaveBaseUrl={(provider, value) => onSaveCredential(provider, "baseUrl", value)}
             onTest={testProviderConnection}

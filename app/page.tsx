@@ -550,6 +550,7 @@ export default function Home() {
     buildProviderHeaders,
     chatModelOptions,
     clearProviderCredentials,
+    commitProviderCredential,
     customProviders,
     deleteCustomProvider,
     handleSaveCredential,
@@ -561,6 +562,7 @@ export default function Home() {
     isLoadingModels,
     modelListMessage,
     providerCredentials,
+    providerCredentialStatus,
     providerKeys,
     providerTest,
     refreshProviderModels,
@@ -2282,6 +2284,7 @@ export default function Home() {
         open={showSettings}
         customProviders={customProviders}
         providerCredentials={providerCredentials}
+        providerCredentialStatus={providerCredentialStatus}
         providerKeys={providerKeys}
         providerTest={providerTest}
         resolveCheckStatus={resolveCheckStatus}
@@ -2298,6 +2301,7 @@ export default function Home() {
         onCleanupAssets={handleDataCleanupAssets}
         onClearAssets={clearProjectAssets}
         onClearCredentials={clearProviderCredentials}
+        onCommitCredential={commitProviderCredential}
         onClearLocalStorage={handleDataClearLocalStorage}
         onClose={() => setShowSettings(false)}
         onDownloadSafetySnapshot={handleDataDownloadSafetySnapshot}

@@ -1939,6 +1939,7 @@ export default function BoardPage({ boardId = DEFAULT_BOARD_ID }: BoardPageProps
     buildProviderHeaders,
     chatModelOptions,
     clearProviderCredentials,
+    commitProviderCredential,
     customProviders,
     deleteCustomProvider,
     handleSaveCredential,
@@ -1950,6 +1951,7 @@ export default function BoardPage({ boardId = DEFAULT_BOARD_ID }: BoardPageProps
     isLoadingModels,
     modelListMessage,
     providerCredentials,
+    providerCredentialStatus,
     providerKeys,
     providerTest,
     refreshProviderModels,
@@ -5551,6 +5553,7 @@ export default function BoardPage({ boardId = DEFAULT_BOARD_ID }: BoardPageProps
         open={showSettings}
         customProviders={customProviders}
         providerCredentials={providerCredentials}
+        providerCredentialStatus={providerCredentialStatus}
         providerKeys={providerKeys}
         providerTest={providerTest}
         resolveCheckStatus={resolveCheckStatus}
@@ -5570,6 +5573,7 @@ export default function BoardPage({ boardId = DEFAULT_BOARD_ID }: BoardPageProps
         onCleanupAssets={handleDataCleanupAssets}
         onClearAssets={clearProjectAssets}
         onClearCredentials={clearProviderCredentials}
+        onCommitCredential={commitProviderCredential}
         onClearLocalStorage={handleDataClearLocalStorage}
         onClose={() => setShowSettings(false)}
         onDownloadSafetySnapshot={handleDataDownloadSafetySnapshot}
