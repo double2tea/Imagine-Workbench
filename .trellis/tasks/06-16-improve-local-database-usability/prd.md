@@ -120,7 +120,8 @@ Completed in the latest continuation:
 Still remaining before the full PRD can be considered complete:
 
 * Broader operational hardening beyond setup-token/login rate limiting.
-* Residual team settings surfaces outside Provider Settings, audit coverage for all sensitive operations, and deployment/upgrade/rollback automation depth.
+* Residual team settings surfaces outside Provider Settings and deployment/upgrade/rollback automation depth.
+* Cloudflare Pages build verification for the current checkpoint.
 
 ## Requirements
 
@@ -202,7 +203,7 @@ Still remaining before the full PRD can be considered complete:
 * [ ] No code path dual-writes workspace data to IndexedDB and PostgreSQL.
 * [ ] Board/settings updates use version checks or equivalent optimistic concurrency; conflicting edits produce a visible reload/merge prompt rather than silently overwriting another user.
 * [ ] Refreshing the app or relevant view shows the latest shared PostgreSQL-backed assets, generation statuses, boards, and asset library records from other team members.
-* [ ] Generation/task status surfaces either poll on an interval or expose an event-stream-ready query cursor so users can see progress without relying only on full-page reloads.
+* [x] Generation/task status surfaces either poll on an interval or expose an event-stream-ready query cursor so users can see progress without relying only on full-page reloads.
 * [ ] Media payloads are stored outside PostgreSQL rows by default and resolved through safe payload refs.
 * [ ] Generated results, imported assets, and asset-library items all resolve through `assets` + `asset_payloads`; `asset_library` records reference backing assets instead of storing separate files.
 * [ ] Browser clients can view/download media through app routes without seeing `IMAGINE_MEDIA_DIR`, database credentials, or raw filesystem paths.
@@ -213,14 +214,14 @@ Still remaining before the full PRD can be considered complete:
 * [x] PostgreSQL/media backups use a documented consistent snapshot mechanism so database refs and media files match after restore.
 * [x] Team deployment docs include backup/restore for PostgreSQL and media volume together, plus restore verification steps.
 * [x] Upgrade docs explain when migrations run, how to back up before upgrade, and how to roll back app/database/media when migration fails.
-* [ ] Audit events are stored for login, logout, bootstrap, member/role changes, provider credential changes, destructive cleanup/delete, backup/export, restore/import, and migration.
+* [x] Audit events are stored for login, logout, bootstrap, member/role changes, provider credential changes, destructive cleanup/delete, backup/export, restore/import, and migration.
 * [x] Configurable media/upload limits protect local disk usage and produce visible errors when exceeded.
-* [ ] Data health detects PostgreSQL/media consistency issues: DB ref without file, file without DB ref, stale tmp, stale trash, stale preview, and failed task records.
-* [ ] Settings -> Data reports PostgreSQL mode health, storage counts, and actionable maintenance states.
+* [x] Data health detects PostgreSQL/media consistency issues: DB ref without file, file without DB ref, stale tmp, stale trash, stale preview, and failed task records.
+* [x] Settings -> Data reports PostgreSQL mode health, storage counts, and actionable maintenance states.
 * [ ] PostgreSQL routes and driver imports are Node-only and do not break Cloudflare Pages/public builds.
-* [ ] PostgreSQL connections use a bounded server-side pool with configured timeouts; health checks fail visibly when the pool/database is unavailable.
+* [x] PostgreSQL connections use a bounded server-side pool with configured timeouts; health checks fail visibly when the pool/database is unavailable.
 * [ ] Storage-focused tests cover migrations, CRUD, payload refs, hosted/browser mode, PostgreSQL fail-fast config errors, explicit migration, backup/restore target selection, authz role checks, config hiding, and CSRF/origin rejection.
-* [ ] `pnpm run lint` and `pnpm run typecheck` pass.
+* [x] `pnpm run lint` and `pnpm run typecheck` pass.
 
 ## Research References
 
