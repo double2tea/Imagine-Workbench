@@ -65,7 +65,7 @@ test("saveTeamVoiceProfile upserts an editor-scoped profile", async () => {
   assert.deepEqual(insert?.values, [PROFILE_ID, WORKSPACE_ID, PROFILE, PROFILE.createdAt, PROFILE.updatedAt]);
 });
 
-test("deleteTeamVoiceProfile removes an editor-scoped profile", async () => {
+test("deleteTeamVoiceProfile removes an editor-scoped profile with audit", async () => {
   const queries: Array<{ text: string; values?: readonly unknown[] }> = [];
   await deleteTeamVoiceProfile(
     createTeamVoiceProfilesQueryable(queries, { role: "editor" }),
@@ -78,6 +78,20 @@ test("deleteTeamVoiceProfile removes an editor-scoped profile", async () => {
     queries.find(query => query.text.startsWith("delete from voice_profiles"))?.values,
     [WORKSPACE_ID, PROFILE_ID],
   );
+  assert.ok(queries.some(query => query.text === "begin"));
+  assert.ok(queries.some(query => query.text === "commit"));
+  assert.equal(queries.some(query => query.text === "rollback"), false);
+  const audit = queries.find(query => query.text.startsWith("insert into audit_events"));
+  assert.deepEqual(audit?.values, [
+    WORKSPACE_ID,
+    "user_1",
+    "team_voice_profile.delete",
+    JSON.stringify({
+      profileId: PROFILE_ID,
+      referenceAudioAssetCount: 1,
+      sourceAssetCount: 1,
+    }),
+  ]);
 });
 
 test("team voice profile save route rejects missing CSRF before opening a database client", async () => {
@@ -172,6 +186,9 @@ function createTeamVoiceProfilesQueryable(
   return {
     query: async <T extends QueryResultRow = QueryResultRow>(text: string, values?: readonly unknown[]) => {
       queries.push({ text, values });
+      if (text === "begin" || text === "commit" || text === "rollback") {
+        return typedQueryResult<T>([]);
+      }
       if (text.includes("from sessions")) {
         return typedQueryResult<T>([{
           email: "editor@example.com",
@@ -185,6 +202,9 @@ function createTeamVoiceProfilesQueryable(
       }
       if (text.startsWith("select profile from voice_profiles")) {
         return typedQueryResult<T>([{ profile: PROFILE }]);
+      }
+      if (text.startsWith("insert into audit_events")) {
+        return typedQueryResult<T>([]);
       }
       return typedQueryResult<T>([]);
     },
