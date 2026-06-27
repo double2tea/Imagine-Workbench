@@ -387,6 +387,7 @@
     "exportFailed": "Full backup export failed",
     "snapshotDownloaded": "Safety snapshot downloaded: {fileName}",
     "snapshotDownloadFailed": "Safety snapshot download failed",
+    "teamModeDataActionUnsupported": "This data operation is not routed to PostgreSQL team storage yet, so it was not run against browser storage.",
     "localAssetsCleaned": "Local asset library cleared",
     "localAssetsCleanFailed": "Failed to clear local asset library",
     "assetsCleanupSuccess": "Cleaned up {count} item(s)",

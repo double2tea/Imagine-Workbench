@@ -435,6 +435,12 @@ export default function Home() {
     setWorkspaceNotices(prev => [{ id, type, message }, ...prev].slice(0, 4));
   }, [setWorkspaceNotices]);
 
+  const requireBrowserDataManagementAction = useCallback((): boolean => {
+    if (workspaceStorageTarget !== "postgres") return true;
+    pushWorkspaceNotice("error", t("common.dataManagement.teamModeDataActionUnsupported"));
+    return false;
+  }, [pushWorkspaceNotice, workspaceStorageTarget, t]);
+
   const {
     resolveIntegrationAvailable,
     resolveIntegrationEnabled,
@@ -1706,6 +1712,7 @@ export default function Home() {
   });
 
   const clearProjectAssets = useCallback(async () => {
+    if (!requireBrowserDataManagementAction()) return;
     try {
       await createWorkspaceSafetySnapshot("clear-assets");
       await clearAllDB();
@@ -1718,7 +1725,7 @@ export default function Home() {
       void assetLibrary.reload().catch(() => undefined);
       pushWorkspaceNotice("error", toErrorMessage(error, t("common.dataManagement.localAssetsCleanFailed")));
     }
-  }, [assetLibrary, pushWorkspaceNotice, setCompareItemIds, setSelectedItemIds]);
+  }, [assetLibrary, pushWorkspaceNotice, requireBrowserDataManagementAction, setCompareItemIds, setSelectedItemIds]);
 
   const handleClearProject = async () => {
     if (!(await confirmAction({
@@ -1792,24 +1799,27 @@ export default function Home() {
   }, [assetLibraryTarget, handleSelectAtItem, pushWorkspaceNotice]);
 
   const handleDataExportWorkspace = useCallback(async (includeCredentials: boolean) => {
+    if (!requireBrowserDataManagementAction()) return;
     try {
       const result = await exportCompleteWorkspaceBackup(includeCredentials);
       pushWorkspaceNotice("success", t("common.dataManagement.exportComplete", { fileName: result.fileName }));
     } catch (error) {
       pushWorkspaceNotice("error", toErrorMessage(error, t("common.dataManagement.exportFailed")));
     }
-  }, [pushWorkspaceNotice]);
+  }, [pushWorkspaceNotice, requireBrowserDataManagementAction]);
 
   const handleDataDownloadSafetySnapshot = useCallback(async () => {
+    if (!requireBrowserDataManagementAction()) return;
     try {
       const result = await downloadLatestWorkspaceSafetySnapshot();
       pushWorkspaceNotice("success", t("common.dataManagement.snapshotDownloaded", { fileName: result.fileName }));
     } catch (error) {
       pushWorkspaceNotice("error", toErrorMessage(error, t("common.dataManagement.snapshotDownloadFailed")));
     }
-  }, [pushWorkspaceNotice]);
+  }, [pushWorkspaceNotice, requireBrowserDataManagementAction]);
 
   const handleDataImportWorkspace = useCallback(async (file: File, includeCredentials: boolean) => {
+    if (!requireBrowserDataManagementAction()) return;
     try {
       const preview = await previewWorkspaceBackup(file);
       const credentialNote = preview.includesCredentials && !includeCredentials
@@ -1828,7 +1838,7 @@ export default function Home() {
     } catch (error) {
       pushWorkspaceNotice("error", toErrorMessage(error, t("common.dataManagement.workspaceRestoreFailed")));
     }
-  }, [confirmAction, pushWorkspaceNotice]);
+  }, [confirmAction, pushWorkspaceNotice, requireBrowserDataManagementAction]);
 
   const handleDataImportLocalAssets = useCallback(async (files: File[]) => {
     const importedItems: StorageItem[] = [];
@@ -1853,6 +1863,7 @@ export default function Home() {
   }, [pushWorkspaceNotice, saveWorkspaceAssetDirect]);
 
   const handleDataCleanupAssets = useCallback(async (kind: WorkspaceCleanupKind) => {
+    if (!requireBrowserDataManagementAction()) return;
     try {
       const result = await cleanupWorkspaceAssets(kind);
       await reloadWorkspaceAssets();
@@ -1862,9 +1873,10 @@ export default function Home() {
     } catch (error) {
       pushWorkspaceNotice("error", toErrorMessage(error, t("common.dataManagement.assetsCleanupFailed")));
     }
-  }, [pushWorkspaceNotice, reloadWorkspaceAssets, setCompareItemIds, setSelectedItemIds]);
+  }, [pushWorkspaceNotice, reloadWorkspaceAssets, requireBrowserDataManagementAction, setCompareItemIds, setSelectedItemIds]);
 
   const handleDataRepairAssetSources = useCallback(async () => {
+    if (!requireBrowserDataManagementAction()) return;
     try {
       const result = await repairStaleAssetSourceLinks();
       await reloadWorkspaceAssets();
@@ -1872,21 +1884,23 @@ export default function Home() {
     } catch (error) {
       pushWorkspaceNotice("error", toErrorMessage(error, t("common.dataManagement.sourceLinkRepairFailed")));
     }
-  }, [pushWorkspaceNotice, reloadWorkspaceAssets]);
+  }, [pushWorkspaceNotice, reloadWorkspaceAssets, requireBrowserDataManagementAction]);
 
   const handleDataClearLocalStorage = useCallback(async (kind: LocalStorageCleanupKind) => {
+    if (!requireBrowserDataManagementAction()) return;
     const count = clearLocalStorageGroup(kind);
     pushWorkspaceNotice("success", t("common.dataManagement.localKeysCleaned", { count }));
-  }, [pushWorkspaceNotice]);
+  }, [pushWorkspaceNotice, requireBrowserDataManagementAction, t]);
 
   const handleDataResetBoards = useCallback(async () => {
+    if (!requireBrowserDataManagementAction()) return;
     try {
       await resetBoardsToDefault();
       pushWorkspaceNotice("success", t("common.dataManagement.boardsReset"));
     } catch (error) {
       pushWorkspaceNotice("error", toErrorMessage(error, t("common.dataManagement.boardsResetFailed")));
     }
-  }, [pushWorkspaceNotice]);
+  }, [pushWorkspaceNotice, requireBrowserDataManagementAction]);
 
   const renderAssetGalleryWorkspace = () => (
     <AssetGalleryWorkspace

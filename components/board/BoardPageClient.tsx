@@ -1812,6 +1812,12 @@ export default function BoardPage({ boardId = DEFAULT_BOARD_ID }: BoardPageProps
     window.setTimeout(() => dismissWorkspaceNotice(id), 8000);
   }, [dismissWorkspaceNotice]);
 
+  const requireBrowserDataManagementAction = useCallback((): boolean => {
+    if (boardStorageTarget !== "postgres") return true;
+    pushWorkspaceNotice("error", t("common.dataManagement.teamModeDataActionUnsupported"));
+    return false;
+  }, [boardStorageTarget, pushWorkspaceNotice, t]);
+
   useEffect(() => {
     let isActive = true;
     void fetchWorkspaceStorageRuntimeStatus()
@@ -4873,6 +4879,7 @@ export default function BoardPage({ boardId = DEFAULT_BOARD_ID }: BoardPageProps
   }, [boardAssetsLoading, boardController, generationTasks, isBoardAssetScopeLoaded, items]);
 
   const clearProjectAssets = useCallback(async () => {
+    if (!requireBrowserDataManagementAction()) return;
     try {
       await createWorkspaceSafetySnapshot("clear-assets");
       await clearAllDB();
@@ -4884,22 +4891,24 @@ export default function BoardPage({ boardId = DEFAULT_BOARD_ID }: BoardPageProps
     } catch (error) {
       pushWorkspaceNotice("error", toErrorMessage(error, t("common.dataManagement.localAssetsCleanFailed")));
     }
-  }, [pushWorkspaceNotice]);
+  }, [pushWorkspaceNotice, requireBrowserDataManagementAction]);
 
   const reloadBoardAssetsFromDB = useCallback(async () => {
     await reloadBoardAssets();
   }, [reloadBoardAssets]);
 
   const handleDataExportWorkspace = useCallback(async (includeCredentials: boolean) => {
+    if (!requireBrowserDataManagementAction()) return;
     try {
       const result = await exportCompleteWorkspaceBackup(includeCredentials);
       pushWorkspaceNotice("success", t("common.dataManagement.exportComplete", { fileName: result.fileName }));
     } catch (error) {
       pushWorkspaceNotice("error", toErrorMessage(error, t("common.dataManagement.boardRenameFailed")));
     }
-  }, [pushWorkspaceNotice]);
+  }, [pushWorkspaceNotice, requireBrowserDataManagementAction]);
 
   const handleDataExportCurrentBoard = useCallback(async (includeCredentials: boolean) => {
+    if (!requireBrowserDataManagementAction()) return;
     try {
       flushSync(() => flushAllBoardText());
       await boardController.saveNow();
@@ -4908,18 +4917,20 @@ export default function BoardPage({ boardId = DEFAULT_BOARD_ID }: BoardPageProps
     } catch (error) {
       pushWorkspaceNotice("error", toErrorMessage(error, t("common.dataManagement.exportFailed")));
     }
-  }, [boardController, pushWorkspaceNotice, t]);
+  }, [boardController, pushWorkspaceNotice, requireBrowserDataManagementAction, t]);
 
   const handleDataDownloadSafetySnapshot = useCallback(async () => {
+    if (!requireBrowserDataManagementAction()) return;
     try {
       const result = await downloadLatestWorkspaceSafetySnapshot();
       pushWorkspaceNotice("success", t("common.dataManagement.snapshotDownloaded", { fileName: result.fileName }));
     } catch (error) {
       pushWorkspaceNotice("error", toErrorMessage(error, t("common.dataManagement.snapshotDownloadFailed")));
     }
-  }, [pushWorkspaceNotice]);
+  }, [pushWorkspaceNotice, requireBrowserDataManagementAction]);
 
   const handleDataImportWorkspace = useCallback(async (file: File, includeCredentials: boolean) => {
+    if (!requireBrowserDataManagementAction()) return;
     try {
       const preview = await previewWorkspaceBackup(file);
       const credentialNote = preview.includesCredentials && !includeCredentials
@@ -4938,7 +4949,7 @@ export default function BoardPage({ boardId = DEFAULT_BOARD_ID }: BoardPageProps
     } catch (error) {
       pushWorkspaceNotice("error", toErrorMessage(error, t("common.dataManagement.workspaceRestoreFailed")));
     }
-  }, [confirmAction, pushWorkspaceNotice, t]);
+  }, [confirmAction, pushWorkspaceNotice, requireBrowserDataManagementAction, t]);
 
   const handleDataImportLocalAssets = useCallback(async (files: File[]) => {
     const importedItems: StorageItem[] = [];
@@ -4968,6 +4979,7 @@ export default function BoardPage({ boardId = DEFAULT_BOARD_ID }: BoardPageProps
   }, [pushWorkspaceNotice, resolvedBoardId, t]);
 
   const handleDataCleanupAssets = useCallback(async (kind: WorkspaceCleanupKind) => {
+    if (!requireBrowserDataManagementAction()) return;
     try {
       const result = await cleanupWorkspaceAssets(kind);
       await reloadBoardAssetsFromDB();
@@ -4975,9 +4987,10 @@ export default function BoardPage({ boardId = DEFAULT_BOARD_ID }: BoardPageProps
     } catch (error) {
       pushWorkspaceNotice("error", toErrorMessage(error, t("common.dataManagement.assetsCleanupFailed")));
     }
-  }, [pushWorkspaceNotice, reloadBoardAssetsFromDB]);
+  }, [pushWorkspaceNotice, reloadBoardAssetsFromDB, requireBrowserDataManagementAction]);
 
   const handleDataRepairAssetSources = useCallback(async () => {
+    if (!requireBrowserDataManagementAction()) return;
     try {
       const result = await repairStaleAssetSourceLinks();
       await reloadBoardAssetsFromDB();
@@ -4985,14 +4998,16 @@ export default function BoardPage({ boardId = DEFAULT_BOARD_ID }: BoardPageProps
     } catch (error) {
       pushWorkspaceNotice("error", toErrorMessage(error, t("common.dataManagement.sourceLinkRepairFailed")));
     }
-  }, [pushWorkspaceNotice, reloadBoardAssetsFromDB]);
+  }, [pushWorkspaceNotice, reloadBoardAssetsFromDB, requireBrowserDataManagementAction]);
 
   const handleDataClearLocalStorage = useCallback(async (kind: LocalStorageCleanupKind) => {
+    if (!requireBrowserDataManagementAction()) return;
     const count = clearLocalStorageGroup(kind);
     pushWorkspaceNotice("success", t("common.dataManagement.localKeysCleaned", { count }));
-  }, [pushWorkspaceNotice, t]);
+  }, [pushWorkspaceNotice, requireBrowserDataManagementAction, t]);
 
   const handleDataResetBoards = useCallback(async () => {
+    if (!requireBrowserDataManagementAction()) return;
     try {
       await resetBoardsToDefault();
       pushWorkspaceNotice("success", t("common.dataManagement.boardsReset"));
@@ -5000,7 +5015,7 @@ export default function BoardPage({ boardId = DEFAULT_BOARD_ID }: BoardPageProps
     } catch (error) {
       pushWorkspaceNotice("error", toErrorMessage(error, t("common.dataManagement.boardsResetFailed")));
     }
-  }, [pushWorkspaceNotice]);
+  }, [pushWorkspaceNotice, requireBrowserDataManagementAction]);
 
   const duplicateCurrentBoard = useCallback(async () => {
     try {

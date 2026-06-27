@@ -507,6 +507,7 @@
     "exportFailed": "完整备份导出失败",
     "snapshotDownloaded": "已下载安全快照：{fileName}",
     "snapshotDownloadFailed": "安全快照下载失败",
+    "teamModeDataActionUnsupported": "这个数据操作尚未接入 PostgreSQL 团队存储，已阻止它改动浏览器本地数据。",
     "localAssetsCleaned": "本地资产库已清空",
     "localAssetsCleanFailed": "本地资产库清空失败",
     "assetsCleanupSuccess": "已清理 {count} 项",
