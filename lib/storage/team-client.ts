@@ -9,6 +9,7 @@ import type {
   GenerationTaskUpdate,
   ListGenerationTasksOptions,
 } from "@/lib/generation-tasks";
+import type { WorkspaceDataSummary } from "@/lib/data-management";
 import type { PublicLocalStorageRuntimeStatus } from "@/lib/storage/local-public-runtime";
 import type { WORKSPACE_STORAGE_SCHEMA_VERSION } from "@/lib/storage/schema";
 import type {
@@ -22,6 +23,7 @@ import type {
   TeamAssetLibraryListResult,
   TeamAssetLibraryMutationResult,
 } from "@/lib/storage/team-asset-library-types";
+import type { TeamWorkspaceDataSummaryResult } from "@/lib/storage/team-data-summary-types";
 import type { TeamBoardDocumentResult, TeamBoardSummaryListResult } from "@/lib/storage/team-board-types";
 import type {
   TeamGenerationTaskListResult,
@@ -196,6 +198,16 @@ export async function fetchTeamStorageHealth(fetcher: Fetcher = fetch): Promise<
     throw new Error(error);
   }
   return parseTeamStorageHealth(body);
+}
+
+export async function fetchTeamWorkspaceDataSummary(fetcher: Fetcher = fetch): Promise<WorkspaceDataSummary> {
+  const response = await fetcher(API_ROUTES.storage.teamDataSummary, { cache: "no-store" });
+  const body: unknown = await response.json();
+  if (!response.ok) {
+    const error = readStringField(body, "error") ?? "Team data summary failed";
+    throw new Error(error);
+  }
+  return parseTeamWorkspaceDataSummaryResult(body).summary;
 }
 
 export async function fetchTeamSession(fetcher: Fetcher = fetch): Promise<TeamSessionContext> {
@@ -947,6 +959,11 @@ function parseTeamStorageHealth(value: unknown): TeamStorageHealth {
   return value as unknown as TeamStorageHealth;
 }
 
+function parseTeamWorkspaceDataSummaryResult(value: unknown): TeamWorkspaceDataSummaryResult {
+  if (!isTeamWorkspaceDataSummaryResult(value)) throw new Error("Team data summary response is invalid");
+  return value;
+}
+
 function parseTeamStorageMigrationResult(value: unknown): TeamStorageMigrationResult {
   if (!isRecord(value)) throw new Error("PostgreSQL migration response is invalid");
   if (value.mode !== "postgres" || value.targetKind !== "postgres") throw new Error("PostgreSQL migration target is invalid");
@@ -1211,6 +1228,95 @@ function isTeamAssetListResult(value: unknown): value is TeamAssetListResult {
     Number.isInteger(value.offset) &&
     Array.isArray(value.assets) &&
     value.assets.every(isPublicTeamAssetRecord)
+  );
+}
+
+function isTeamWorkspaceDataSummaryResult(value: unknown): value is TeamWorkspaceDataSummaryResult {
+  if (!isRecord(value)) return false;
+  return (
+    value.targetKind === "postgres" &&
+    typeof value.workspaceId === "string" &&
+    isWorkspaceDataSummary(value.summary)
+  );
+}
+
+function isWorkspaceDataSummary(value: unknown): value is WorkspaceDataSummary {
+  if (!isRecord(value)) return false;
+  return (
+    isWorkspaceDataSummaryAssets(value.assets) &&
+    isWorkspaceDataSummaryBoards(value.boards) &&
+    isWorkspaceDataSummaryLocalStorage(value.localStorage) &&
+    isWorkspaceDataSummaryIntegrity(value.integrity) &&
+    isRecord(value.safety) &&
+    (value.teamStorage === undefined || isWorkspaceDataSummaryTeamStorage(value.teamStorage))
+  );
+}
+
+function isWorkspaceDataSummaryAssets(value: unknown): boolean {
+  if (!isRecord(value)) return false;
+  return (
+    typeof value.audio === "number" &&
+    typeof value.brokenComplete === "number" &&
+    typeof value.failed === "number" &&
+    typeof value.image === "number" &&
+    typeof value.missingBoardReferences === "number" &&
+    typeof value.orphaned === "number" &&
+    typeof value.pending === "number" &&
+    typeof value.processing === "number" &&
+    typeof value.referencedByBoards === "number" &&
+    typeof value.staleProcessing === "number" &&
+    isRecord(value.stores) &&
+    typeof value.total === "number" &&
+    typeof value.video === "number" &&
+    typeof value.transcript === "number" &&
+    typeof value.estimatedBytes === "number"
+  );
+}
+
+function isWorkspaceDataSummaryBoards(value: unknown): boolean {
+  if (!isRecord(value)) return false;
+  return typeof value.total === "number" && typeof value.nodes === "number" && typeof value.estimatedBytes === "number";
+}
+
+function isWorkspaceDataSummaryLocalStorage(value: unknown): boolean {
+  if (!isRecord(value)) return false;
+  return (
+    typeof value.agentKeys === "number" &&
+    typeof value.credentialKeys === "number" &&
+    typeof value.modelCacheKeys === "number" &&
+    typeof value.providerSettingKeys === "number" &&
+    typeof value.uiPreferenceKeys === "number" &&
+    Array.isArray(value.inventory) &&
+    typeof value.estimatedBytes === "number"
+  );
+}
+
+function isWorkspaceDataSummaryIntegrity(value: unknown): boolean {
+  if (!isRecord(value)) return false;
+  return (
+    Array.isArray(value.brokenCompleteAssetIds) &&
+    Array.isArray(value.failedAssetIds) &&
+    typeof value.issueCount === "number" &&
+    Array.isArray(value.missingBoardReferences) &&
+    Array.isArray(value.orphanedAssetIds) &&
+    Array.isArray(value.staleAssetSourceLinks) &&
+    Array.isArray(value.staleProcessingAssetIds) &&
+    (value.status === "healthy" || value.status === "attention" || value.status === "critical")
+  );
+}
+
+function isWorkspaceDataSummaryTeamStorage(value: unknown): boolean {
+  if (!isRecord(value)) return false;
+  return (
+    typeof value.assetLibraryRecords === "number" &&
+    typeof value.generationTasks === "number" &&
+    typeof value.payloadBytes === "number" &&
+    typeof value.payloadRefs === "number" &&
+    typeof value.promptTemplates === "number" &&
+    typeof value.providerTargets === "number" &&
+    typeof value.secretSettings === "number" &&
+    typeof value.settings === "number" &&
+    typeof value.voiceProfiles === "number"
   );
 }
 

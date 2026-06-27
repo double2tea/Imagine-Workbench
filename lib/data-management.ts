@@ -320,6 +320,17 @@ export interface WorkspaceDataSummary {
     quota?: number;
     usage?: number;
   };
+  teamStorage?: {
+    assetLibraryRecords: number;
+    generationTasks: number;
+    payloadBytes: number;
+    payloadRefs: number;
+    promptTemplates: number;
+    providerTargets: number;
+    secretSettings: number;
+    settings: number;
+    voiceProfiles: number;
+  };
   safety: {
     latestSnapshot: WorkspaceSafetySnapshotSummary | null;
     origin: string;

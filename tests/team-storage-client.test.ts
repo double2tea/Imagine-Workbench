@@ -25,6 +25,7 @@ import {
   fetchTeamStorageHealth,
   fetchTeamSession,
   fetchTeamWorkspaceGalleryItems,
+  fetchTeamWorkspaceDataSummary,
   loginTeamSession,
   logoutTeamSession,
   readTeamCsrfToken,
@@ -125,6 +126,29 @@ test("fetchWorkspaceStorageRuntimeStatus parses browser storage status", async (
 
   assert.equal(status.mode, "browser");
   assert.equal(status.targetKind, "indexeddb");
+});
+
+test("fetchTeamWorkspaceDataSummary parses PostgreSQL data summary", async () => {
+  const summary = await fetchTeamWorkspaceDataSummary(async input => {
+    assert.equal(String(input), "/api/storage/team/data-summary");
+    return jsonResponse({
+      summary: createWorkspaceDataSummary(),
+      targetKind: "postgres",
+      workspaceId: "workspace_1",
+    });
+  });
+
+  assert.equal(summary.assets.total, 2);
+  assert.equal(summary.teamStorage?.payloadBytes, 2048);
+
+  await assert.rejects(
+    fetchTeamWorkspaceDataSummary(async () => jsonResponse({
+      summary: { ...createWorkspaceDataSummary(), assets: { total: 2 } },
+      targetKind: "postgres",
+      workspaceId: "workspace_1",
+    })),
+    /Team data summary response is invalid/,
+  );
 });
 
 test("teamAssetMediaUrl encodes asset ids and download intent", () => {
@@ -813,6 +837,76 @@ function createBoardSummary(): BoardSummary {
     nodeCount: 1,
     title: "Shared Board",
     updatedAt: "2026-06-26T01:00:00.000Z",
+  };
+}
+
+function createWorkspaceDataSummary() {
+  return {
+    assets: {
+      audio: 0,
+      brokenComplete: 0,
+      estimatedBytes: 512,
+      failed: 0,
+      image: 2,
+      largest: [],
+      missingBoardReferences: 0,
+      orphaned: 0,
+      pending: 0,
+      processing: 0,
+      referencedByBoards: 1,
+      staleProcessing: 0,
+      stores: {
+        legacyAssetRecords: 0,
+        legacyBlobRecords: 0,
+        libraryRecords: 1,
+        metaRecords: 2,
+        previewRecords: 0,
+        sharedBlobRecords: 2,
+        version: 1,
+      },
+      total: 2,
+      transcript: 0,
+      video: 0,
+    },
+    boards: {
+      estimatedBytes: 128,
+      nodes: 1,
+      total: 1,
+    },
+    integrity: {
+      brokenCompleteAssetIds: [],
+      failedAssetIds: [],
+      issueCount: 0,
+      missingBoardReferences: [],
+      orphanedAssetIds: [],
+      staleAssetSourceLinks: [],
+      staleProcessingAssetIds: [],
+      status: "healthy",
+    },
+    localStorage: {
+      agentKeys: 0,
+      credentialKeys: 1,
+      estimatedBytes: 0,
+      inventory: [],
+      modelCacheKeys: 0,
+      providerSettingKeys: 2,
+      uiPreferenceKeys: 0,
+    },
+    safety: {
+      latestSnapshot: null,
+      origin: "postgres-team",
+    },
+    teamStorage: {
+      assetLibraryRecords: 1,
+      generationTasks: 1,
+      payloadBytes: 2048,
+      payloadRefs: 2,
+      promptTemplates: 1,
+      providerTargets: 1,
+      secretSettings: 1,
+      settings: 2,
+      voiceProfiles: 1,
+    },
   };
 }
 

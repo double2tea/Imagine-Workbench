@@ -377,12 +377,30 @@ export default function DataManagementWorkspace({
   const usage = summary?.browserStorage?.usage;
   const usageRatio = quota && usage !== undefined ? Math.min(1, usage / quota) : undefined;
   const assetStores = assetSummary?.stores;
+  const teamStorageSummary = summary?.teamStorage;
   const latestSafetySnapshot = summary?.safety.latestSnapshot ?? null;
   const health = healthCopy(integrity?.status, t);
   const actionDisabled = busyLabel !== null || teamMigrationBusy || teamSessionBusy || teamMembersBusy;
   const isTeamStorageMode = storageStatus?.mode === "postgres";
   const hasPendingTeamMigrations = (teamHealth?.migrationStatus?.pendingMigrationIds.length ?? 0) > 0;
   const canManageTeamMembers = teamSession?.role === "owner" || teamSession?.role === "admin";
+  const storageSlotItems: Array<[string, number]> | null = assetStores
+    ? isTeamStorageMode && teamStorageSummary
+      ? [
+          [t("dataManagement.storageSlots.meta"), assetStores.metaRecords],
+          [t("dataManagement.storageSlots.payloads"), teamStorageSummary.payloadRefs],
+          [t("dataManagement.storageSlots.library"), teamStorageSummary.assetLibraryRecords],
+          [t("dataManagement.storageSlots.tasks"), teamStorageSummary.generationTasks],
+          [t("dataManagement.storageSlots.settings"), teamStorageSummary.settings + teamStorageSummary.secretSettings],
+        ]
+      : [
+          [t("dataManagement.storageSlots.meta"), assetStores.metaRecords],
+          [t("dataManagement.storageSlots.hash"), assetStores.sharedBlobRecords],
+          [t("dataManagement.storageSlots.preview"), assetStores.previewRecords],
+          [t("dataManagement.storageSlots.legacyBlob"), assetStores.legacyBlobRecords],
+          [t("dataManagement.storageSlots.legacyAssets"), assetStores.legacyAssetRecords],
+        ]
+    : null;
 
   const issueGroups = useMemo<HealthIssueGroup[]>(() => {
     if (!integrity) return [];
@@ -401,7 +419,7 @@ export default function DataManagementWorkspace({
         title: t("dataManagement.issueGroups.brokenComplete"),
         count: integrity.brokenCompleteAssetIds.length,
         tone: "critical",
-        action: {
+        action: isTeamStorageMode ? undefined : {
           label: t("dataManagement.issueGroups.cleanBrokenRecords"),
           busyLabel: t("dataManagement.issueGroups.cleanBrokenRecordsBusy"),
           confirmRequest: buildCleanupConfirmRequest("broken-complete", t),
@@ -414,7 +432,7 @@ export default function DataManagementWorkspace({
         title: t("dataManagement.issueGroups.staleSourceLinks"),
         count: integrity.staleAssetSourceLinks.length,
         tone: "attention",
-        action: {
+        action: isTeamStorageMode ? undefined : {
           label: t("dataManagement.issueGroups.repairSources"),
           busyLabel: t("dataManagement.issueGroups.repairSourcesBusy"),
           confirmRequest: buildRepairSourcesConfirmRequest(t),
@@ -429,7 +447,7 @@ export default function DataManagementWorkspace({
         title: t("dataManagement.issueGroups.staleProcessing"),
         count: integrity.staleProcessingAssetIds.length,
         tone: "attention",
-        action: {
+        action: isTeamStorageMode ? undefined : {
           label: t("dataManagement.issueGroups.cleanStale"),
           busyLabel: t("dataManagement.issueGroups.cleanStaleBusy"),
           confirmRequest: buildCleanupConfirmRequest("stale-processing", t),
@@ -442,7 +460,7 @@ export default function DataManagementWorkspace({
         title: t("dataManagement.issueGroups.failedAssets"),
         count: integrity.failedAssetIds.length,
         tone: "attention",
-        action: {
+        action: isTeamStorageMode ? undefined : {
           label: t("dataManagement.issueGroups.cleanFailed"),
           busyLabel: t("dataManagement.issueGroups.cleanFailedBusy"),
           confirmRequest: buildCleanupConfirmRequest("failed", t),
@@ -451,7 +469,7 @@ export default function DataManagementWorkspace({
         details: integrity.failedAssetIds,
       },
     ];
-  }, [integrity, onCleanupAssets, onRepairAssetSources, t]);
+  }, [integrity, isTeamStorageMode, onCleanupAssets, onRepairAssetSources, t]);
 
   const toggleGroup = (key: string) => {
     setExpandedGroups(current => ({ ...current, [key]: !current[key] }));
@@ -878,19 +896,41 @@ export default function DataManagementWorkspace({
           secondary={boardSummary ? t("dataManagement.boardsDetailTemplate", { nodes: boardSummary.nodes, bytes: formatBytes(boardSummary.estimatedBytes) }) : t("dataManagement.statCards.waitingStats")}
         />
         <StatCard
-          label={t("dataManagement.statCards.localSettings")}
-          primary={storageSummary ? String(storageSummary.agentKeys + storageSummary.modelCacheKeys + storageSummary.providerSettingKeys + storageSummary.uiPreferenceKeys + storageSummary.credentialKeys) : "--"}
-          secondary={storageSummary ? t("dataManagement.localSettingsDetailTemplate", {
-            agentKeys: storageSummary.agentKeys,
-            modelCacheKeys: storageSummary.modelCacheKeys,
-            providerSettingKeys: storageSummary.providerSettingKeys,
-            credentialKeys: storageSummary.credentialKeys,
-          }) : t("dataManagement.statCards.waitingStats")}
+          label={isTeamStorageMode ? t("dataManagement.statCards.teamSettings") : t("dataManagement.statCards.localSettings")}
+          primary={isTeamStorageMode
+            ? teamStorageSummary ? String(teamStorageSummary.settings + teamStorageSummary.secretSettings) : "--"
+            : storageSummary ? String(storageSummary.agentKeys + storageSummary.modelCacheKeys + storageSummary.providerSettingKeys + storageSummary.uiPreferenceKeys + storageSummary.credentialKeys) : "--"}
+          secondary={isTeamStorageMode
+            ? teamStorageSummary
+              ? t("dataManagement.teamSettingsDetailTemplate", {
+                  promptTemplates: teamStorageSummary.promptTemplates,
+                  providerTargets: teamStorageSummary.providerTargets,
+                  secretSettings: teamStorageSummary.secretSettings,
+                  settings: teamStorageSummary.settings,
+                  voiceProfiles: teamStorageSummary.voiceProfiles,
+                })
+              : t("dataManagement.statCards.waitingStats")
+            : storageSummary ? t("dataManagement.localSettingsDetailTemplate", {
+                agentKeys: storageSummary.agentKeys,
+                modelCacheKeys: storageSummary.modelCacheKeys,
+                providerSettingKeys: storageSummary.providerSettingKeys,
+                credentialKeys: storageSummary.credentialKeys,
+              }) : t("dataManagement.statCards.waitingStats")}
         />
         <StatCard
-          label={t("dataManagement.statCards.browserStorage")}
-          primary={usage !== undefined ? formatBytes(usage) : "--"}
-          secondary={quota !== undefined ? t("dataManagement.browserStorageDetailTemplate", { quota: formatBytes(quota), percent: formatPercent(usageRatio) }) : t("dataManagement.statCards.browserNoQuota")}
+          label={isTeamStorageMode ? t("dataManagement.statCards.teamMedia") : t("dataManagement.statCards.browserStorage")}
+          primary={isTeamStorageMode
+            ? teamStorageSummary ? formatBytes(teamStorageSummary.payloadBytes) : "--"
+            : usage !== undefined ? formatBytes(usage) : "--"}
+          secondary={isTeamStorageMode
+            ? teamStorageSummary
+              ? t("dataManagement.teamMediaDetailTemplate", {
+                  library: teamStorageSummary.assetLibraryRecords,
+                  payloads: teamStorageSummary.payloadRefs,
+                  tasks: teamStorageSummary.generationTasks,
+                })
+              : t("dataManagement.statCards.waitingStats")
+            : quota !== undefined ? t("dataManagement.browserStorageDetailTemplate", { quota: formatBytes(quota), percent: formatPercent(usageRatio) }) : t("dataManagement.statCards.browserNoQuota")}
         />
       </div>
 
@@ -951,7 +991,9 @@ export default function DataManagementWorkspace({
               {t("dataManagement.storageStructure")}
             </p>
             <p className="mt-1 text-[11px] leading-5 text-[var(--iw-muted)]">
-              {t("dataManagement.storageStructureDescription")}
+              {isTeamStorageMode
+                ? t("dataManagement.teamStorageStructureDescription")
+                : t("dataManagement.storageStructureDescription")}
             </p>
           </div>
           <p className="font-mono text-[11px] text-[var(--iw-muted)]">
@@ -963,15 +1005,9 @@ export default function DataManagementWorkspace({
             <div className="h-full rounded-full bg-emerald-400" style={{ width: `${Math.max(4, usageRatio * 100)}%` }} />
           </div>
         ) : null}
-        {assetStores ? (
+        {storageSlotItems ? (
           <div className="mt-3 grid gap-2 sm:grid-cols-5">
-            {[
-              [t("dataManagement.storageSlots.meta"), assetStores.metaRecords],
-              [t("dataManagement.storageSlots.hash"), assetStores.sharedBlobRecords],
-              [t("dataManagement.storageSlots.preview"), assetStores.previewRecords],
-              [t("dataManagement.storageSlots.legacyBlob"), assetStores.legacyBlobRecords],
-              [t("dataManagement.storageSlots.legacyAssets"), assetStores.legacyAssetRecords],
-            ].map(([label, value]) => (
+            {storageSlotItems.map(([label, value]) => (
               <div key={label} className="rounded-md border border-[var(--iw-border)] px-2 py-2">
                 <p className="text-[10px] uppercase text-[var(--iw-faint)]">{label}</p>
                 <p className="mt-1 font-mono text-sm text-[var(--iw-text)]">{value}</p>

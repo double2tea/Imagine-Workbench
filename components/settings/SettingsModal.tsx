@@ -25,6 +25,7 @@ import {
   fetchTeamStorageHealth,
   fetchTeamMembers,
   fetchTeamSession,
+  fetchTeamWorkspaceDataSummary,
   loginTeamSession,
   logoutTeamSession,
   readTeamCsrfToken,
@@ -207,12 +208,15 @@ export default function SettingsModal({
   const refreshDataSummary = useCallback(async () => {
     try {
       setDataSummaryError(null);
-      setDataSummary(await getWorkspaceDataSummary());
+      const status = await fetchWorkspaceStorageRuntimeStatus();
+      setDataSummary(status.mode === "postgres"
+        ? await fetchTeamWorkspaceDataSummary()
+        : await getWorkspaceDataSummary());
     } catch (error) {
       setDataSummary(null);
       setDataSummaryError(formatSettingsError(error, t));
     }
-  }, []);
+  }, [t]);
 
   const refreshTeamMembersForSession = useCallback(async (session: TeamSessionContext | null) => {
     if (!canManageTeamMembers(session)) {
