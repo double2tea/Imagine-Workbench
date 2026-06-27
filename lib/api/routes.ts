@@ -35,6 +35,8 @@ export const API_ROUTES = {
     teamBoard: (boardId: string) => `/api/storage/team/boards/${encodeURIComponent(boardId)}`,
     teamMembers: "/api/storage/team/members",
     teamMember: (userId: string) => `/api/storage/team/members/${encodeURIComponent(userId)}`,
+    teamProviderTargets: "/api/storage/team/provider-targets",
+    teamProviderTarget: (targetId: string) => `/api/storage/team/provider-targets/${encodeURIComponent(targetId)}`,
     teamSecrets: "/api/storage/team/secrets",
     teamSecret: (key: string) => `/api/storage/team/secrets/${encodeURIComponent(key)}`,
     teamAssetMedia: (assetId: string, options: { download?: boolean } = {}) => {

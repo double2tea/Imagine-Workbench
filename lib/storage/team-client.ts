@@ -28,6 +28,12 @@ import type {
   TeamMemberMutationResult,
 } from "@/lib/storage/team-member-types";
 import type {
+  PublicTeamProviderTarget,
+  TeamProviderTargetListResult,
+  TeamProviderTargetMutationResult,
+  TeamProviderTargetSaveInput,
+} from "@/lib/storage/team-provider-target-types";
+import type {
   PublicTeamSecretStatus,
   TeamSecretListResult,
   TeamSecretMutationResult,
@@ -261,6 +267,59 @@ export async function fetchTeamSecrets(
     throw new Error(error);
   }
   return parseTeamSecretListResult(body);
+}
+
+export async function fetchTeamProviderTargets(fetcher: Fetcher = fetch): Promise<TeamProviderTargetListResult> {
+  const response = await fetcher(API_ROUTES.storage.teamProviderTargets, { cache: "no-store" });
+  const body: unknown = await response.json();
+  if (!response.ok) {
+    const error = readStringField(body, "error") ?? "Team provider target list failed";
+    throw new Error(error);
+  }
+  return parseTeamProviderTargetListResult(body);
+}
+
+export async function saveTeamProviderTarget(
+  input: TeamProviderTargetSaveInput,
+  csrfToken: string,
+  fetcher: Fetcher = fetch,
+): Promise<TeamProviderTargetMutationResult> {
+  const token = csrfToken.trim();
+  if (!token) throw new Error("CSRF token is required");
+  const response = await fetcher(API_ROUTES.storage.teamProviderTargets, {
+    cache: "no-store",
+    body: JSON.stringify(input),
+    headers: {
+      "content-type": "application/json",
+      "x-imagine-csrf-token": token,
+    },
+    method: "POST",
+  });
+  const body: unknown = await response.json();
+  if (!response.ok) {
+    const error = readStringField(body, "error") ?? "Team provider target save failed";
+    throw new Error(error);
+  }
+  return parseTeamProviderTargetMutationResult(body);
+}
+
+export async function deleteTeamProviderTarget(
+  targetId: string,
+  csrfToken: string,
+  fetcher: Fetcher = fetch,
+): Promise<void> {
+  const token = csrfToken.trim();
+  if (!token) throw new Error("CSRF token is required");
+  const response = await fetcher(API_ROUTES.storage.teamProviderTarget(targetId), {
+    cache: "no-store",
+    headers: { "x-imagine-csrf-token": token },
+    method: "DELETE",
+  });
+  const body: unknown = await response.json();
+  if (!response.ok) {
+    const error = readStringField(body, "error") ?? "Team provider target delete failed";
+    throw new Error(error);
+  }
 }
 
 export async function saveTeamSecret(
@@ -669,6 +728,16 @@ function parseTeamSecretMutationResult(value: unknown): TeamSecretMutationResult
   return value;
 }
 
+function parseTeamProviderTargetListResult(value: unknown): TeamProviderTargetListResult {
+  if (!isTeamProviderTargetListResult(value)) throw new Error("Team provider target list response is invalid");
+  return value;
+}
+
+function parseTeamProviderTargetMutationResult(value: unknown): TeamProviderTargetMutationResult {
+  if (!isTeamProviderTargetMutationResult(value)) throw new Error("Team provider target response is invalid");
+  return value;
+}
+
 function parseTeamAssetListResult(value: unknown): TeamAssetListResult {
   if (!isTeamAssetListResult(value)) throw new Error("Team asset list response is invalid");
   return value;
@@ -870,6 +939,25 @@ function isTeamSecretMutationResult(value: unknown): value is TeamSecretMutation
   );
 }
 
+function isTeamProviderTargetListResult(value: unknown): value is TeamProviderTargetListResult {
+  if (!isRecord(value)) return false;
+  return (
+    value.targetKind === "postgres" &&
+    typeof value.workspaceId === "string" &&
+    Array.isArray(value.targets) &&
+    value.targets.every(isPublicTeamProviderTarget)
+  );
+}
+
+function isTeamProviderTargetMutationResult(value: unknown): value is TeamProviderTargetMutationResult {
+  if (!isRecord(value)) return false;
+  return (
+    value.targetKind === "postgres" &&
+    typeof value.workspaceId === "string" &&
+    isPublicTeamProviderTarget(value.target)
+  );
+}
+
 function isPublicTeamMember(value: unknown): value is PublicTeamMember {
   if (!isRecord(value)) return false;
   return (
@@ -888,6 +976,24 @@ function isPublicTeamSecretStatus(value: unknown): value is PublicTeamSecretStat
     typeof value.key === "string" &&
     typeof value.updatedAt === "string" &&
     !("value" in value)
+  );
+}
+
+function isPublicTeamProviderTarget(value: unknown): value is PublicTeamProviderTarget {
+  if (!isRecord(value)) return false;
+  return (
+    value.provider === "runninghub" &&
+    typeof value.accessPasswordConfigured === "boolean" &&
+    typeof value.id === "string" &&
+    typeof value.label === "string" &&
+    isRunningHubOutputType(value.outputType) &&
+    typeof value.targetId === "string" &&
+    isRunningHubTargetType(value.targetType) &&
+    typeof value.updatedAt === "string" &&
+    Array.isArray(value.bindings) &&
+    value.bindings.every(isRunningHubBinding) &&
+    !("accessPassword" in value) &&
+    !("accessPasswordEncrypted" in value)
   );
 }
 
@@ -1007,6 +1113,34 @@ function isGenerationTaskMediaType(value: unknown): boolean {
 
 function isGenerationTaskStatus(value: unknown): value is GenerationTaskStatus {
   return value === "pending" || value === "processing" || value === "complete" || value === "failed" || value === "canceled";
+}
+
+function isRunningHubBinding(value: unknown): boolean {
+  if (!isRecord(value)) return false;
+  return (
+    typeof value.id === "string" &&
+    typeof value.nodeId === "string" &&
+    typeof value.fieldName === "string" &&
+    isRunningHubBindingSource(value.source) &&
+    typeof value.value === "string" &&
+    isRunningHubBindingDelivery(value.deliveryMode)
+  );
+}
+
+function isRunningHubTargetType(value: unknown): boolean {
+  return value === "ai-app" || value === "workflow";
+}
+
+function isRunningHubOutputType(value: unknown): boolean {
+  return value === "image" || value === "video" || value === "audio";
+}
+
+function isRunningHubBindingSource(value: unknown): boolean {
+  return value === "literal" || value === "prompt" || value === "reference" || value === "randomSeed";
+}
+
+function isRunningHubBindingDelivery(value: unknown): boolean {
+  return value === "raw" || value === "url" || value === "fileName";
 }
 
 function isPayloadKind(value: unknown): value is PublicTeamAssetPayload["kind"] {
