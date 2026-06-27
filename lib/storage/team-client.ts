@@ -29,7 +29,7 @@ import type {
   TeamMediaMaintenanceCleanupResult,
   TeamMediaMaintenanceTarget,
 } from "@/lib/storage/team-media-maintenance-types";
-import type { TeamBoardDocumentResult, TeamBoardSummaryListResult } from "@/lib/storage/team-board-types";
+import type { TeamBoardDocumentResult, TeamBoardResetResult, TeamBoardSummaryListResult } from "@/lib/storage/team-board-types";
 import type {
   TeamGenerationTaskListResult,
   TeamGenerationTaskMutationResult,
@@ -971,6 +971,24 @@ export async function deleteTeamBoardDocument(
   }
 }
 
+export async function resetTeamBoards(
+  csrfToken: string,
+  fetcher: Fetcher = fetch,
+): Promise<TeamBoardResetResult> {
+  const token = csrfToken.trim();
+  if (!token) throw new Error("CSRF token is required");
+  const response = await fetcher(API_ROUTES.storage.teamBoards, {
+    cache: "no-store",
+    headers: { "x-imagine-csrf-token": token },
+    method: "DELETE",
+  });
+  const body: unknown = await response.json();
+  if (!response.ok) {
+    throw readTeamStorageClientError(body, "Team boards reset failed");
+  }
+  return parseTeamBoardResetResult(body);
+}
+
 export async function loginTeamSession(
   input: { email: string; password: string },
   fetcher: Fetcher = fetch,
@@ -1236,6 +1254,11 @@ function parseTeamBoardSummaryListResult(value: unknown): TeamBoardSummaryListRe
 
 function parseTeamBoardDocumentResult(value: unknown): TeamBoardDocumentResult {
   if (!isTeamBoardDocumentResult(value)) throw new Error("Team board response is invalid");
+  return value;
+}
+
+function parseTeamBoardResetResult(value: unknown): TeamBoardResetResult {
+  if (!isTeamBoardResetResult(value)) throw new Error("Team board reset response is invalid");
   return value;
 }
 
@@ -1583,6 +1606,10 @@ function isTeamBoardDocumentResult(value: unknown): value is TeamBoardDocumentRe
     isBoardDocument(value.board) &&
     isBoardSummary(value.summary)
   );
+}
+
+function isTeamBoardResetResult(value: unknown): value is TeamBoardResetResult {
+  return isRecord(value) && isTeamBoardDocumentResult(value) && Number.isInteger(value.deletedBoardCount);
 }
 
 function isTeamMemberListResult(value: unknown): value is TeamMemberListResult {

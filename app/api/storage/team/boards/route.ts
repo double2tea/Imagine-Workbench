@@ -7,7 +7,7 @@ import {
   assertTeamCsrf,
   assertTrustedTeamRequestOrigin,
 } from "@/lib/storage/team-auth";
-import { createTeamBoardDocument, listTeamBoardSummaries } from "@/lib/storage/team-boards";
+import { createTeamBoardDocument, listTeamBoardSummaries, resetTeamBoards } from "@/lib/storage/team-boards";
 
 export const runtime = "nodejs";
 export const dynamic = "force-dynamic";
@@ -39,6 +39,24 @@ export async function POST(request: Request): Promise<Response> {
     return Response.json(result, { status: 201 });
   } catch (error) {
     const response = apiErrorResponse(error, "Team board create failed");
+    return Response.json(response.body, {
+      status: error instanceof PostgresStorageConfigError ? 400 : response.status,
+    });
+  }
+}
+
+export async function DELETE(request: Request): Promise<Response> {
+  try {
+    assertTrustedTeamRequestOrigin(request, {
+      APP_URL: process.env.APP_URL,
+      IMAGINE_TRUSTED_ORIGINS: process.env.IMAGINE_TRUSTED_ORIGINS,
+    });
+    assertTeamCsrf(request);
+    const config = resolvePostgresStorageConfig(process.env);
+    const result = await withPostgresClient(config, client => resetTeamBoards(client, config, request));
+    return Response.json(result);
+  } catch (error) {
+    const response = apiErrorResponse(error, "Team boards reset failed");
     return Response.json(response.body, {
       status: error instanceof PostgresStorageConfigError ? 400 : response.status,
     });

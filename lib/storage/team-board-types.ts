@@ -8,6 +8,10 @@ export interface TeamBoardDocumentResult {
   workspaceId: string;
 }
 
+export interface TeamBoardResetResult extends TeamBoardDocumentResult {
+  deletedBoardCount: number;
+}
+
 export interface TeamBoardSummaryListResult {
   boards: BoardSummary[];
   limit: number;

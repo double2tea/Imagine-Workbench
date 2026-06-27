@@ -33,6 +33,7 @@ import {
   logoutTeamSession,
   readTeamCsrfToken,
   fetchWorkspaceStorageRuntimeStatus,
+  resetTeamBoards,
   restoreTeamWorkspaceBackup,
   runTeamStorageMigrations,
   updateTeamMemberRole,
@@ -398,6 +399,18 @@ export default function SettingsModal({
     await refreshDataSummary();
   }, [onClearAssets, refreshDataSummary, storageStatus?.mode, t, teamSession]);
 
+  const runResetBoards = useCallback(async () => {
+    if (storageStatus?.mode !== "postgres") {
+      await onResetBoards();
+      return;
+    }
+    if (!teamSession) throw new Error(t("dataManagement.teamSessionRequired"));
+    const csrfToken = readTeamCsrfToken();
+    if (!csrfToken) throw new Error(t("dataManagement.teamSessionCsrfMissing"));
+    await resetTeamBoards(csrfToken);
+    await refreshDataSummary();
+  }, [onResetBoards, refreshDataSummary, storageStatus?.mode, t, teamSession]);
+
   const runExportWorkspace = useCallback(async (includeCredentials: boolean) => {
     if (storageStatus?.mode !== "postgres") {
       await onExportWorkspace(includeCredentials);
@@ -642,7 +655,7 @@ export default function SettingsModal({
                   onRefreshSummary={refreshDataSummary}
                   onRefreshStorageStatus={refreshStorageStatus}
                   onRepairAssetSources={onRepairAssetSources}
-                  onResetBoards={onResetBoards}
+                  onResetBoards={runResetBoards}
                   onCleanupTeamMediaMaintenance={runTeamMediaMaintenanceCleanup}
                   onRunTeamMigrations={runTeamMigrations}
                   onRefreshTeamMembers={refreshTeamMembers}

@@ -33,6 +33,7 @@ import {
   loginTeamSession,
   logoutTeamSession,
   readTeamCsrfToken,
+  resetTeamBoards,
   saveTeamBoardDocument,
   saveTeamAsset,
   saveTeamAssetLibraryRecord,
@@ -930,6 +931,24 @@ test("team board document client creates, reads, saves, and deletes boards", asy
   });
   assert.equal(deleteCsrfHeader, "csrf-token");
 
+  let resetCsrfHeader: string | null = null;
+  const resetResult = await resetTeamBoards("csrf-token", async (input, init) => {
+    assert.equal(String(input), "/api/storage/team/boards");
+    assert.equal(init?.method, "DELETE");
+    const headers = new Headers(init?.headers);
+    resetCsrfHeader = headers.get("x-imagine-csrf-token");
+    return jsonResponse({
+      board,
+      deletedBoardCount: 2,
+      summary: createBoardSummary(),
+      targetKind: "postgres",
+      version: 1,
+      workspaceId: "workspace_1",
+    });
+  });
+  assert.equal(resetCsrfHeader, "csrf-token");
+  assert.equal(resetResult.deletedBoardCount, 2);
+
   await assert.rejects(
     createTeamBoardDocument(board, " "),
     /CSRF token is required/,
@@ -940,6 +959,10 @@ test("team board document client creates, reads, saves, and deletes boards", asy
   );
   await assert.rejects(
     deleteTeamBoardDocument("board_1", " "),
+    /CSRF token is required/,
+  );
+  await assert.rejects(
+    resetTeamBoards(" "),
     /CSRF token is required/,
   );
 });

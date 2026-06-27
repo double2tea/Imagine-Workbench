@@ -3,11 +3,12 @@ import test from "node:test";
 import type { QueryResult, QueryResultRow } from "pg";
 
 import { ApiError } from "../lib/api/errors";
+import { DEFAULT_BOARD_ID } from "../lib/board/defaults";
 import type { BoardDocument, BoardSummary } from "../lib/board/types";
 import type { PostgresQueryable } from "../lib/storage/postgres/connection";
 import { hashTeamSessionToken } from "../lib/storage/team-auth";
-import { createTeamBoardDocument, deleteTeamBoardDocument, getTeamBoardDocument, listTeamBoardSummaries, saveTeamBoardDocument } from "../lib/storage/team-boards";
-import { GET as getTeamBoards, POST as postTeamBoard } from "../app/api/storage/team/boards/route";
+import { createTeamBoardDocument, deleteTeamBoardDocument, getTeamBoardDocument, listTeamBoardSummaries, resetTeamBoards, saveTeamBoardDocument } from "../lib/storage/team-boards";
+import { DELETE as resetTeamBoardsRoute, GET as getTeamBoards, POST as postTeamBoard } from "../app/api/storage/team/boards/route";
 import { DELETE as deleteTeamBoard, PUT as putTeamBoard } from "../app/api/storage/team/boards/[boardId]/route";
 
 const RAW_SESSION_TOKEN = "raw-session-token";
@@ -186,6 +187,40 @@ test("deleteTeamBoardDocument deletes an editor-scoped board", async () => {
   assert.deepEqual(deleteQuery?.values, [WORKSPACE_ID, BOARD_ID]);
 });
 
+test("resetTeamBoards deletes workspace boards, recreates the default board, and records an audit event", async () => {
+  const queries: Array<{ text: string; values?: readonly unknown[] }> = [];
+  const result = await resetTeamBoards(
+    createTeamBoardsQueryable(queries, { insertVersion: 1, resetBoardCount: 2, role: "admin" }),
+    { databaseUrl: "postgres://localhost/imagine", mediaDir: "/srv/imagine/media" },
+    requestWithSession(),
+  );
+
+  assert.equal(result.deletedBoardCount, 2);
+  assert.equal(result.board.id, DEFAULT_BOARD_ID);
+  assert.equal(result.summary.id, DEFAULT_BOARD_ID);
+  assert.equal(result.version, 1);
+  assert.equal(queries.find(query => query.text.startsWith("delete from boards where workspace_id"))?.values?.[0], WORKSPACE_ID);
+  const auditQuery = queries.find(query => query.text.trim().startsWith("insert into audit_events"));
+  assert.deepEqual(auditQuery?.values, [
+    WORKSPACE_ID,
+    "user_1",
+    "team_boards.reset",
+    JSON.stringify({ defaultBoardId: DEFAULT_BOARD_ID, deletedBoardCount: 2 }),
+  ]);
+  assert.equal(queries.at(-1)?.text, "commit");
+});
+
+test("resetTeamBoards requires an admin-scoped session", async () => {
+  await assert.rejects(
+    () => resetTeamBoards(
+      createTeamBoardsQueryable([], { role: "editor" }),
+      { databaseUrl: "postgres://localhost/imagine", mediaDir: "/srv/imagine/media" },
+      requestWithSession(),
+    ),
+    (error: unknown) => error instanceof ApiError && error.status === 403 && error.code === "forbidden",
+  );
+});
+
 test("team board route rejects missing write versions before opening a database client", async () => {
   const originalEnv = {
     APP_URL: process.env.APP_URL,
@@ -221,7 +256,7 @@ test("team board route rejects missing write versions before opening a database 
   }
 });
 
-test("team board create and delete routes reject missing CSRF before opening a database client", async () => {
+test("team board create, reset, and delete routes reject missing CSRF before opening a database client", async () => {
   const originalEnv = {
     APP_URL: process.env.APP_URL,
     DATABASE_URL: process.env.DATABASE_URL,
@@ -241,6 +276,16 @@ test("team board create and delete routes reject missing CSRF before opening a d
     }));
     assert.equal(createResponse.status, 403);
     assert.deepEqual(await createResponse.json(), {
+      code: "invalid_csrf",
+      error: "Valid CSRF token is required",
+    });
+
+    const resetResponse = await resetTeamBoardsRoute(new Request("http://localhost:3000/api/storage/team/boards", {
+      headers: { origin: "http://localhost:3000" },
+      method: "DELETE",
+    }));
+    assert.equal(resetResponse.status, 403);
+    assert.deepEqual(await resetResponse.json(), {
       code: "invalid_csrf",
       error: "Valid CSRF token is required",
     });
@@ -278,6 +323,7 @@ function createTeamBoardsQueryable(
     conflictVersion?: number;
     deleteFound?: boolean;
     insertVersion?: number;
+    resetBoardCount?: number;
     role?: "owner" | "admin" | "editor" | "viewer";
     updateVersion?: number;
   } = {},
@@ -308,6 +354,12 @@ function createTeamBoardsQueryable(
         return typedQueryResult<T>(
           options.insertVersion === undefined ? [] : [{ version: options.insertVersion }],
         );
+      }
+      if (text.startsWith("select count(*) as board_count from boards")) {
+        return typedQueryResult<T>([{ board_count: options.resetBoardCount ?? 0 }]);
+      }
+      if (text.trim().startsWith("insert into audit_events")) {
+        return typedQueryResult<T>([]);
       }
       if (text.startsWith("select version from boards")) {
         return typedQueryResult<T>(
