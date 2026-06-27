@@ -73,7 +73,7 @@ test("saveTeamAssetLibraryRecord writes an editor-scoped library record", async 
   assert.deepEqual(insert?.values?.[3], record);
 });
 
-test("deleteTeamAssetLibraryRecord deletes dedicated backing assets only", async () => {
+test("deleteTeamAssetLibraryRecord deletes dedicated backing assets with audit", async () => {
   const dedicatedQueries: Array<{ text: string; values?: readonly unknown[] }> = [];
   await deleteTeamAssetLibraryRecord(
     createTeamAssetLibraryQueryable(dedicatedQueries, { role: "editor", dedicatedLibraryAsset: true }),
@@ -85,6 +85,16 @@ test("deleteTeamAssetLibraryRecord deletes dedicated backing assets only", async
     dedicatedQueries.find(query => query.text.startsWith("delete from assets"))?.values,
     [WORKSPACE_ID, ASSET_ID],
   );
+  assert.ok(dedicatedQueries.some(query => query.text === "begin"));
+  assert.ok(dedicatedQueries.some(query => query.text === "commit"));
+  assert.equal(dedicatedQueries.some(query => query.text === "rollback"), false);
+  const dedicatedAudit = dedicatedQueries.find(query => query.text.startsWith("insert into audit_events"));
+  assert.deepEqual(dedicatedAudit?.values, [
+    WORKSPACE_ID,
+    "user_1",
+    "team_asset_library.delete",
+    JSON.stringify({ assetId: ASSET_ID, deletedBackingAsset: true, itemId: LIBRARY_ITEM_ID }),
+  ]);
 
   const promotedQueries: Array<{ text: string; values?: readonly unknown[] }> = [];
   await deleteTeamAssetLibraryRecord(
@@ -98,6 +108,13 @@ test("deleteTeamAssetLibraryRecord deletes dedicated backing assets only", async
     promotedQueries.find(query => query.text.startsWith("delete from asset_library"))?.values,
     [WORKSPACE_ID, LIBRARY_ITEM_ID],
   );
+  const promotedAudit = promotedQueries.find(query => query.text.startsWith("insert into audit_events"));
+  assert.deepEqual(promotedAudit?.values, [
+    WORKSPACE_ID,
+    "user_1",
+    "team_asset_library.delete",
+    JSON.stringify({ assetId: ASSET_ID, deletedBackingAsset: false, itemId: LIBRARY_ITEM_ID }),
+  ]);
 });
 
 test("team asset library routes reject invalid inputs before opening a database client", async () => {
@@ -170,6 +187,9 @@ function createTeamAssetLibraryQueryable(
   return {
     query: async <T extends QueryResultRow = QueryResultRow>(text: string, values?: readonly unknown[]) => {
       queries.push({ text, values });
+      if (text === "begin" || text === "commit" || text === "rollback") {
+        return typedQueryResult<T>([]);
+      }
       if (text.includes("from sessions")) {
         return typedQueryResult<T>([{
           email: "viewer@example.com",
@@ -195,6 +215,9 @@ function createTeamAssetLibraryQueryable(
           storage_key: "originals/image/asset_1.png",
           storage_kind: "local-file",
         }]);
+      }
+      if (text.startsWith("insert into audit_events")) {
+        return typedQueryResult<T>([]);
       }
       return typedQueryResult<T>([]);
     },

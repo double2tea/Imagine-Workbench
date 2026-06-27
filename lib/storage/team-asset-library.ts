@@ -3,6 +3,7 @@ import type { LibraryAssetRecord } from "@/lib/db";
 import type { PostgresStorageConfig } from "@/lib/storage/postgres/config";
 import type { PostgresQueryable } from "@/lib/storage/postgres/connection";
 import type { WorkspaceStoragePageOptions } from "@/lib/storage/repository";
+import { recordTeamAuditEvent } from "@/lib/storage/team-audit";
 import { publicTeamAssetRecord } from "@/lib/storage/team-assets";
 import { createTeamWorkspaceStorageContext } from "@/lib/storage/team-context";
 import type {
@@ -59,11 +60,29 @@ export async function deleteTeamAssetLibraryRecord(
   const record = await context.repository.assetLibrary.get(itemId);
   if (!record) throw new ApiError(404, "team_asset_library_not_found", "Team library item was not found");
   const asset = await context.repository.assets.get(record.record.assetId);
-  if (asset?.meta.libraryItemId === itemId) {
-    await context.repository.assets.delete(record.record.assetId);
-    return;
+  const deletedBackingAsset = asset?.meta.libraryItemId === itemId;
+  await context.queryable.query("begin");
+  try {
+    if (deletedBackingAsset) {
+      await context.repository.assets.delete(record.record.assetId);
+    } else {
+      await context.repository.assetLibrary.delete(itemId);
+    }
+    await recordTeamAuditEvent(context.queryable, {
+      eventType: "team_asset_library.delete",
+      metadata: {
+        assetId: record.record.assetId,
+        deletedBackingAsset,
+        itemId,
+      },
+      userId: context.session.userId,
+      workspaceId: context.session.workspaceId,
+    });
+    await context.queryable.query("commit");
+  } catch (error) {
+    await context.queryable.query("rollback");
+    throw error;
   }
-  await context.repository.assetLibrary.delete(itemId);
 }
 
 async function publicTeamAssetLibraryEntry(

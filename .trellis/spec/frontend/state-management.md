@@ -624,6 +624,7 @@ if (requestToken !== setupToken) {
 - `POST` must verify `record.assetId` belongs to an asset in the caller workspace before writing the library record.
 - Promoted team library records may point directly at the source asset with `assetId === sourceAssetId`; deleting that library record must not delete the source asset.
 - Imported team library files create a dedicated backing asset with `meta.libraryItemId === record.id`; deleting that library item deletes the backing asset and relies on the database cascade to remove its library row.
+- Team asset-library deletes must write `team_asset_library.delete` with non-secret item id, asset id, and `deletedBackingAsset` metadata in the same transaction as the delete.
 - Missing CSRF on save/delete fails visibly; do not fall back to IndexedDB after PostgreSQL mode has been selected.
 
 #### 4. Validation & Error Matrix
@@ -646,7 +647,7 @@ if (requestToken !== setupToken) {
 
 - Service: list returns workspace-scoped entries with safe public payload metadata and no `uri`.
 - Service: save requires editor access, verifies the backing asset exists, and writes `asset_library`.
-- Service: delete removes only dedicated backing assets (`meta.libraryItemId === itemId`) and otherwise deletes only the library record.
+- Service: delete removes only dedicated backing assets (`meta.libraryItemId === itemId`) and otherwise deletes only the library record, with `team_asset_library.delete` audit metadata in the same transaction.
 - Route: invalid query/missing CSRF are rejected before opening a database client for mutating calls.
 - Client: list URL encodes filters, save/delete send CSRF headers, item IDs are encoded, and leaked payload `uri` fields are rejected.
 - Quality gates: `pnpm run typecheck`, `pnpm run lint`, `pnpm run test:providers`, and `pnpm run build`.
