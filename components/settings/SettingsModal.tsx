@@ -20,16 +20,21 @@ import {
 } from "@/lib/data-management";
 import {
   bootstrapTeamOwner,
+  createTeamMember,
+  deleteTeamMember,
   fetchTeamStorageHealth,
+  fetchTeamMembers,
   fetchTeamSession,
   loginTeamSession,
   logoutTeamSession,
   readTeamCsrfToken,
   fetchWorkspaceStorageRuntimeStatus,
   runTeamStorageMigrations,
+  updateTeamMemberRole,
   type TeamSessionContext,
   type TeamStorageHealth,
 } from "@/lib/storage/team-client";
+import type { ManageableTeamRole, PublicTeamMember } from "@/lib/storage/team-member-types";
 import type { PublicLocalStorageRuntimeStatus } from "@/lib/storage/local-public-runtime";
 
 export type { ProviderTestState };
@@ -102,6 +107,10 @@ function formatSettingsError(error: unknown, t: (key: string) => string): string
   return error instanceof Error && error.message.trim() ? error.message : t("modal.dataSummaryError");
 }
 
+function canManageTeamMembers(session: TeamSessionContext | null): boolean {
+  return session?.role === "owner" || session?.role === "admin";
+}
+
 export default function SettingsModal({
   audioModelGroups,
   chatModelGroups,
@@ -172,6 +181,12 @@ export default function SettingsModal({
   const [teamLoginPassword, setTeamLoginPassword] = useState("");
   const [teamBootstrapEmail, setTeamBootstrapEmail] = useState("");
   const [teamBootstrapPassword, setTeamBootstrapPassword] = useState("");
+  const [teamMembers, setTeamMembers] = useState<PublicTeamMember[]>([]);
+  const [teamMembersBusy, setTeamMembersBusy] = useState(false);
+  const [teamMembersError, setTeamMembersError] = useState<string | null>(null);
+  const [teamMemberEmail, setTeamMemberEmail] = useState("");
+  const [teamMemberPassword, setTeamMemberPassword] = useState("");
+  const [teamMemberRole, setTeamMemberRole] = useState<ManageableTeamRole>("editor");
   const tabs: Array<{ key: SettingsTab; label: string }> = [
     { key: "connections", label: t("tabs.connections") },
     { key: "feature-models", label: t("tabs.featureModels") },
@@ -195,6 +210,24 @@ export default function SettingsModal({
     }
   }, []);
 
+  const refreshTeamMembersForSession = useCallback(async (session: TeamSessionContext | null) => {
+    if (!canManageTeamMembers(session)) {
+      setTeamMembers([]);
+      setTeamMembersError(null);
+      return;
+    }
+    setTeamMembersBusy(true);
+    try {
+      setTeamMembersError(null);
+      setTeamMembers((await fetchTeamMembers()).members);
+    } catch (error) {
+      setTeamMembers([]);
+      setTeamMembersError(formatSettingsError(error, t));
+    } finally {
+      setTeamMembersBusy(false);
+    }
+  }, [t]);
+
   const refreshStorageStatus = useCallback(async () => {
     try {
       setStorageStatusError(null);
@@ -205,68 +238,82 @@ export default function SettingsModal({
         setTeamHealth(await fetchTeamStorageHealth());
         try {
           setTeamSessionError(null);
-          setTeamSession(await fetchTeamSession());
+          const session = await fetchTeamSession();
+          setTeamSession(session);
+          await refreshTeamMembersForSession(session);
         } catch (error) {
           setTeamSession(null);
+          await refreshTeamMembersForSession(null);
           setTeamSessionError(formatSettingsError(error, t));
         }
       } else {
         setTeamHealth(null);
         setTeamSession(null);
         setTeamSessionError(null);
+        await refreshTeamMembersForSession(null);
       }
     } catch (error) {
       setStorageStatus(null);
       setTeamHealth(null);
       setTeamSession(null);
+      await refreshTeamMembersForSession(null);
       setStorageStatusError(formatSettingsError(error, t));
     }
-  }, [t]);
+  }, [refreshTeamMembersForSession, t]);
 
   const refreshTeamSession = useCallback(async () => {
     setTeamSessionBusy(true);
     try {
       setTeamSessionError(null);
-      setTeamSession(await fetchTeamSession());
+      const session = await fetchTeamSession();
+      setTeamSession(session);
+      await refreshTeamMembersForSession(session);
     } catch (error) {
       setTeamSession(null);
+      await refreshTeamMembersForSession(null);
       setTeamSessionError(formatSettingsError(error, t));
     } finally {
       setTeamSessionBusy(false);
     }
-  }, [t]);
+  }, [refreshTeamMembersForSession, t]);
 
   const runTeamLogin = useCallback(async () => {
     setTeamSessionBusy(true);
     try {
       setTeamSessionError(null);
-      setTeamSession(await loginTeamSession({ email: teamLoginEmail, password: teamLoginPassword }));
+      const session = await loginTeamSession({ email: teamLoginEmail, password: teamLoginPassword });
+      setTeamSession(session);
+      await refreshTeamMembersForSession(session);
       setTeamLoginPassword("");
     } catch (error) {
       setTeamSession(null);
+      await refreshTeamMembersForSession(null);
       setTeamSessionError(formatSettingsError(error, t));
     } finally {
       setTeamSessionBusy(false);
     }
-  }, [t, teamLoginEmail, teamLoginPassword]);
+  }, [refreshTeamMembersForSession, t, teamLoginEmail, teamLoginPassword]);
 
   const runTeamBootstrap = useCallback(async () => {
     setTeamSessionBusy(true);
     try {
       setTeamSessionError(null);
-      setTeamSession(await bootstrapTeamOwner({
+      const session = await bootstrapTeamOwner({
         email: teamBootstrapEmail,
         password: teamBootstrapPassword,
         setupToken: teamSetupToken,
-      }));
+      });
+      setTeamSession(session);
+      await refreshTeamMembersForSession(session);
       setTeamBootstrapPassword("");
     } catch (error) {
       setTeamSession(null);
+      await refreshTeamMembersForSession(null);
       setTeamSessionError(formatSettingsError(error, t));
     } finally {
       setTeamSessionBusy(false);
     }
-  }, [t, teamBootstrapEmail, teamBootstrapPassword, teamSetupToken]);
+  }, [refreshTeamMembersForSession, t, teamBootstrapEmail, teamBootstrapPassword, teamSetupToken]);
 
   const runTeamLogout = useCallback(async () => {
     setTeamSessionBusy(true);
@@ -276,12 +323,47 @@ export default function SettingsModal({
       if (!csrfToken) throw new Error(t("dataManagement.teamSessionCsrfMissing"));
       await logoutTeamSession(csrfToken);
       setTeamSession(null);
+      await refreshTeamMembersForSession(null);
     } catch (error) {
       setTeamSessionError(formatSettingsError(error, t));
     } finally {
       setTeamSessionBusy(false);
     }
-  }, [t]);
+  }, [refreshTeamMembersForSession, t]);
+
+  const refreshTeamMembers = useCallback(async () => {
+    await refreshTeamMembersForSession(teamSession);
+  }, [refreshTeamMembersForSession, teamSession]);
+
+  const runCreateTeamMember = useCallback(async () => {
+    if (!teamSession) throw new Error(t("dataManagement.teamSessionRequired"));
+    const csrfToken = readTeamCsrfToken();
+    if (!csrfToken) throw new Error(t("dataManagement.teamSessionCsrfMissing"));
+    await createTeamMember({
+      email: teamMemberEmail,
+      password: teamMemberPassword,
+      role: teamMemberRole,
+    }, csrfToken);
+    setTeamMemberEmail("");
+    setTeamMemberPassword("");
+    await refreshTeamMembersForSession(teamSession);
+  }, [refreshTeamMembersForSession, t, teamMemberEmail, teamMemberPassword, teamMemberRole, teamSession]);
+
+  const runUpdateTeamMemberRole = useCallback(async (userId: string, role: ManageableTeamRole) => {
+    if (!teamSession) throw new Error(t("dataManagement.teamSessionRequired"));
+    const csrfToken = readTeamCsrfToken();
+    if (!csrfToken) throw new Error(t("dataManagement.teamSessionCsrfMissing"));
+    await updateTeamMemberRole(userId, role, csrfToken);
+    await refreshTeamMembersForSession(teamSession);
+  }, [refreshTeamMembersForSession, t, teamSession]);
+
+  const runDeleteTeamMember = useCallback(async (userId: string) => {
+    if (!teamSession) throw new Error(t("dataManagement.teamSessionRequired"));
+    const csrfToken = readTeamCsrfToken();
+    if (!csrfToken) throw new Error(t("dataManagement.teamSessionCsrfMissing"));
+    await deleteTeamMember(userId, csrfToken);
+    await refreshTeamMembersForSession(teamSession);
+  }, [refreshTeamMembersForSession, t, teamSession]);
 
   const runTeamMigrations = useCallback(async () => {
     setTeamMigrationBusy(true);
@@ -473,6 +555,12 @@ export default function SettingsModal({
                   teamSession={teamSession}
                   teamSessionBusy={teamSessionBusy}
                   teamSessionError={teamSessionError}
+                  teamMembers={teamMembers}
+                  teamMembersBusy={teamMembersBusy}
+                  teamMembersError={teamMembersError}
+                  teamMemberEmail={teamMemberEmail}
+                  teamMemberPassword={teamMemberPassword}
+                  teamMemberRole={teamMemberRole}
                   teamLoginEmail={teamLoginEmail}
                   teamLoginPassword={teamLoginPassword}
                   teamBootstrapEmail={teamBootstrapEmail}
@@ -491,6 +579,13 @@ export default function SettingsModal({
                   onRepairAssetSources={onRepairAssetSources}
                   onResetBoards={onResetBoards}
                   onRunTeamMigrations={runTeamMigrations}
+                  onRefreshTeamMembers={refreshTeamMembers}
+                  onCreateTeamMember={runCreateTeamMember}
+                  onDeleteTeamMember={runDeleteTeamMember}
+                  onTeamMemberEmailChange={setTeamMemberEmail}
+                  onTeamMemberPasswordChange={setTeamMemberPassword}
+                  onTeamMemberRoleChange={setTeamMemberRole}
+                  onUpdateTeamMemberRole={runUpdateTeamMemberRole}
                   onTeamSetupTokenChange={setTeamSetupToken}
                   onRefreshTeamSession={refreshTeamSession}
                   onTeamBootstrap={runTeamBootstrap}

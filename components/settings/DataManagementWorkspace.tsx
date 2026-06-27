@@ -13,6 +13,7 @@ import {
   Shield,
   Trash2,
   Upload,
+  UserPlus,
   Wrench,
 } from "lucide-react";
 import { useMemo, useRef, useState } from "react";
@@ -28,6 +29,7 @@ import {
 } from "@/lib/data-management";
 import type { PublicLocalStorageRuntimeStatus } from "@/lib/storage/local-public-runtime";
 import type { TeamSessionContext, TeamStorageHealth } from "@/lib/storage/team-client";
+import type { ManageableTeamRole, PublicTeamMember } from "@/lib/storage/team-member-types";
 import { getClearWorkspaceAssetsMessage } from "@/lib/workspace-messages";
 
 interface DataManagementWorkspaceProps {
@@ -43,6 +45,12 @@ interface DataManagementWorkspaceProps {
   teamSession: TeamSessionContext | null;
   teamSessionBusy: boolean;
   teamSessionError: string | null;
+  teamMembers: PublicTeamMember[];
+  teamMembersBusy: boolean;
+  teamMembersError: string | null;
+  teamMemberEmail: string;
+  teamMemberPassword: string;
+  teamMemberRole: ManageableTeamRole;
   teamLoginEmail: string;
   teamLoginPassword: string;
   teamBootstrapEmail: string;
@@ -61,6 +69,13 @@ interface DataManagementWorkspaceProps {
   onRepairAssetSources: () => Promise<void>;
   onResetBoards: () => Promise<void>;
   onRunTeamMigrations: () => Promise<void>;
+  onRefreshTeamMembers: () => Promise<void>;
+  onCreateTeamMember: () => Promise<void>;
+  onDeleteTeamMember: (userId: string) => Promise<void>;
+  onTeamMemberEmailChange: (value: string) => void;
+  onTeamMemberPasswordChange: (value: string) => void;
+  onTeamMemberRoleChange: (value: ManageableTeamRole) => void;
+  onUpdateTeamMemberRole: (userId: string, role: ManageableTeamRole) => Promise<void>;
   onRefreshTeamSession: () => Promise<void>;
   onTeamBootstrap: () => Promise<void>;
   onTeamBootstrapEmailChange: (value: string) => void;
@@ -156,6 +171,8 @@ const LOCAL_STORAGE_LABEL_BY_KIND: Record<LocalStorageCleanupKind, string> = {
   "ui-preferences": "dataManagement.localStorageLabels.uiPreferences",
 };
 
+const MANAGEABLE_TEAM_ROLES: ManageableTeamRole[] = ["admin", "editor", "viewer"];
+
 function buildRepairSourcesConfirmRequest(t: TranslateFn): ConfirmRequest {
   return {
     message: t("dataManagement.repairSourcesMessage"),
@@ -185,6 +202,25 @@ function buildLocalStorageConfirmRequest(kind: LocalStorageCleanupKind, t: Trans
     tone: "danger",
     confirmLabel: t("dataManagement.cleanupConfirmLabel"),
   };
+}
+
+function buildTeamMemberDeleteConfirmRequest(email: string, t: TranslateFn): ConfirmRequest {
+  return {
+    message: t("dataManagement.teamMemberDeleteConfirm", { email }),
+    tone: "danger",
+    confirmLabel: t("dataManagement.teamMemberDelete"),
+  };
+}
+
+function teamRoleLabel(role: PublicTeamMember["role"], t: TranslateFn): string {
+  if (role === "owner") return t("dataManagement.teamMemberRoleOwner");
+  if (role === "admin") return t("dataManagement.teamMemberRoleAdmin");
+  if (role === "editor") return t("dataManagement.teamMemberRoleEditor");
+  return t("dataManagement.teamMemberRoleViewer");
+}
+
+function isManageableTeamRole(value: string): value is ManageableTeamRole {
+  return value === "admin" || value === "editor" || value === "viewer";
 }
 
 function formatPercent(value: number | undefined): string {
@@ -250,6 +286,12 @@ export default function DataManagementWorkspace({
   teamSession,
   teamSessionBusy,
   teamSessionError,
+  teamMembers,
+  teamMembersBusy,
+  teamMembersError,
+  teamMemberEmail,
+  teamMemberPassword,
+  teamMemberRole,
   teamLoginEmail,
   teamLoginPassword,
   teamBootstrapEmail,
@@ -268,6 +310,13 @@ export default function DataManagementWorkspace({
   onRepairAssetSources,
   onResetBoards,
   onRunTeamMigrations,
+  onRefreshTeamMembers,
+  onCreateTeamMember,
+  onDeleteTeamMember,
+  onTeamMemberEmailChange,
+  onTeamMemberPasswordChange,
+  onTeamMemberRoleChange,
+  onUpdateTeamMemberRole,
   onRefreshTeamSession,
   onTeamBootstrap,
   onTeamBootstrapEmailChange,
@@ -330,9 +379,10 @@ export default function DataManagementWorkspace({
   const assetStores = assetSummary?.stores;
   const latestSafetySnapshot = summary?.safety.latestSnapshot ?? null;
   const health = healthCopy(integrity?.status, t);
-  const actionDisabled = busyLabel !== null || teamMigrationBusy || teamSessionBusy;
+  const actionDisabled = busyLabel !== null || teamMigrationBusy || teamSessionBusy || teamMembersBusy;
   const isTeamStorageMode = storageStatus?.mode === "postgres";
   const hasPendingTeamMigrations = (teamHealth?.migrationStatus?.pendingMigrationIds.length ?? 0) > 0;
+  const canManageTeamMembers = teamSession?.role === "owner" || teamSession?.role === "admin";
 
   const issueGroups = useMemo<HealthIssueGroup[]>(() => {
     if (!integrity) return [];
@@ -580,19 +630,155 @@ export default function DataManagementWorkspace({
                 </button>
               </div>
               {teamSession ? (
-                <div className="mt-3 flex flex-wrap items-center gap-2">
-                  <div className="rounded-md border border-[var(--iw-border)] px-2 py-1">
-                    <p className="text-[10px] text-[var(--iw-faint)]">{t("dataManagement.teamSessionWorkspace")}</p>
-                    <p className="font-mono text-[11px] text-[var(--iw-text)]">{teamSession.workspaceId}</p>
+                <div className="mt-3 space-y-3">
+                  <div className="flex flex-wrap items-center gap-2">
+                    <div className="rounded-md border border-[var(--iw-border)] px-2 py-1">
+                      <p className="text-[10px] text-[var(--iw-faint)]">{t("dataManagement.teamSessionWorkspace")}</p>
+                      <p className="font-mono text-[11px] text-[var(--iw-text)]">{teamSession.workspaceId}</p>
+                    </div>
+                    <button
+                      type="button"
+                      disabled={actionDisabled}
+                      onClick={() => void runAction(t("dataManagement.teamLogoutBusy"), onTeamLogout)}
+                      className="imagine-secondary-action h-8 rounded-md border border-[var(--iw-border)] px-2 text-[10px] font-semibold text-[var(--iw-text)] disabled:opacity-50"
+                    >
+                      {t("dataManagement.teamLogout")}
+                    </button>
                   </div>
-                  <button
-                    type="button"
-                    disabled={actionDisabled}
-                    onClick={() => void runAction(t("dataManagement.teamLogoutBusy"), onTeamLogout)}
-                    className="imagine-secondary-action h-8 rounded-md border border-[var(--iw-border)] px-2 text-[10px] font-semibold text-[var(--iw-text)] disabled:opacity-50"
-                  >
-                    {t("dataManagement.teamLogout")}
-                  </button>
+
+                  {canManageTeamMembers ? (
+                    <div className="rounded-md border border-[var(--iw-border)] p-2">
+                      <div className="flex flex-wrap items-start justify-between gap-2">
+                        <div>
+                          <p className="flex items-center gap-2 text-[10px] font-semibold uppercase text-[var(--iw-faint)]">
+                            <UserPlus className="imagine-tone-icon h-3.5 w-3.5" data-tone="accent" />
+                            {t("dataManagement.teamMembers")}
+                          </p>
+                          <p className="mt-1 text-[11px] leading-5 text-[var(--iw-muted)]">
+                            {teamMembersError
+                              ? t("dataManagement.teamMembersError", { error: teamMembersError })
+                              : t("dataManagement.teamMembersCount", { count: teamMembers.length })}
+                          </p>
+                        </div>
+                        <button
+                          type="button"
+                          disabled={actionDisabled}
+                          onClick={() => void runAction(t("dataManagement.teamMembersRefreshing"), onRefreshTeamMembers)}
+                          className="imagine-secondary-action h-8 rounded-md border border-[var(--iw-border)] px-2 text-[10px] font-semibold text-[var(--iw-text)] disabled:opacity-50"
+                        >
+                          {t("dataManagement.teamMembersRefresh")}
+                        </button>
+                      </div>
+
+                      {teamMembersError ? (
+                        <div className="mt-2 rounded-md border border-rose-500/30 bg-rose-500/10 px-2 py-1 text-[10px] leading-5 text-rose-200">
+                          {t("dataManagement.teamMembersError", { error: teamMembersError })}
+                        </div>
+                      ) : null}
+
+                      {teamMembers.length > 0 ? (
+                        <div className="mt-2 max-h-56 space-y-1 overflow-y-auto">
+                          {teamMembers.map(member => {
+                            const locked = member.role === "owner" || member.userId === teamSession.userId;
+                            return (
+                              <div key={member.userId} className="flex flex-wrap items-center justify-between gap-2 rounded-md border border-[var(--iw-border)] px-2 py-1.5">
+                                <div className="min-w-0">
+                                  <p className="truncate text-[11px] font-semibold text-[var(--iw-text)]">{member.email}</p>
+                                  <p className="font-mono text-[10px] text-[var(--iw-faint)]">{member.userId}</p>
+                                </div>
+                                <div className="flex items-center gap-2">
+                                  {locked || !isManageableTeamRole(member.role) ? (
+                                    <span className="rounded-md border border-[var(--iw-border)] px-2 py-1 text-[10px] text-[var(--iw-muted)]">
+                                      {teamRoleLabel(member.role, t)}
+                                    </span>
+                                  ) : (
+                                    <select
+                                      value={member.role}
+                                      disabled={actionDisabled}
+                                      onChange={event => {
+                                        const nextRole = event.target.value;
+                                        if (!isManageableTeamRole(nextRole) || nextRole === member.role) return;
+                                        void runAction(t("dataManagement.teamMemberUpdateBusy"), () => onUpdateTeamMemberRole(member.userId, nextRole));
+                                      }}
+                                      className="imagine-select h-8 px-2 py-0 text-[10px]"
+                                      aria-label={t("dataManagement.teamMemberRoleAriaLabel", { email: member.email })}
+                                    >
+                                      {MANAGEABLE_TEAM_ROLES.map(role => (
+                                        <option key={role} value={role}>{teamRoleLabel(role, t)}</option>
+                                      ))}
+                                    </select>
+                                  )}
+                                  {!locked ? (
+                                    <button
+                                      type="button"
+                                      disabled={actionDisabled}
+                                      onClick={() => void runConfirmedAction(
+                                        t("dataManagement.teamMemberDeleteBusy"),
+                                        buildTeamMemberDeleteConfirmRequest(member.email, t),
+                                        () => onDeleteTeamMember(member.userId),
+                                      )}
+                                      className="imagine-danger-action flex h-8 w-8 items-center justify-center rounded-md disabled:opacity-50"
+                                      aria-label={t("dataManagement.teamMemberDeleteAriaLabel", { email: member.email })}
+                                    >
+                                      <Trash2 className="h-3.5 w-3.5" />
+                                    </button>
+                                  ) : null}
+                                </div>
+                              </div>
+                            );
+                          })}
+                        </div>
+                      ) : (
+                        <p className="mt-2 rounded-md border border-[var(--iw-border)] px-2 py-1.5 text-[11px] text-[var(--iw-muted)]">
+                          {t("dataManagement.teamMembersEmpty")}
+                        </p>
+                      )}
+
+                      <form
+                        className="mt-3 border-t border-[var(--iw-border)] pt-3"
+                        onSubmit={event => {
+                          event.preventDefault();
+                          void runAction(t("dataManagement.teamMemberCreateBusy"), onCreateTeamMember);
+                        }}
+                      >
+                        <div className="flex flex-wrap items-center gap-2">
+                          <input
+                            type="email"
+                            value={teamMemberEmail}
+                            onChange={event => onTeamMemberEmailChange(event.target.value)}
+                            placeholder={t("dataManagement.teamMemberEmailPlaceholder")}
+                            className="h-9 min-w-56 rounded-lg border border-[var(--iw-border)] bg-[var(--iw-panel)] px-3 text-[11px] text-[var(--iw-text)] outline-none focus:border-[var(--iw-accent)]"
+                          />
+                          <input
+                            type="password"
+                            value={teamMemberPassword}
+                            onChange={event => onTeamMemberPasswordChange(event.target.value)}
+                            placeholder={t("dataManagement.teamMemberPasswordPlaceholder")}
+                            className="h-9 min-w-56 rounded-lg border border-[var(--iw-border)] bg-[var(--iw-panel)] px-3 text-[11px] text-[var(--iw-text)] outline-none focus:border-[var(--iw-accent)]"
+                          />
+                          <select
+                            value={teamMemberRole}
+                            onChange={event => {
+                              if (isManageableTeamRole(event.target.value)) onTeamMemberRoleChange(event.target.value);
+                            }}
+                            className="imagine-select h-9 px-2 py-0 text-[11px]"
+                            aria-label={t("dataManagement.teamMemberNewRoleAriaLabel")}
+                          >
+                            {MANAGEABLE_TEAM_ROLES.map(role => (
+                              <option key={role} value={role}>{teamRoleLabel(role, t)}</option>
+                            ))}
+                          </select>
+                          <button
+                            type="submit"
+                            disabled={actionDisabled || !teamMemberEmail.trim() || teamMemberPassword.length < 12}
+                            className="imagine-secondary-action h-9 rounded-lg border border-[var(--iw-border)] px-3 text-[11px] font-semibold text-[var(--iw-text)] disabled:opacity-50"
+                          >
+                            {t("dataManagement.teamMemberCreate")}
+                          </button>
+                        </div>
+                      </form>
+                    </div>
+                  ) : null}
                 </div>
               ) : (
                 <div className="mt-3 space-y-3">

@@ -4,9 +4,12 @@ import type { BoardDocument, BoardSummary } from "../lib/board/types";
 
 import {
   bootstrapTeamOwner,
+  createTeamMember,
+  deleteTeamMember,
   createTeamBoardDocument,
   deleteTeamBoardDocument,
   fetchTeamBoardDocument,
+  fetchTeamMembers,
   fetchTeamAssets,
   fetchTeamBoardSummaries,
   fetchTeamStorageHealth,
@@ -16,6 +19,7 @@ import {
   readTeamCsrfToken,
   saveTeamBoardDocument,
   teamAssetMediaUrl,
+  updateTeamMemberRole,
   fetchWorkspaceStorageRuntimeStatus,
   runTeamStorageMigrations,
 } from "../lib/storage/team-client";
@@ -264,6 +268,84 @@ test("team board document client rejects secret-bearing board responses", async 
   );
 });
 
+test("team member client lists and mutates members with CSRF headers", async () => {
+  let listUrl = "";
+  const memberList = await fetchTeamMembers(async input => {
+    listUrl = String(input);
+    return jsonResponse({
+      members: [createTeamMemberRecord()],
+      targetKind: "postgres",
+      workspaceId: "workspace_1",
+    });
+  });
+  assert.equal(listUrl, "/api/storage/team/members");
+  assert.equal(memberList.members[0]?.email, "editor@example.com");
+
+  let createCsrfHeader: string | null = null;
+  let createBody = "";
+  const created = await createTeamMember({
+    email: "editor@example.com",
+    password: "a long member password",
+    role: "editor",
+  }, "csrf-token", async (input, init) => {
+    assert.equal(String(input), "/api/storage/team/members");
+    assert.equal(init?.method, "POST");
+    createBody = String(init?.body ?? "");
+    createCsrfHeader = new Headers(init?.headers).get("x-imagine-csrf-token");
+    return jsonResponse({
+      member: createTeamMemberRecord(),
+      targetKind: "postgres",
+      workspaceId: "workspace_1",
+    }, { status: 201 });
+  });
+  assert.equal(created.member.role, "editor");
+  assert.equal(createCsrfHeader, "csrf-token");
+  assert.deepEqual(JSON.parse(createBody), {
+    email: "editor@example.com",
+    password: "a long member password",
+    role: "editor",
+  });
+
+  let updateCsrfHeader: string | null = null;
+  let updateBody = "";
+  const updated = await updateTeamMemberRole("user_2", "viewer", "csrf-token", async (input, init) => {
+    assert.equal(String(input), "/api/storage/team/members/user_2");
+    assert.equal(init?.method, "PATCH");
+    updateBody = String(init?.body ?? "");
+    updateCsrfHeader = new Headers(init?.headers).get("x-imagine-csrf-token");
+    return jsonResponse({
+      member: createTeamMemberRecord({ role: "viewer" }),
+      targetKind: "postgres",
+      workspaceId: "workspace_1",
+    });
+  });
+  assert.equal(updated.member.role, "viewer");
+  assert.equal(updateCsrfHeader, "csrf-token");
+  assert.deepEqual(JSON.parse(updateBody), { role: "viewer" });
+
+  let deleteCsrfHeader: string | null = null;
+  await deleteTeamMember("user_2", "csrf-token", async (input, init) => {
+    assert.equal(String(input), "/api/storage/team/members/user_2");
+    assert.equal(init?.method, "DELETE");
+    deleteCsrfHeader = new Headers(init?.headers).get("x-imagine-csrf-token");
+    return jsonResponse({ ok: true });
+  });
+  assert.equal(deleteCsrfHeader, "csrf-token");
+
+  await assert.rejects(
+    createTeamMember({ email: "editor@example.com", password: "a long member password", role: "editor" }, " "),
+    /CSRF token is required/,
+  );
+  await assert.rejects(
+    updateTeamMemberRole("user_2", "viewer", " "),
+    /CSRF token is required/,
+  );
+  await assert.rejects(
+    deleteTeamMember("user_2", " "),
+    /CSRF token is required/,
+  );
+});
+
 test("fetchTeamStorageHealth surfaces server errors without exposing config values", async () => {
   await assert.rejects(
     fetchTeamStorageHealth(async () => jsonResponse({
@@ -311,6 +393,15 @@ function createBoardDocument(options: { includeSecret?: boolean } = {}): BoardDo
     title: "Shared Board",
     updatedAt: "2026-06-26T01:00:00.000Z",
     viewport: { x: 0, y: 0, zoom: 1 },
+  };
+}
+
+function createTeamMemberRecord(options: { role?: "owner" | "admin" | "editor" | "viewer" } = {}) {
+  return {
+    createdAt: "2026-06-27T00:00:00.000Z",
+    email: "editor@example.com",
+    role: options.role ?? "editor",
+    userId: "user_2",
   };
 }
 

@@ -6,6 +6,12 @@ import type { PublicLocalStorageRuntimeStatus } from "@/lib/storage/local-public
 import type { WORKSPACE_STORAGE_SCHEMA_VERSION } from "@/lib/storage/schema";
 import type { PublicTeamAssetPayload, PublicTeamAssetRecord, TeamAssetListResult } from "@/lib/storage/team-asset-types";
 import type { TeamBoardDocumentResult, TeamBoardSummaryListResult } from "@/lib/storage/team-board-types";
+import type {
+  ManageableTeamRole,
+  PublicTeamMember,
+  TeamMemberListResult,
+  TeamMemberMutationResult,
+} from "@/lib/storage/team-member-types";
 
 export interface TeamStorageMigrationStatus {
   appliedMigrationIds: string[];
@@ -48,6 +54,12 @@ export interface TeamBootstrapOwnerInput {
   email: string;
   password: string;
   setupToken: string;
+}
+
+export interface CreateTeamMemberInput {
+  email: string;
+  password: string;
+  role: ManageableTeamRole;
 }
 
 export interface TeamAssetListOptions {
@@ -115,6 +127,84 @@ export async function fetchTeamSession(fetcher: Fetcher = fetch): Promise<TeamSe
     throw new Error(error);
   }
   return parseTeamSessionContext(body);
+}
+
+export async function fetchTeamMembers(fetcher: Fetcher = fetch): Promise<TeamMemberListResult> {
+  const response = await fetcher(API_ROUTES.storage.teamMembers, { cache: "no-store" });
+  const body: unknown = await response.json();
+  if (!response.ok) {
+    const error = readStringField(body, "error") ?? "Team member list failed";
+    throw new Error(error);
+  }
+  return parseTeamMemberListResult(body);
+}
+
+export async function createTeamMember(
+  input: CreateTeamMemberInput,
+  csrfToken: string,
+  fetcher: Fetcher = fetch,
+): Promise<TeamMemberMutationResult> {
+  const token = csrfToken.trim();
+  if (!token) throw new Error("CSRF token is required");
+  const response = await fetcher(API_ROUTES.storage.teamMembers, {
+    cache: "no-store",
+    body: JSON.stringify(input),
+    headers: {
+      "content-type": "application/json",
+      "x-imagine-csrf-token": token,
+    },
+    method: "POST",
+  });
+  const body: unknown = await response.json();
+  if (!response.ok) {
+    const error = readStringField(body, "error") ?? "Team member create failed";
+    throw new Error(error);
+  }
+  return parseTeamMemberMutationResult(body);
+}
+
+export async function updateTeamMemberRole(
+  userId: string,
+  role: ManageableTeamRole,
+  csrfToken: string,
+  fetcher: Fetcher = fetch,
+): Promise<TeamMemberMutationResult> {
+  const token = csrfToken.trim();
+  if (!token) throw new Error("CSRF token is required");
+  const response = await fetcher(API_ROUTES.storage.teamMember(userId), {
+    cache: "no-store",
+    body: JSON.stringify({ role }),
+    headers: {
+      "content-type": "application/json",
+      "x-imagine-csrf-token": token,
+    },
+    method: "PATCH",
+  });
+  const body: unknown = await response.json();
+  if (!response.ok) {
+    const error = readStringField(body, "error") ?? "Team member update failed";
+    throw new Error(error);
+  }
+  return parseTeamMemberMutationResult(body);
+}
+
+export async function deleteTeamMember(
+  userId: string,
+  csrfToken: string,
+  fetcher: Fetcher = fetch,
+): Promise<void> {
+  const token = csrfToken.trim();
+  if (!token) throw new Error("CSRF token is required");
+  const response = await fetcher(API_ROUTES.storage.teamMember(userId), {
+    cache: "no-store",
+    headers: { "x-imagine-csrf-token": token },
+    method: "DELETE",
+  });
+  const body: unknown = await response.json();
+  if (!response.ok) {
+    const error = readStringField(body, "error") ?? "Team member delete failed";
+    throw new Error(error);
+  }
 }
 
 export async function fetchTeamAssets(
@@ -328,6 +418,16 @@ function parseTeamSessionContext(value: unknown): TeamSessionContext {
   return value as unknown as TeamSessionContext;
 }
 
+function parseTeamMemberListResult(value: unknown): TeamMemberListResult {
+  if (!isTeamMemberListResult(value)) throw new Error("Team member list response is invalid");
+  return value;
+}
+
+function parseTeamMemberMutationResult(value: unknown): TeamMemberMutationResult {
+  if (!isTeamMemberMutationResult(value)) throw new Error("Team member response is invalid");
+  return value;
+}
+
 function parseTeamAssetListResult(value: unknown): TeamAssetListResult {
   if (!isTeamAssetListResult(value)) throw new Error("Team asset list response is invalid");
   return value;
@@ -427,6 +527,35 @@ function isTeamBoardDocumentResult(value: unknown): value is TeamBoardDocumentRe
   );
 }
 
+function isTeamMemberListResult(value: unknown): value is TeamMemberListResult {
+  if (!isRecord(value)) return false;
+  return (
+    value.targetKind === "postgres" &&
+    typeof value.workspaceId === "string" &&
+    Array.isArray(value.members) &&
+    value.members.every(isPublicTeamMember)
+  );
+}
+
+function isTeamMemberMutationResult(value: unknown): value is TeamMemberMutationResult {
+  if (!isRecord(value)) return false;
+  return (
+    value.targetKind === "postgres" &&
+    typeof value.workspaceId === "string" &&
+    isPublicTeamMember(value.member)
+  );
+}
+
+function isPublicTeamMember(value: unknown): value is PublicTeamMember {
+  if (!isRecord(value)) return false;
+  return (
+    typeof value.createdAt === "string" &&
+    typeof value.email === "string" &&
+    isTeamRole(value.role) &&
+    typeof value.userId === "string"
+  );
+}
+
 function isPublicTeamAssetRecord(value: unknown): value is PublicTeamAssetRecord {
   if (!isRecord(value)) return false;
   const payload = value.payload;
@@ -490,6 +619,10 @@ function isBoardDocument(value: unknown): value is BoardDocument {
 function isPublicTeamBoardNode(value: unknown): boolean {
   if (!isRecord(value)) return false;
   return value.kind !== "runninghub-app" || !("accessPassword" in value);
+}
+
+function isTeamRole(value: unknown): value is TeamSessionContext["role"] {
+  return value === "owner" || value === "admin" || value === "editor" || value === "viewer";
 }
 
 function isStorageItemStatus(value: unknown): value is StorageItemMeta["status"] {

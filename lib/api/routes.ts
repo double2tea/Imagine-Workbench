@@ -31,6 +31,8 @@ export const API_ROUTES = {
     teamAssets: "/api/storage/team/assets",
     teamBoards: "/api/storage/team/boards",
     teamBoard: (boardId: string) => `/api/storage/team/boards/${encodeURIComponent(boardId)}`,
+    teamMembers: "/api/storage/team/members",
+    teamMember: (userId: string) => `/api/storage/team/members/${encodeURIComponent(userId)}`,
     teamAssetMedia: (assetId: string, options: { download?: boolean } = {}) => {
       const url = `/api/storage/team/assets/${encodeURIComponent(assetId)}/media`;
       return options.download ? `${url}?download=1` : url;
