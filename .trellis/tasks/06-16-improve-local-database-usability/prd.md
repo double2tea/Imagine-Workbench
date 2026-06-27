@@ -119,12 +119,12 @@ Completed in the latest continuation:
 * Promoted the PostgreSQL storage adapter from planned to active now that the team storage vertical slices are implemented, and tightened the adapter test so only IndexedDB and PostgreSQL are exposed with no planned SQLite/local-folder/remote-api targets.
 * Migrated pnpm build-script approvals from ignored `package.json.pnpm.onlyBuiltDependencies` to `pnpm-workspace.yaml` `allowBuilds`, restoring clean pnpm 11 installs/checks after dependency rebuilds.
 * Added a compact active storage-mode badge to the main workspace and board top bars so users can see whether the current workspace is using IndexedDB or PostgreSQL without opening Settings -> Data.
+* Restored Cloudflare Pages verification for the current checkpoint. `scripts/build-cloudflare-pages.mjs` now hides all `runtime = "nodejs"` route entry files during the adapter build, restores them in `finally`, avoids recursive deletion of heavy `.next` standalone output, and `CI=true pnpm run pages:build` passes with only edge/static routes in the Pages output.
 
 Still remaining before the full PRD can be considered complete:
 
 * Broader operational hardening beyond setup-token/login rate limiting.
 * Residual team settings surfaces outside Provider Settings and deployment/upgrade/rollback automation depth.
-* Cloudflare Pages build verification for the current checkpoint.
 
 ## Requirements
 
@@ -221,7 +221,7 @@ Still remaining before the full PRD can be considered complete:
 * [x] Configurable media/upload limits protect local disk usage and produce visible errors when exceeded.
 * [x] Data health detects PostgreSQL/media consistency issues: DB ref without file, file without DB ref, stale tmp, stale trash, stale preview, and failed task records.
 * [x] Settings -> Data reports PostgreSQL mode health, storage counts, and actionable maintenance states.
-* [ ] PostgreSQL routes and driver imports are Node-only and do not break Cloudflare Pages/public builds.
+* [x] PostgreSQL routes and driver imports are Node-only and do not break Cloudflare Pages/public builds.
 * [x] PostgreSQL connections use a bounded server-side pool with configured timeouts; health checks fail visibly when the pool/database is unavailable.
 * [ ] Storage-focused tests cover migrations, CRUD, payload refs, hosted/browser mode, PostgreSQL fail-fast config errors, explicit migration, backup/restore target selection, authz role checks, config hiding, and CSRF/origin rejection.
 * [x] `pnpm run lint` and `pnpm run typecheck` pass.
@@ -725,4 +725,4 @@ Suggested implementation order is 1 -> 2 -> 3 -> 4 -> 5 -> 6 -> 7 -> 8. Tasks 4 
 * Use a bounded `pg` connection pool with explicit max connections, idle timeout, and connection timeout. Do not create per-request clients without pooling.
 * Avoid adding an ORM in the first implementation unless a later task explicitly chooses one.
 * Existing `lib/storage/schema.ts` and `lib/storage/repository.ts` should be evolved rather than bypassed.
-* Existing `scripts/build-cloudflare-pages.mjs` already excludes local-only Node routes; PostgreSQL local-only routes may need the same treatment.
+* `scripts/build-cloudflare-pages.mjs` automatically hides `app/**/route.ts` files that declare `export const runtime = "nodejs"` before invoking `@cloudflare/next-on-pages`, then restores them in `finally`. This keeps PostgreSQL/team and other local-only Node routes out of Cloudflare Pages builds without changing their local/self-hosted runtime behavior.
