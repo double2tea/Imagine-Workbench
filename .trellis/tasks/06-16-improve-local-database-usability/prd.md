@@ -114,6 +114,7 @@ Completed in the latest continuation:
 * Hardened PostgreSQL health checks for media-volume access. `/api/storage/team/health` now verifies `IMAGINE_MEDIA_DIR` exists, is a directory, and is readable/writable before reporting `reachable: true`, while keeping absolute media paths out of error responses.
 * Added a consistent snapshot boundary for PostgreSQL team ZIP export. `/api/storage/team/backup` now builds the export inside a `repeatable read read only` transaction, records `team_backup.export` only after the snapshot commits, and deployment docs distinguish this in-app snapshot from manual `pg_dump` + media archive backups that still require a quiet point.
 * Extended setup-token brute-force protection to PostgreSQL migrations. `/api/storage/team/migrations` now rate-limits invalid `x-imagine-setup-token` attempts with generic errors before database access, using a separate migrations scope from first-owner bootstrap.
+* Hardened the PostgreSQL migration request boundary. `/api/storage/team/migrations` now rejects untrusted origins before setup-token validation, matching the rest of the team-mode mutating route surface.
 
 Still remaining before the full PRD can be considered complete:
 

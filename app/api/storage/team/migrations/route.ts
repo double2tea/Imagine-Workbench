@@ -6,6 +6,7 @@ import {
   resolvePostgresStorageConfig,
 } from "@/lib/storage/postgres/config";
 import { applyPostgresMigrations } from "@/lib/storage/postgres/migrations";
+import { assertTrustedTeamRequestOrigin } from "@/lib/storage/team-auth";
 import {
   assertTeamRateLimit,
   clearTeamRateLimit,
@@ -19,6 +20,10 @@ export const dynamic = "force-dynamic";
 
 export async function POST(request: Request): Promise<Response> {
   try {
+    assertTrustedTeamRequestOrigin(request, {
+      APP_URL: process.env.APP_URL,
+      IMAGINE_TRUSTED_ORIGINS: process.env.IMAGINE_TRUSTED_ORIGINS,
+    });
     const rateLimitKey = teamRequestRateLimitKey(request, "team-migrations");
     assertTeamRateLimit(rateLimitKey, TEAM_MIGRATION_RATE_LIMIT);
     assertMigrationSetupToken(process.env.IMAGINE_TEAM_SETUP_TOKEN, request.headers.get("x-imagine-setup-token"), rateLimitKey);
