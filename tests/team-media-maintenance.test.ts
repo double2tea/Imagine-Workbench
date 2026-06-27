@@ -45,6 +45,7 @@ test("cleanupTeamMediaMaintenance requires admin and removes only maintenance fi
 
     assert.deepEqual(result, {
       deletedFiles: 4,
+      deletedMissingPayloadAssets: 0,
       deletedOrphanedPayloadFiles: 1,
       deletedOrphanedPreviewFiles: 1,
       deletedTmpFiles: 1,
@@ -57,6 +58,51 @@ test("cleanupTeamMediaMaintenance requires admin and removes only maintenance fi
     assert.equal(await fileExists(mediaDir, "previews/image/kept.webp"), true);
     assert.equal(await fileExists(mediaDir, "originals/image/orphan.png"), false);
     assert.equal(await fileExists(mediaDir, "previews/image/orphan.webp"), false);
+    assert.deepEqual(
+      queries.find(query => query.text.startsWith("insert into audit_events"))?.values?.slice(0, 3),
+      [WORKSPACE_ID, "user_1", "team_media.cleanup"],
+    );
+  });
+});
+
+test("cleanupTeamMediaMaintenance deletes asset rows with missing payload files", async () => {
+  await withTempMediaDir(async mediaDir => {
+    await writeMediaFile(mediaDir, "originals/image/kept.png");
+
+    const queries: Array<{ text: string; values?: readonly unknown[] }> = [];
+    const result = await cleanupTeamMediaMaintenance(
+      createTeamMediaMaintenanceQueryable(
+        queries,
+        "admin",
+        [
+          { asset_id: "asset_kept", storage_key: "originals/image/kept.png", storage_kind: "local-file" },
+          { asset_id: "asset_missing", storage_key: "originals/image/missing.png", storage_kind: "local-file" },
+          { asset_id: "asset_remote", storage_key: "https://example.com/media.png", storage_kind: "remote-url" },
+        ],
+      ),
+      { databaseUrl: "postgres://localhost/imagine", mediaDir },
+      requestWithSession(),
+      "missing-payload-assets",
+    );
+
+    assert.deepEqual(result, {
+      deletedFiles: 0,
+      deletedMissingPayloadAssets: 1,
+      deletedOrphanedPayloadFiles: 0,
+      deletedOrphanedPreviewFiles: 0,
+      deletedTmpFiles: 0,
+      deletedTrashFiles: 0,
+      target: "missing-payload-assets",
+      targetKind: "postgres",
+      workspaceId: WORKSPACE_ID,
+    });
+    assert.ok(queries.some(query => query.text === "begin"));
+    assert.ok(queries.some(query => query.text === "commit"));
+    assert.equal(queries.some(query => query.text === "rollback"), false);
+    assert.deepEqual(
+      queries.filter(query => query.text.startsWith("delete from assets")).map(query => query.values),
+      [[WORKSPACE_ID, "asset_missing"]],
+    );
     assert.deepEqual(
       queries.find(query => query.text.startsWith("insert into audit_events"))?.values?.slice(0, 3),
       [WORKSPACE_ID, "user_1", "team_media.cleanup"],
@@ -114,10 +160,20 @@ function requestWithSession(): Request {
 function createTeamMediaMaintenanceQueryable(
   queries: Array<{ text: string; values?: readonly unknown[] }> = [],
   role: "admin" | "viewer" = "admin",
+  payloadRows: QueryResultRow[] = [{
+    asset_id: "asset_kept",
+    storage_key: "originals/image/kept.png",
+    storage_kind: "local-file",
+  }],
+  previewRows: QueryResultRow[] = [{
+    storage_key: "previews/image/kept.webp",
+    storage_kind: "local-file",
+  }],
 ): PostgresQueryable {
   return {
     query: async <T extends QueryResultRow = QueryResultRow>(text: string, values?: readonly unknown[]) => {
       queries.push({ text, values });
+      if (text === "begin" || text === "commit" || text === "rollback") return typedQueryResult<T>([]);
       if (text.includes("from sessions")) {
         return typedQueryResult<T>([{
           email: "admin@example.com",
@@ -130,16 +186,10 @@ function createTeamMediaMaintenanceQueryable(
         }]);
       }
       if (text.includes("from asset_payloads")) {
-        return typedQueryResult<T>([{
-          storage_key: "originals/image/kept.png",
-          storage_kind: "local-file",
-        }]);
+        return typedQueryResult<T>(payloadRows);
       }
       if (text.includes("from asset_previews")) {
-        return typedQueryResult<T>([{
-          storage_key: "previews/image/kept.webp",
-          storage_kind: "local-file",
-        }]);
+        return typedQueryResult<T>(previewRows);
       }
       return typedQueryResult<T>([]);
     },

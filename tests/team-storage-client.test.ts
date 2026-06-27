@@ -216,6 +216,7 @@ test("cleanupTeamMediaMaintenance posts target and CSRF token", async () => {
     requestedInit = init;
     return jsonResponse({
       deletedFiles: 4,
+      deletedMissingPayloadAssets: 0,
       deletedOrphanedPayloadFiles: 1,
       deletedOrphanedPreviewFiles: 1,
       deletedTmpFiles: 1,

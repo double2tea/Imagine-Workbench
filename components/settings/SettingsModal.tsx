@@ -38,6 +38,7 @@ import {
   type TeamSessionContext,
   type TeamStorageHealth,
 } from "@/lib/storage/team-client";
+import type { TeamMediaMaintenanceTarget } from "@/lib/storage/team-media-maintenance-types";
 import type { ManageableTeamRole, PublicTeamMember } from "@/lib/storage/team-member-types";
 import type { PublicLocalStorageRuntimeStatus } from "@/lib/storage/local-public-runtime";
 
@@ -376,11 +377,11 @@ export default function SettingsModal({
     await refreshTeamMembersForSession(teamSession);
   }, [refreshTeamMembersForSession, t, teamSession]);
 
-  const runTeamMediaMaintenanceCleanup = useCallback(async () => {
+  const runTeamMediaMaintenanceCleanup = useCallback(async (target: TeamMediaMaintenanceTarget) => {
     if (!teamSession) throw new Error(t("dataManagement.teamSessionRequired"));
     const csrfToken = readTeamCsrfToken();
     if (!csrfToken) throw new Error(t("dataManagement.teamSessionCsrfMissing"));
-    await cleanupTeamMediaMaintenance("maintenance-files", csrfToken);
+    await cleanupTeamMediaMaintenance(target, csrfToken);
     await refreshDataSummary();
   }, [refreshDataSummary, t, teamSession]);
 

@@ -7,12 +7,13 @@ import {
   assertTrustedTeamRequestOrigin,
 } from "@/lib/storage/team-auth";
 import { cleanupTeamMediaMaintenance } from "@/lib/storage/team-media-maintenance";
+import { TEAM_MEDIA_MAINTENANCE_TARGETS } from "@/lib/storage/team-media-maintenance-types";
 
 export const runtime = "nodejs";
 export const dynamic = "force-dynamic";
 
 const teamMediaMaintenanceBodySchema = z.object({
-  target: z.literal("maintenance-files"),
+  target: z.enum(TEAM_MEDIA_MAINTENANCE_TARGETS),
 });
 
 export async function POST(request: Request): Promise<Response> {

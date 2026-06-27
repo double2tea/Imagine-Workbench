@@ -1371,9 +1371,10 @@ function isTeamMediaMaintenanceCleanupResult(value: unknown): value is TeamMedia
   if (!isRecord(value)) return false;
   return (
     value.targetKind === "postgres" &&
-    value.target === "maintenance-files" &&
+    (value.target === "maintenance-files" || value.target === "missing-payload-assets") &&
     typeof value.workspaceId === "string" &&
     typeof value.deletedFiles === "number" &&
+    typeof value.deletedMissingPayloadAssets === "number" &&
     typeof value.deletedOrphanedPayloadFiles === "number" &&
     typeof value.deletedOrphanedPreviewFiles === "number" &&
     typeof value.deletedTmpFiles === "number" &&

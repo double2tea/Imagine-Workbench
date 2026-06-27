@@ -29,6 +29,7 @@ import {
 } from "@/lib/data-management";
 import type { PublicLocalStorageRuntimeStatus } from "@/lib/storage/local-public-runtime";
 import type { TeamSessionContext, TeamStorageHealth } from "@/lib/storage/team-client";
+import type { TeamMediaMaintenanceTarget } from "@/lib/storage/team-media-maintenance-types";
 import type { ManageableTeamRole, PublicTeamMember } from "@/lib/storage/team-member-types";
 import { getClearWorkspaceAssetsMessage } from "@/lib/workspace-messages";
 
@@ -68,7 +69,7 @@ interface DataManagementWorkspaceProps {
   onRefreshStorageStatus: () => Promise<void>;
   onRepairAssetSources: () => Promise<void>;
   onResetBoards: () => Promise<void>;
-  onCleanupTeamMediaMaintenance: () => Promise<void>;
+  onCleanupTeamMediaMaintenance: (target: TeamMediaMaintenanceTarget) => Promise<void>;
   onRunTeamMigrations: () => Promise<void>;
   onRefreshTeamMembers: () => Promise<void>;
   onCreateTeamMember: () => Promise<void>;
@@ -218,6 +219,14 @@ function buildTeamMediaMaintenanceConfirmRequest(t: TranslateFn): ConfirmRequest
     message: t("dataManagement.teamMediaMaintenanceConfirm"),
     tone: "danger",
     confirmLabel: t("dataManagement.issueGroups.teamCleanMaintenanceFiles"),
+  };
+}
+
+function buildTeamMissingPayloadAssetsConfirmRequest(t: TranslateFn): ConfirmRequest {
+  return {
+    message: t("dataManagement.teamMissingPayloadAssetsConfirm"),
+    tone: "danger",
+    confirmLabel: t("dataManagement.issueGroups.teamDeleteMissingPayloadAssets"),
   };
 }
 
@@ -485,6 +494,12 @@ export default function DataManagementWorkspace({
           title: t("dataManagement.issueGroups.teamMissingMediaFiles"),
           count: mediaConsistency.missingPayloadFiles + mediaConsistency.missingPreviewFiles,
           tone: "critical" as const,
+          action: mediaConsistency.missingPayloadFiles > 0 ? {
+            label: t("dataManagement.issueGroups.teamDeleteMissingPayloadAssets"),
+            busyLabel: t("dataManagement.issueGroups.teamDeleteMissingPayloadAssetsBusy"),
+            confirmRequest: buildTeamMissingPayloadAssetsConfirmRequest(t),
+            run: () => onCleanupTeamMediaMaintenance("missing-payload-assets"),
+          } : undefined,
           details: [
             t("dataManagement.issueGroups.teamMissingPayloadFiles", { count: mediaConsistency.missingPayloadFiles }),
             t("dataManagement.issueGroups.teamMissingPreviewFiles", { count: mediaConsistency.missingPreviewFiles }),
@@ -499,7 +514,7 @@ export default function DataManagementWorkspace({
             label: t("dataManagement.issueGroups.teamCleanMaintenanceFiles"),
             busyLabel: t("dataManagement.issueGroups.teamCleanMaintenanceFilesBusy"),
             confirmRequest: buildTeamMediaMaintenanceConfirmRequest(t),
-            run: onCleanupTeamMediaMaintenance,
+            run: () => onCleanupTeamMediaMaintenance("maintenance-files"),
           },
           details: [
             t("dataManagement.issueGroups.teamOrphanedPayloadFiles", { count: mediaConsistency.orphanedPayloadFiles }),

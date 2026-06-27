@@ -71,6 +71,10 @@ export async function cleanupTeamMediaMaintenanceFiles(
   };
 }
 
+export async function listMissingTeamMediaStorageKeys(mediaDir: string, storageKeys: Iterable<string>): Promise<string[]> {
+  return listMissingStorageKeys(mediaDir, new Set(storageKeys));
+}
+
 async function collectTeamMediaConsistencyDetails(
   mediaDir: string,
   refs: TeamMediaConsistencyRefs,
