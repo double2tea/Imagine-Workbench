@@ -2,6 +2,9 @@ export const API_ROUTES = {
   agent: {
     respond: "/api/agent/respond",
   },
+  board: {
+    promptText: "/api/board/prompt-text",
+  },
   chat: {
     completions: "/api/chat/completions",
   },

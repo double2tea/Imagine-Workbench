@@ -234,6 +234,10 @@ interface BoardMediaAnalysisResponse {
   thought?: string;
 }
 
+interface BoardPromptTextResponse {
+  text?: string;
+}
+
 const LARGE_BOARD_DATA_URL_MIN_LENGTH = 120_000;
 
 function relatedQuickEditTaskIds(assetId: string): string[] {
@@ -744,6 +748,20 @@ function uniqueBoardReferences(references: ReferenceImageRef[]): ReferenceImageR
     uniqueReferences.push(reference);
   }
   return uniqueReferences;
+}
+
+function firstPromptOutputNote(
+  nodes: BoardDocument["nodes"],
+  edges: BoardDocument["edges"],
+  promptNodeId: string,
+): Extract<BoardDocument["nodes"][number], { kind: "note" }> | undefined {
+  const edge = edges.find(item =>
+    item.from.nodeId === promptNodeId &&
+    item.from.portId === BOARD_PORT_IDS.promptOut &&
+    item.to.portId === BOARD_PORT_IDS.noteIn
+  );
+  const node = edge ? nodes.find(item => item.id === edge.to.nodeId) : undefined;
+  return node?.kind === "note" ? node : undefined;
 }
 
 function readAgentInputSupportPayload(payload: unknown): AgentReferenceInputSupport | null {
@@ -1763,6 +1781,7 @@ export default function BoardPage({ boardId = DEFAULT_BOARD_ID }: BoardPageProps
   const generationAbortControllersRef = useRef<Record<string, AbortController>>({});
   const locallyCanceledItemIdsRef = useRef<Set<string>>(new Set());
   const analyzingBoardMediaNodeIdsRef = useRef<Set<string>>(new Set());
+  const runningPromptNodeIdsRef = useRef<Set<string>>(new Set());
   const workspaceNoticeSequenceRef = useRef(0);
   const confirmAction = useConfirm();
   const generatedBoardAssetIds = useMemo(
@@ -2960,6 +2979,105 @@ export default function BoardPage({ boardId = DEFAULT_BOARD_ID }: BoardPageProps
     buildProviderHeaders,
     items,
     pushWorkspaceNotice,
+    resolveOriginalReferences,
+    selectedChatModel,
+  ]);
+
+  const handleExecutePromptNode = useCallback(async (nodeId: string): Promise<void> => {
+    if (runningPromptNodeIdsRef.current.has(nodeId)) {
+      pushWorkspaceNotice("info", "Prompt text generation in progress");
+      return;
+    }
+    const promptNode = boardController.board.nodes.find(node => node.id === nodeId);
+    if (promptNode?.kind !== "prompt") {
+      pushWorkspaceNotice("error", "Please select a Prompt node");
+      return;
+    }
+
+    const prompt = (getBoardTextDraft(nodeId) ?? promptNode.prompt).trim();
+    flushBoardText([nodeId]);
+    if (!prompt) {
+      pushWorkspaceNotice("error", "Prompt text is required");
+      return;
+    }
+
+    const previewReferences = uniqueBoardReferences(
+      boardController.board.edges
+        .filter(edge => edge.to.nodeId === nodeId && edge.to.portId === BOARD_PORT_IDS.assetIn)
+        .map(edge => boardController.board.nodes.find(node => node.id === edge.from.nodeId))
+        .flatMap(node => boardNodeReferences(node, boardController.board.nodes, boardController.board.edges, items, resolveBoardReferenceUrl)),
+    );
+
+    runningPromptNodeIdsRef.current.add(nodeId);
+    try {
+      pushWorkspaceNotice("info", "Generating text from Prompt");
+      const references = getSendableAgentMediaReferences(
+        await prepareAgentAnalysisReferences(await resolveOriginalReferences(previewReferences)),
+      );
+      if (previewReferences.length > 0 && references.length === 0) {
+        throw new Error("Connected media cannot be sent to Agent");
+      }
+      if (references.length > 0) {
+        const supportResponse = await fetch(`/api/model-vision-support?model=${encodeURIComponent(selectedChatModel)}`);
+        if (supportResponse.ok) {
+          const inputSupport = readAgentInputSupportPayload(await supportResponse.json());
+          const unsupportedReference = references.find(reference => inputSupport?.[getMediaReferenceType(reference)] === false);
+          if (unsupportedReference) {
+            throw new Error(`Current Agent model does not support ${mediaReferenceLabel(getMediaReferenceType(unsupportedReference))} input`);
+          }
+        }
+      }
+
+      const response = await fetch(API_ROUTES.board.promptText, {
+        method: "POST",
+        headers: { "Content-Type": "application/json", ...buildProviderHeaders(selectedChatModel) },
+        body: JSON.stringify({
+          locale,
+          model: selectedChatModel,
+          prompt,
+          references: references.map(reference => ({
+            id: reference.id,
+            type: getMediaReferenceType(reference),
+            url: reference.url,
+          })),
+        }),
+      });
+      if (!response.ok) {
+        throw new Error(await readFetchError(response, "Prompt text generation failed"));
+      }
+
+      const payload = await response.json() as BoardPromptTextResponse;
+      const body = payload.text?.trim();
+      if (!body) throw new Error("Prompt text generation returned no content");
+
+      const connectedNote = firstPromptOutputNote(boardController.board.nodes, boardController.board.edges, nodeId);
+      if (connectedNote) {
+        boardController.updateNoteBody(connectedNote.id, body);
+        pushWorkspaceNotice("success", "Prompt Note updated");
+      } else {
+        boardController.addNoteNodeWithConnection({
+          title: `${promptNode.title} note`,
+          body,
+          position: boardNodeAdjacentPosition(boardController.board.nodes, promptNode, 48),
+        }, {
+          nodeId,
+          portId: BOARD_PORT_IDS.promptOut,
+          portKind: "prompt",
+        });
+        pushWorkspaceNotice("success", "Prompt Note created");
+      }
+    } catch (error) {
+      pushWorkspaceNotice("error", toErrorMessage(error, "Prompt text generation failed"));
+    } finally {
+      runningPromptNodeIdsRef.current.delete(nodeId);
+    }
+  }, [
+    boardController,
+    buildProviderHeaders,
+    items,
+    locale,
+    pushWorkspaceNotice,
+    resolveBoardReferenceUrl,
     resolveOriginalReferences,
     selectedChatModel,
   ]);
@@ -5422,6 +5540,7 @@ export default function BoardPage({ boardId = DEFAULT_BOARD_ID }: BoardPageProps
         onEditAssetImage={editBoardAssetImage}
         onImageQuickEdit={handleBoardImageQuickEdit}
         onExecuteGenerateNode={handleExecuteGenerateNode}
+        onExecutePromptNode={handleExecutePromptNode}
         onExportMultiGrid={handleExportMultiGrid}
         onFetchRunningHubAppSchema={fetchRunningHubAppSchema}
         onImportBoardFiles={handleImportBoardFiles}

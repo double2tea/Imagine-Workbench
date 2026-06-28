@@ -92,7 +92,7 @@ export function buildBoardNodeContextMenuActions(input: {
   if (input.onUngroup) actions.push({ id: "ungroup", label: t('contextMenu.ungroup'), onSelect: input.onUngroup });
   if (input.onCreateReferenceGroup) actions.push({ id: "create-reference-group", label: t('contextMenu.createRefGroup'), onSelect: input.onCreateReferenceGroup });
   if (input.onCopyImage) actions.push({ id: "copy-image", label: t('contextMenu.copyImage'), onSelect: input.onCopyImage });
-  if ((input.node.kind === "image-generate" || input.node.kind === "video-generate" || input.node.kind === "audio-operation" || input.node.kind === "runninghub-app") && input.onExecute) {
+  if ((input.node.kind === "prompt" || input.node.kind === "image-generate" || input.node.kind === "video-generate" || input.node.kind === "audio-operation" || input.node.kind === "runninghub-app") && input.onExecute) {
     actions.push({ id: "execute", label: t('contextMenu.execute'), onSelect: input.onExecute });
   }
   if (input.node.kind === "asset" && input.node.asset.type === "image") {

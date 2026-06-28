@@ -130,6 +130,9 @@ function findPort(
   const node = findNode(nodes, ref.nodeId);
   const port = getBoardNodePortDefinition(node, ref.portId, options);
   if (!port) throw new Error(t("board.ports.errors.noPortOrUnsupported"));
+  if (node.kind === "note" && ref.portId === BOARD_PORT_IDS.noteIn && ref.portKind === "prompt") {
+    return { node, port: { ...port, kind: "prompt" } };
+  }
   if (port.kind !== ref.portKind) throw new Error(t("board.ports.errors.portTypeMismatch"));
   return { node, port };
 }
@@ -332,6 +335,17 @@ export function resolveBoardConnectionKind(nodes: BoardNode[], from: BoardPortRe
   }
 
   if (
+    source.node.kind === "prompt" &&
+    target.node.kind === "note" &&
+    source.port.id === BOARD_PORT_IDS.promptOut &&
+    target.port.id === BOARD_PORT_IDS.noteIn &&
+    source.port.kind === "prompt" &&
+    target.port.kind === "prompt"
+  ) {
+    return "prompt";
+  }
+
+  if (
     isAcceptedGenerateReferenceSource(source.node, target.node) &&
     isExecutableNode(target.node) &&
     source.port.id === BOARD_PORT_IDS.assetOut &&
@@ -371,7 +385,9 @@ export function resolveBoardConnectionKind(nodes: BoardNode[], from: BoardPortRe
     (source.node.kind === "asset" || source.node.kind === "result") &&
     target.node.kind === "note" &&
     source.port.id === BOARD_PORT_IDS.assetOut &&
-    target.port.id === BOARD_PORT_IDS.noteIn
+    target.port.id === BOARD_PORT_IDS.noteIn &&
+    source.port.kind === "asset" &&
+    target.port.kind === "result"
   ) {
     return "reference";
   }
@@ -390,7 +406,9 @@ export function resolveBoardConnectionKind(nodes: BoardNode[], from: BoardPortRe
     isExecutableNode(source.node) &&
     target.node.kind === "note" &&
     source.port.id === BOARD_PORT_IDS.resultOut &&
-    target.port.id === BOARD_PORT_IDS.noteIn
+    target.port.id === BOARD_PORT_IDS.noteIn &&
+    source.port.kind === "result" &&
+    target.port.kind === "result"
   ) {
     return "result";
   }

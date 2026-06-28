@@ -1,4 +1,5 @@
 import { memo, useRef } from "react";
+import { Play } from "lucide-react";
 import BoardPromptTextarea, { type BoardPromptTextareaHandle } from "@/components/board/BoardPromptTextarea";
 import PromptTemplatePicker, { type PromptTemplatePickerHandle } from "@/components/prompt-templates/PromptTemplatePicker";
 import type { BoardPromptNode } from "@/lib/board";
@@ -15,11 +16,12 @@ import {
 interface PromptBoardNodeProps {
   node: BoardPromptNode;
   onChange: (prompt: string) => void;
+  onExecute: () => void | Promise<void>;
   onSelectReference?: (reference: BoardPromptReference, index: number) => void;
   references: BoardPromptReference[];
 }
 
-const PromptBoardNode = memo(function PromptBoardNode({ node, onChange, onSelectReference, references }: PromptBoardNodeProps) {
+const PromptBoardNode = memo(function PromptBoardNode({ node, onChange, onExecute, onSelectReference, references }: PromptBoardNodeProps) {
   const { t } = useTranslations("board");
   const textareaRef = useRef<BoardPromptTextareaHandle | null>(null);
   const templatePickerRef = useRef<PromptTemplatePickerHandle | null>(null);
@@ -59,6 +61,18 @@ const PromptBoardNode = memo(function PromptBoardNode({ node, onChange, onSelect
   const headerRight = (
     <div className="flex items-center gap-1">
       <PromptTemplatePicker ref={templatePickerRef} accent="teal" compact onApply={handleApplyPromptTemplate} />
+      <button
+        type="button"
+        onClick={event => {
+          event.stopPropagation();
+          void onExecute();
+        }}
+        onPointerDown={event => event.stopPropagation()}
+        className="nodrag nopan imagine-floating-card-action flex h-7 w-7 items-center justify-center"
+        title={t("contextMenu.execute")}
+      >
+        <Play className="h-3.5 w-3.5" />
+      </button>
     </div>
   );
 

@@ -2374,7 +2374,11 @@ export function useBoardState(
       createdAt,
       updatedAt: createdAt,
     };
-    const to: BoardPortRef = { nodeId, portId: BOARD_PORT_IDS.noteIn, portKind: "result" };
+    const to: BoardPortRef = {
+      nodeId,
+      portId: BOARD_PORT_IDS.noteIn,
+      portKind: from.portKind === "prompt" ? "prompt" : "result",
+    };
 
     mutateBoard(currentBoard => {
       const nextNodes = [...currentBoard.nodes, node];

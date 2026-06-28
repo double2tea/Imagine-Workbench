@@ -81,6 +81,7 @@ import {
   DEFAULT_ASSET_NODE_SIZE,
   DEFAULT_GENERATE_NODE_SIZE,
   DEFAULT_MULTI_GRID_NODE_SIZE,
+  DEFAULT_NOTE_NODE_SIZE,
   DEFAULT_REFERENCE_GROUP_NODE_SIZE,
   DEFAULT_RUNNINGHUB_APP_NODE_SIZE,
   boardNodeAbsolutePosition,
@@ -134,6 +135,7 @@ interface BoardWorkspaceProps {
   onEditAssetImage: (nodeId: string) => void;
   onImageQuickEdit: (nodeId: string, operation: ImageEditFeature) => void;
   onExecuteGenerateNode: (nodeId: string) => void;
+  onExecutePromptNode: (nodeId: string) => void | Promise<void>;
   onFetchRunningHubAppSchema: (webappId: string) => Promise<BoardRunningHubAppSchemaResult>;
   onImportBoardFiles: (files: File[], position: BoardPoint) => void | Promise<void>;
   onMarkGeneratedAssetsViewed?: (assetIds: string[]) => void;
@@ -697,7 +699,7 @@ function portKindFromHandle(handleId: string | null | undefined): BoardPortKind 
   if (!handleId) return null;
   if (handleId === BOARD_PORT_IDS.promptIn || handleId === BOARD_PORT_IDS.promptOut) return "prompt";
   if (handleId === BOARD_PORT_IDS.agentContextIn) return "agent";
-  if (handleId === BOARD_PORT_IDS.resultOut) return "result";
+  if (handleId === BOARD_PORT_IDS.resultOut || handleId === BOARD_PORT_IDS.noteIn) return "result";
   if (handleId === BOARD_PORT_IDS.assetIn || handleId === BOARD_PORT_IDS.assetOut || handleId === BOARD_PORT_IDS.referenceIn) return "asset";
   return null;
 }
@@ -712,6 +714,7 @@ function handleDirectionFromHandle(handleId: string | null | undefined): BoardHa
   if (
     handleId === BOARD_PORT_IDS.assetIn ||
     handleId === BOARD_PORT_IDS.promptIn ||
+    handleId === BOARD_PORT_IDS.noteIn ||
     handleId === BOARD_PORT_IDS.referenceIn ||
     handleId === BOARD_PORT_IDS.agentContextIn
   ) return "input";
@@ -739,8 +742,10 @@ function connectionPortRefs(connection: {
     !targetDirection
   ) return null;
 
-  const sourceRef: BoardPortRef = { nodeId: connection.source, portId: connection.sourceHandle, portKind: sourceKind };
-  const targetRef: BoardPortRef = { nodeId: connection.target, portId: connection.targetHandle, portKind: targetKind };
+  const resolvedSourceKind = connection.sourceHandle === BOARD_PORT_IDS.noteIn && targetKind === "prompt" ? "prompt" : sourceKind;
+  const sourceRef: BoardPortRef = { nodeId: connection.source, portId: connection.sourceHandle, portKind: resolvedSourceKind };
+  const resolvedTargetKind = connection.targetHandle === BOARD_PORT_IDS.noteIn && sourceKind === "prompt" ? "prompt" : targetKind;
+  const targetRef: BoardPortRef = { nodeId: connection.target, portId: connection.targetHandle, portKind: resolvedTargetKind };
   if (sourceDirection === "output" && targetDirection === "input") return { from: sourceRef, to: targetRef };
   if (sourceDirection === "input" && targetDirection === "output") return { from: targetRef, to: sourceRef };
   return null;
@@ -1120,6 +1125,9 @@ function batchConnectionToTarget(
     if (target.kind === "prompt" && outputPort.portKind === "asset") {
       return { portId: BOARD_PORT_IDS.assetIn, portKind: "asset" as const };
     }
+    if (target.kind === "note" && outputPort.portKind === "prompt") {
+      return { portId: BOARD_PORT_IDS.noteIn, portKind: "prompt" as const };
+    }
     if (target.kind === "image-generate" || target.kind === "video-generate" || target.kind === "audio-operation" || target.kind === "runninghub-app") {
       return outputPort.portKind === "prompt"
         ? { portId: BOARD_PORT_IDS.promptIn, portKind: "prompt" as const }
@@ -1316,6 +1324,7 @@ export default function BoardWorkspace({
   onEditAssetImage,
   onImageQuickEdit,
   onExecuteGenerateNode,
+  onExecutePromptNode,
   onFetchRunningHubAppSchema,
   onImportBoardFiles,
   onMarkGeneratedAssetsViewed,
@@ -2089,6 +2098,7 @@ export default function BoardWorkspace({
     onEditAssetImage,
     onImageQuickEdit,
     onExecuteGenerate: onExecuteGenerateNode,
+    onExecutePrompt: onExecutePromptNode,
     onFetchRunningHubAppSchema,
     onFocusNode: focusReferenceSourceNode,
     onFocusReferenceSource: focusReferenceSourceNode,
@@ -2140,7 +2150,7 @@ export default function BoardWorkspace({
     },
   }), [
     onCancelAssetTask, onCancelGenerateNode, onCaptureVideoFrame, trashAndDeleteNode, onDownloadAsset, onEditAssetImage, onImageQuickEdit,
-    onExecuteGenerateNode, onFetchRunningHubAppSchema, focusReferenceSourceNode, onAnalyzeBoardMedia, handleSplitImageGrid, onOpenFullscreen,
+    onExecuteGenerateNode, onExecutePromptNode, onFetchRunningHubAppSchema, focusReferenceSourceNode, onAnalyzeBoardMedia, handleSplitImageGrid, onOpenFullscreen,
     onOpenPanorama, onSaveVoiceProfile, moveGenerateReferenceEdge, moveReferenceGroupItem,
     deleteEdge, removeReferenceGroupItem, onSendAgentNode, onSendAssetToAgent, connectSelectedBoardPromptReference,
     updateReferenceGroupItemRole, updateAgentInstruction, updateGenerateNode, handleExtractMultiGridItem, updateMultiGridNode,
@@ -2312,15 +2322,7 @@ export default function BoardWorkspace({
           !targetPortIds?.has(edge.to.portId) ||
           sourcePortKind === null ||
           targetPortKind === null ||
-          !isValidBoardPortConnection(board.nodes, {
-            nodeId: edge.from.nodeId,
-            portId: edge.from.portId,
-            portKind: sourcePortKind,
-          }, {
-            nodeId: edge.to.nodeId,
-            portId: edge.to.portId,
-            portKind: targetPortKind,
-          })
+          !isValidBoardPortConnection(board.nodes, edge.from, edge.to)
         ) continue;
         const processing = isResultSourceNode(sourceNode) && sourceNode.status === "processing";
         const isSelected = selectedEdgeId === edge.id;
@@ -2807,15 +2809,22 @@ export default function BoardWorkspace({
       });
       selectOnlyNodeIds([nodeId]);
       setQuickInsertMenu(null);
+      return;
     }
-  }, [addAssetToMultiGrid, addGenerateNodeWithConnections, addMultiGridNode, addReferenceGroupNodeWithAssets, addRunningHubAppNode, availableCenteredNodePosition, board.nodes, connectPorts, onConnectionError, selectOnlyNodeIds]);
+    if (kind === "note" && from.portKind === "prompt") {
+      const nodeId = addNoteNode({ position: availableCenteredNodePosition(point, DEFAULT_NOTE_NODE_SIZE) });
+      connectPorts(from, { nodeId, portId: BOARD_PORT_IDS.noteIn, portKind: "prompt" });
+      selectOnlyNodeIds([nodeId]);
+      setQuickInsertMenu(null);
+    }
+  }, [addAssetToMultiGrid, addGenerateNodeWithConnections, addMultiGridNode, addNoteNode, addReferenceGroupNodeWithAssets, addRunningHubAppNode, availableCenteredNodePosition, board.nodes, connectPorts, onConnectionError, selectOnlyNodeIds]);
 
   const quickInsertMenuItems = useMemo(() => {
     const from = quickInsertMenu?.connectionFrom;
     if (!from) return [BOARD_QUICK_INSERT_IMPORT_ITEM, ...BOARD_INSERT_CATALOG];
     const sourceNode = board.nodes.find(node => node.id === from.nodeId);
     if (from.portKind === "prompt") {
-      return BOARD_INSERT_CATALOG.filter(item => item.kind === "image-generate" || item.kind === "video-generate" || item.kind === "audio-operation" || item.kind === "runninghub-app");
+      return BOARD_INSERT_CATALOG.filter(item => item.kind === "note" || item.kind === "image-generate" || item.kind === "video-generate" || item.kind === "audio-operation" || item.kind === "runninghub-app");
     }
     if (from.portKind !== "asset") return [];
     if (isBoardMediaSourceNode(sourceNode)) {
@@ -3790,9 +3799,13 @@ export default function BoardWorkspace({
                   closeOverlayMenus();
                 }
                 : undefined,
-              onExecute: node.kind === "image-generate" || node.kind === "video-generate" || node.kind === "audio-operation" || node.kind === "runninghub-app"
+              onExecute: node.kind === "prompt" || node.kind === "image-generate" || node.kind === "video-generate" || node.kind === "audio-operation" || node.kind === "runninghub-app"
                 ? () => {
-                  onExecuteGenerateNode(node.id);
+                  if (node.kind === "prompt") {
+                    void onExecutePromptNode(node.id);
+                  } else {
+                    onExecuteGenerateNode(node.id);
+                  }
                   closeOverlayMenus();
                 }
                 : undefined,

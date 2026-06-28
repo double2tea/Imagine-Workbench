@@ -482,6 +482,7 @@ function BoardNode({ data, selected }: NodeProps<BoardFlowNode>) {
             node={node}
             references={data.promptReferences ?? EMPTY_BOARD_PROMPT_REFERENCES}
             onChange={prompt => c.onUpdatePrompt(node.id, prompt)}
+            onExecute={() => c.onExecutePrompt(node.id)}
             onSelectReference={reference => c.onSelectPromptReference(node.id, reference)}
           />
         )}
