@@ -18,6 +18,7 @@ Imagine Workbench is a browser-first creative workstation for AI image, video, a
 - Use Agent Mode to plan creative actions and trigger recommended generation steps.
 - Arrange assets, notes, references, and generation nodes on `/board` canvases.
 - Store generated assets locally in browser IndexedDB, with ZIP backup and restore tools.
+- Run an opt-in PostgreSQL team workspace with login, roles, shared assets, boards, generation tasks, provider settings, backups, and media maintenance.
 - Route model calls through provider adapters for 12AI, grok2api, Agnes AI, ModelScope, MiMo, and RunningHub.
 - Expose a small OpenAI-compatible `/v1/*` API surface for plugins and scripts.
 
@@ -68,6 +69,7 @@ More details: [Configuration](docs/configuration.md).
 | [OpenAI-compatible API](docs/openai-compatible-api.md) | [OpenAI 兼容 API](docs/zh-CN/openai-compatible-api.md) |
 | [RunningHub API](docs/runninghub-api.md) | [RunningHub API](docs/zh-CN/runninghub-api.md) |
 | [DaVinci Resolve Bridge](docs/resolve-bridge.md) | [DaVinci Resolve Bridge](docs/zh-CN/resolve-bridge.md) |
+| [Local team deployment](docs/deployment/team-local.md) | [本地团队部署](docs/zh-CN/deployment/team-local.md) |
 | [Development guide](docs/development.md) | [开发指南](docs/zh-CN/development.md) |
 | [Security policy](SECURITY.md) | [安全策略](SECURITY.zh-CN.md) |
 | [Contributing guide](CONTRIBUTING.md) | [贡献指南](CONTRIBUTING.zh-CN.md) |
@@ -96,6 +98,8 @@ Manual deploy:
 ```bash
 pnpm run pages:deploy
 ```
+
+For opt-in LAN/self-hosted team workspaces backed by PostgreSQL and a server media volume, see [Local team deployment](docs/deployment/team-local.md). Browser IndexedDB remains the default storage mode.
 
 ## License
 

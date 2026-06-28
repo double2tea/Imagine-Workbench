@@ -1,6 +1,6 @@
 {
   "name": "imagine-workbench",
-  "version": "0.1.0",
+  "version": "0.2.0",
   "description": "Browser-first AI creative workstation for image, video, audio, and agent-assisted visual workflows.",
   "private": true,
   "homepage": "https://imagine-workbench.pages.dev",

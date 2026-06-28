@@ -19,7 +19,7 @@ tests/                       helper 和供应商行为的 Node 测试
 - `app/page.tsx` 负责主工作台 shell。
 - `app/board/*`、`components/board/*`、`hooks/useBoardState.ts` 和 `lib/board/*` 负责 board 工作流。
 - `app/api/*` 路由应保持轻量；供应商行为放在 `lib/providers/*`。
-- 生成媒体存储在浏览器 IndexedDB asset store 中。
+- 生成媒体走 active storage boundary：默认使用浏览器 IndexedDB，团队模式使用 PostgreSQL 元数据和服务端媒体 payload refs。
 - 主题持久化逻辑位于 `lib/theme-mode.ts`。
 
 ## 质量检查

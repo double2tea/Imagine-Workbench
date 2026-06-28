@@ -55,16 +55,29 @@ The Settings panel has:
 
 - `连接`: provider credentials, model lists, and connection checks.
 - `功能模型`: per-feature model selections.
-- `数据`: local workspace backup, restore, cleanup, and import actions.
+- `数据`: browser workspace backup/restore/cleanup, plus PostgreSQL team status, migration, member, backup, restore, import, and maintenance actions when team mode is enabled.
 
-Generated media and boards are stored in browser IndexedDB. Optional provider credential export is explicit and off by default.
+Generated media and boards are stored in browser IndexedDB by default. Optional provider credential export is explicit and off by default.
 
 ## Storage Target
 
-The supported default workspace storage is browser storage:
+The default workspace storage is browser storage:
 
 - generated media, media metadata, library items, generation tasks, and boards use IndexedDB;
 - provider credentials, model caches, UI preferences, and agent chat snapshots use browser `localStorage`;
 - workspace backup and restore use explicit ZIP export/import.
 
-The codebase contains early storage-target metadata for a future local SQLite workspace, but it is not the default production storage path. See [Data storage](data-storage.md).
+PostgreSQL team storage is opt-in:
+
+```bash
+IMAGINE_STORAGE_TARGET="postgres"
+DATABASE_URL="postgresql://imagine:replace_with_password@db:5432/imagine_workbench"
+IMAGINE_MEDIA_DIR="/data/imagine-media"
+IMAGINE_MAX_MEDIA_PAYLOAD_BYTES="536870912"
+IMAGINE_TEAM_SETUP_TOKEN="replace_with_a_long_random_setup_token"
+IMAGINE_TEAM_SECRET_ENCRYPTION_KEY="replace_with_a_long_random_workspace_secret_key"
+APP_URL="http://localhost:3000"
+IMAGINE_TRUSTED_ORIGINS="http://localhost:3000"
+```
+
+Team mode also supports `IMAGINE_MEDIA_USAGE_WARNING_BYTES` and PostgreSQL pool timeout settings. See [Data storage](data-storage.md) and [Local team deployment](deployment/team-local.md).

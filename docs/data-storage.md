@@ -2,9 +2,18 @@
 
 [English](data-storage.md) | [简体中文](zh-CN/data-storage.md)
 
-Imagine Workbench is local-first. A deployed instance serves the app and provider proxy routes, but each user's workspace data lives in that user's browser by default.
+Imagine Workbench is browser-first by default and can also run an explicit PostgreSQL-backed team workspace for LAN or self-hosted deployments.
 
-## Active Default Storage
+## Storage Modes
+
+| Mode | Use case | Workspace authority |
+| --- | --- | --- |
+| `browser` | Hosted preview, single-user local use, and normal development | Browser IndexedDB + `localStorage` |
+| `postgres` | Opt-in LAN/self-hosted team workspace | App server + PostgreSQL + server media volume |
+
+Browser mode remains the default. PostgreSQL mode is enabled only when `IMAGINE_STORAGE_TARGET=postgres` and the required team storage environment variables are configured.
+
+## Browser Mode
 
 | Data | Storage |
 | --- | --- |
@@ -19,6 +28,21 @@ Imagine Workbench is local-first. A deployed instance serves the app and provide
 
 This means the hosted preview does not have a shared server database containing every user's assets. Clearing browser data can remove the local workspace unless the user exported a backup.
 
+## PostgreSQL Team Mode
+
+PostgreSQL team mode stores shared workspace records in PostgreSQL and stores media bytes in a server-side media volume referenced by safe payload refs.
+
+Implemented team-mode storage includes:
+
+- first-owner bootstrap, login sessions, CSRF/origin checks, and role-based access for owner/admin/editor/viewer;
+- shared assets, payload refs, previews, asset library records, boards, generation tasks, prompt templates, voice profiles, safety snapshots, and non-secret settings;
+- encrypted team workspace secrets and saved RunningHub/provider targets;
+- versioned schema migrations, schema health, bounded PostgreSQL pool settings, and unsupported-newer-schema refusal;
+- Settings -> Data team summary, migration status, team member controls, backup/restore, browser IndexedDB -> PostgreSQL import, clear-assets/reset-boards, media maintenance, missing-payload cleanup, missing-preview cleanup, and stale source-link repair;
+- preservation of rich generation metadata, including cinematic profiles, reference media snapshots, board/result-stack links, crop derivative metadata, library backing links, preview status, voice profile refs, and transcript assets.
+
+Generated results, imported assets, and asset-library entries all resolve through `assets` plus `asset_payloads`; `asset_library` stores curation metadata that references backing assets instead of creating a separate media storage path.
+
 ## Backup And Restore
 
 Use Settings -> Data to:
@@ -32,16 +56,11 @@ Use Settings -> Data to:
 
 Provider credentials are not included in exports unless the user explicitly enables credential export.
 
-## Local Database Status
+In PostgreSQL mode, full workspace export uses the team backup route and packages PostgreSQL records with referenced media bytes. Restore creates a safety snapshot first, replaces workspace records in a transaction, and imports secrets only when credential restore is explicitly enabled.
 
-The codebase contains storage-target types and runtime status helpers for a future local SQLite workspace target:
+## Team Deployment
 
-- `IMAGINE_STORAGE_TARGET`
-- `IMAGINE_LOCAL_WORKSPACE_DIR`
-- `imagine-workbench.sqlite`
-- local asset, preview, export, and trash folder names
-
-That local database path is not the current default production storage path. The active supported path is still browser IndexedDB plus explicit ZIP backup/restore. Local folder, local database, and remote database adapters are marked as planned storage targets in the codebase.
+Use [Local team deployment](deployment/team-local.md) for Docker Compose setup, environment variables, migrations, first-owner bootstrap, backup, restore, upgrade, and rollback steps.
 
 ## Hosted Deployment Implications
 
@@ -55,9 +74,7 @@ For Cloudflare Pages, Vercel, Netlify, or other hosted deployments:
 
 ## Current Limitations
 
-- No built-in user accounts.
-- No built-in cross-device sync.
-- No shared team workspace database.
-- No default SQLite database startup.
+- Browser mode has no built-in user accounts or cross-device sync.
+- PostgreSQL mode is opt-in and intended for trusted LAN/self-hosted access.
 - No public API for reading another browser's IndexedDB assets.
-- No automatic migration from IndexedDB to a server database.
+- Browser IndexedDB -> PostgreSQL migration is explicit and user-triggered, not automatic.

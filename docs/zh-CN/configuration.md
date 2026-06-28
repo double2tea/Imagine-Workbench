@@ -55,16 +55,29 @@ Settings 面板包含：
 
 - `连接`：供应商密钥、模型列表和连接检查。
 - `功能模型`：各功能的模型选择。
-- `数据`：本地工作区备份、恢复、清理和导入。
+- `数据`：浏览器工作区备份/恢复/清理；启用团队模式后，也会显示 PostgreSQL 团队状态、迁移、成员、备份、恢复、导入和维护操作。
 
-生成素材和画布存储在浏览器 IndexedDB。供应商密钥导出是显式操作，默认关闭。
+生成素材和画布默认存储在浏览器 IndexedDB。供应商密钥导出是显式操作，默认关闭。
 
 ## 存储目标
 
-当前支持的默认工作区存储是浏览器存储：
+默认工作区存储是浏览器存储：
 
 - 生成媒体、媒体元数据、素材库、生成任务和 board 使用 IndexedDB；
 - 供应商密钥、模型缓存、UI 偏好和 Agent 会话快照使用浏览器 `localStorage`；
 - 工作区备份与恢复通过显式 ZIP 导出/导入完成。
 
-代码中已有面向未来本地 SQLite 工作区的存储目标元数据，但它不是当前默认生产存储路径。详见：[数据存储](data-storage.md)。
+PostgreSQL 团队存储需要显式启用：
+
+```bash
+IMAGINE_STORAGE_TARGET="postgres"
+DATABASE_URL="postgresql://imagine:replace_with_password@db:5432/imagine_workbench"
+IMAGINE_MEDIA_DIR="/data/imagine-media"
+IMAGINE_MAX_MEDIA_PAYLOAD_BYTES="536870912"
+IMAGINE_TEAM_SETUP_TOKEN="replace_with_a_long_random_setup_token"
+IMAGINE_TEAM_SECRET_ENCRYPTION_KEY="replace_with_a_long_random_workspace_secret_key"
+APP_URL="http://localhost:3000"
+IMAGINE_TRUSTED_ORIGINS="http://localhost:3000"
+```
+
+团队模式还支持 `IMAGINE_MEDIA_USAGE_WARNING_BYTES` 和 PostgreSQL 连接池/超时设置。详见[数据存储](data-storage.md)和[本地团队部署](deployment/team-local.md)。

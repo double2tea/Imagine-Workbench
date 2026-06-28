@@ -19,7 +19,7 @@ Key boundaries:
 - `app/page.tsx` owns the main workstation shell.
 - `app/board/*`, `components/board/*`, `hooks/useBoardState.ts`, and `lib/board/*` own board workflows.
 - `app/api/*` routes should stay thin; provider-specific behavior belongs in `lib/providers/*`.
-- Generated media lives in the browser IndexedDB asset store.
+- Generated media uses the active storage boundary: browser IndexedDB by default, PostgreSQL metadata plus server media payload refs in team mode.
 - Theme persistence lives in `lib/theme-mode.ts`.
 
 ## Quality Gates
