@@ -22,6 +22,7 @@ Edit `.env.team` before starting the stack:
 - Replace `IMAGINE_TEAM_SECRET_ENCRYPTION_KEY` with a long random server-side key. Keep it stable across restarts and backups, because team workspace secrets encrypted with it cannot be read with a different key.
 - Set `APP_URL` to the URL users will open on the LAN.
 - Set `IMAGINE_TRUSTED_ORIGINS` to `APP_URL` plus any reverse-proxy origins that may send browser requests.
+- Optionally set `APP_PORT` when the host port should not be 3000; keep `APP_URL` aligned with that port.
 
 ## Start
 
@@ -29,7 +30,7 @@ Edit `.env.team` before starting the stack:
 docker compose --env-file .env.team -f docker-compose.team.yml up --build
 ```
 
-The app listens on `http://localhost:3000` by default. PostgreSQL data is stored in the `postgres-data` volume. Generated media is stored in the `imagine-media` volume under `/data/imagine-media` inside the app container. Any single media payload larger than `IMAGINE_MAX_MEDIA_PAYLOAD_BYTES` is rejected before it is written to the media volume, and the failing request returns a visible error. When total media-volume usage reaches `IMAGINE_MEDIA_USAGE_WARNING_BYTES`, Settings -> Data shows a non-secret aggregate warning with used bytes and threshold bytes. PostgreSQL access uses a bounded app-server pool; the default pool max is 5 connections, with 3000 ms connection timeout, 1000 ms idle timeout, and 30000 ms query timeout.
+The app listens on `http://localhost:3000` by default, or on the host port set by `APP_PORT`. PostgreSQL data is stored in the `postgres-data` volume. Generated media is stored in the `imagine-media` volume under `/data/imagine-media` inside the app container. Any single media payload larger than `IMAGINE_MAX_MEDIA_PAYLOAD_BYTES` is rejected before it is written to the media volume, and the failing request returns a visible error. When total media-volume usage reaches `IMAGINE_MEDIA_USAGE_WARNING_BYTES`, Settings -> Data shows a non-secret aggregate warning with used bytes and threshold bytes. PostgreSQL access uses a bounded app-server pool; the default pool max is 5 connections, with 3000 ms connection timeout, 1000 ms idle timeout, and 30000 ms query timeout.
 
 ## Run Schema Migrations
 

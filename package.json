@@ -38,6 +38,7 @@
     "typecheck": "tsc --noEmit",
     "check": "pnpm run lint && pnpm run typecheck && pnpm run check:version && pnpm run check:model-capabilities",
     "check:version": "node scripts/check-app-version.mjs",
+    "check:docker": "node scripts/check-docker-compose.mjs",
     "generate:model-capabilities": "tsc -p scripts/tsconfig.model-catalog.json && node .tmp/model-catalog-generator/scripts/generate-model-capabilities.js",
     "check:model-capabilities": "tsc -p scripts/tsconfig.model-catalog.json && IMAGINE_COMPILED_ALIAS_ROOT=.tmp/model-catalog-generator node -r ./scripts/register-compiled-alias.cjs .tmp/model-catalog-generator/scripts/generate-model-capabilities.js --check",
     "check:light-contrast": "node scripts/check-light-contrast.mjs",

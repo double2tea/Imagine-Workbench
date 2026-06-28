@@ -81,6 +81,7 @@ pnpm run dev
 pnpm run lint
 pnpm run typecheck
 pnpm run check
+pnpm run check:docker
 pnpm run build
 pnpm run pages:build
 pnpm run test:providers
@@ -95,6 +96,7 @@ docker compose up --build
 ```
 
 打开 `http://localhost:3000`。该模式不会启动 PostgreSQL；生成素材和 board 仍保存在当前浏览器配置文件中。
+如果 3000 端口已被占用，可以运行 `APP_PORT=3010 docker compose up --build`，然后打开 `http://localhost:3010`。
 
 仓库内置 Cloudflare Pages 工作流。推送到 `main` 后，在配置好下面的 GitHub secret 和 variable 时，会构建 Pages 输出并部署到 `imagine-workbench` Cloudflare Pages 项目：
 

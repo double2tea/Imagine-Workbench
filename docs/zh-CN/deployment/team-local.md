@@ -22,6 +22,7 @@ cp .env.team.example .env.team
 - 将 `IMAGINE_TEAM_SECRET_ENCRYPTION_KEY` 替换为足够长的服务端随机密钥。它必须在重启和备份恢复后保持稳定，否则已加密的团队工作区密钥将无法读取。
 - 将 `APP_URL` 设置为团队成员在局域网中打开的地址。
 - 将 `IMAGINE_TRUSTED_ORIGINS` 设置为 `APP_URL`，以及可能发起浏览器请求的反向代理 origin。
+- 如宿主机端口不是 3000，可设置 `APP_PORT`；同时保持 `APP_URL` 与该端口一致。
 
 ## 启动
 
@@ -29,7 +30,7 @@ cp .env.team.example .env.team
 docker compose --env-file .env.team -f docker-compose.team.yml up --build
 ```
 
-默认情况下，应用监听 `http://localhost:3000`。PostgreSQL 数据保存在 `postgres-data` volume。生成媒体保存在 app 容器内 `/data/imagine-media` 对应的 `imagine-media` volume。
+默认情况下，应用监听 `http://localhost:3000`；如果设置了 `APP_PORT`，则使用对应宿主机端口。PostgreSQL 数据保存在 `postgres-data` volume。生成媒体保存在 app 容器内 `/data/imagine-media` 对应的 `imagine-media` volume。
 
 ## 运行 Schema Migrations
 

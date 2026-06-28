@@ -14,6 +14,7 @@ RUN pnpm run build
 FROM node:24-bookworm-slim AS runner
 WORKDIR /app
 ENV NODE_ENV=production
+ENV HOSTNAME=0.0.0.0
 RUN corepack enable && corepack prepare pnpm@10.27.0 --activate
 RUN groupadd --system --gid 1001 nodejs && useradd --system --uid 1001 nextjs
 COPY --from=builder /app/package.json ./package.json

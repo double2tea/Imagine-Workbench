@@ -5,7 +5,18 @@ services:
     environment:
       APP_URL: ${APP_URL:-http://localhost:3000}
       IMAGINE_STORAGE_TARGET: browser
-      NEXT_PUBLIC_APP_VERSION: ${NEXT_PUBLIC_APP_VERSION:-0.2.0}
       OPENAI_COMPAT_API_KEY: ${OPENAI_COMPAT_API_KEY:-}
     ports:
-      - "3000:3000"
+      - "${APP_PORT:-3000}:3000"
+    healthcheck:
+      test:
+        [
+          "CMD",
+          "node",
+          "-e",
+          "fetch('http://127.0.0.1:3000/api/storage/local/status').then(async (response) => { if (!response.ok) process.exit(1); const status = await response.json(); if (status.mode !== 'browser' || status.targetKind !== 'indexeddb') process.exit(1); }).catch(() => process.exit(1));",
+        ]
+      interval: 10s
+      timeout: 5s
+      retries: 12
+      start_period: 20s

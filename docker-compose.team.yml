@@ -16,7 +16,6 @@ services:
       IMAGINE_TEAM_SECRET_ENCRYPTION_KEY: ${IMAGINE_TEAM_SECRET_ENCRYPTION_KEY:?IMAGINE_TEAM_SECRET_ENCRYPTION_KEY is required}
       IMAGINE_TEAM_SETUP_TOKEN: ${IMAGINE_TEAM_SETUP_TOKEN:?IMAGINE_TEAM_SETUP_TOKEN is required}
       IMAGINE_TRUSTED_ORIGINS: ${IMAGINE_TRUSTED_ORIGINS:-}
-      NEXT_PUBLIC_APP_VERSION: ${NEXT_PUBLIC_APP_VERSION:-0.2.0}
       TWELVE_AI_API_KEY: ${TWELVE_AI_API_KEY:-}
       TWELVE_AI_BASE_URL: ${TWELVE_AI_BASE_URL:-}
       TWELVE_AI_VIDEO_BASE_URL: ${TWELVE_AI_VIDEO_BASE_URL:-}
@@ -25,12 +24,24 @@ services:
       MIMO_API_KEY: ${MIMO_API_KEY:-}
       MIMO_BASE_URL: ${MIMO_BASE_URL:-}
     ports:
-      - "3000:3000"
+      - "${APP_PORT:-3000}:3000"
     depends_on:
       db:
         condition: service_healthy
     volumes:
       - imagine-media:/data/imagine-media
+    healthcheck:
+      test:
+        [
+          "CMD",
+          "node",
+          "-e",
+          "fetch('http://127.0.0.1:3000/api/storage/local/status').then(async (response) => { if (!response.ok) process.exit(1); const status = await response.json(); if (status.mode !== 'postgres' || status.targetKind !== 'postgres') process.exit(1); }).catch(() => process.exit(1));",
+        ]
+      interval: 10s
+      timeout: 5s
+      retries: 12
+      start_period: 20s
 
   db:
     image: postgres:17-alpine

@@ -81,6 +81,7 @@ pnpm run dev
 pnpm run lint
 pnpm run typecheck
 pnpm run check
+pnpm run check:docker
 pnpm run build
 pnpm run test:providers
 ```
@@ -94,6 +95,7 @@ docker compose up --build
 ```
 
 Open `http://localhost:3000`. This mode does not start PostgreSQL; generated assets and boards remain in the current browser profile.
+If port 3000 is already in use, run `APP_PORT=3010 docker compose up --build` and open `http://localhost:3010`.
 
 The repository includes an opt-in Cloudflare Pages workflow. Pushes to `main` build and deploy to the `imagine-workbench` Cloudflare Pages project only when Pages deployment is explicitly enabled and the required GitHub settings are configured:
 
