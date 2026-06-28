@@ -1851,3 +1851,69 @@ Fixed board generation writeback and processing indicators to use resolved resul
 ### Next Steps
 
 - None - task complete
+
+
+## Session 174: Fix board media menu and grid split regressions
+
+**Date**: 2026-06-28
+**Task**: Fix board media menu and grid split regressions
+**Branch**: `main`
+
+### Summary
+
+Fixed board media menu hover cleanup hook ordering and grid split separator-only false positives; verified lint, typecheck, check, and provider tests.
+
+### Main Changes
+
+(Add details)
+
+### Git Commits
+
+| Hash | Message |
+|------|---------|
+| `37a7afc1` | (see git log) |
+
+### Testing
+
+- [OK] (Add test results)
+
+### Status
+
+[OK] **Completed**
+
+### Next Steps
+
+- None - task complete
+
+
+## Session 175: Fix board multi-select media controls
+
+**Date**: 2026-06-28
+**Task**: Fix board multi-select media controls
+**Branch**: `main`
+
+### Summary
+
+Suppressed per-media-node controls during board batch selection, fixed React Flow data equality so the batch-selection flag reaches rendered nodes, and verified with board regression tests plus project checks.
+
+### Main Changes
+
+(Add details)
+
+### Git Commits
+
+| Hash | Message |
+|------|---------|
+| `89a245fc` | (see git log) |
+
+### Testing
+
+- [OK] (Add test results)
+
+### Status
+
+[OK] **Completed**
+
+### Next Steps
+
+- None - task complete

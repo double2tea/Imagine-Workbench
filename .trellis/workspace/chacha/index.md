@@ -8,7 +8,7 @@
 
 <!-- @@@auto:current-status -->
 - **Active File**: `journal-3.md`
-- **Total Sessions**: 173
+- **Total Sessions**: 175
 - **Last Active**: 2026-06-28
 <!-- @@@/auto:current-status -->
 
@@ -19,7 +19,7 @@
 <!-- @@@auto:active-documents -->
 | File | Lines | Status |
 |------|-------|--------|
-| `journal-3.md` | ~1853 | Active |
+| `journal-3.md` | ~1919 | Active |
 | `journal-2.md` | ~1973 | Archived |
 | `journal-1.md` | ~1988 | Archived |
 <!-- @@@/auto:active-documents -->
@@ -31,6 +31,8 @@
 <!-- @@@auto:session-history -->
 | # | Date | Title | Commits | Branch |
 |---|------|-------|---------|--------|
+| 175 | 2026-06-28 | Fix board multi-select media controls | `89a245fc` | `main` |
+| 174 | 2026-06-28 | Fix board media menu and grid split regressions | `37a7afc1` | `main` |
 | 173 | 2026-06-28 | Fix board generation result stack sync | `9ca30129` | `main` |
 | 172 | 2026-06-28 | Local database and Docker deployment usability | `2ca06d3d`, `517fdf0b`, `d154a821`, `85fc8399` | `main` |
 | 171 | 2026-06-28 | Run prompt nodes to notes | `686cb334` | `main` |
