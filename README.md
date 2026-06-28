@@ -87,6 +87,14 @@ pnpm run test:providers
 
 ## Deployment
 
+Personal Docker deployment uses the default browser IndexedDB storage mode:
+
+```bash
+docker compose up --build
+```
+
+Open `http://localhost:3000`. This mode does not start PostgreSQL; generated assets and boards remain in the current browser profile.
+
 The repository includes an opt-in Cloudflare Pages workflow. Pushes to `main` build and deploy to the `imagine-workbench` Cloudflare Pages project only when Pages deployment is explicitly enabled and the required GitHub settings are configured:
 
 - `ENABLE_CLOUDFLARE_PAGES_DEPLOY=true`
@@ -102,7 +110,7 @@ pnpm run pages:deploy
 Cloudflare Pages builds fail fast while non-team Node runtime API routes exist, so provider APIs are not silently omitted from a Pages deployment.
 Run `pnpm run pages:build` as the Cloudflare compatibility check before enabling or manually running Pages deployment.
 
-For opt-in LAN/self-hosted team workspaces backed by PostgreSQL and a server media volume, see [Local team deployment](docs/deployment/team-local.md). Browser IndexedDB remains the default storage mode.
+For opt-in LAN/self-hosted team workspaces backed by PostgreSQL and a server media volume, use `docker-compose.team.yml` and see [Local team deployment](docs/deployment/team-local.md). Browser IndexedDB remains the default storage mode.
 
 ## License
 

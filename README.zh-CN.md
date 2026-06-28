@@ -88,6 +88,14 @@ pnpm run test:providers
 
 ## 部署
 
+个人 Docker 部署使用默认的浏览器 IndexedDB 存储模式：
+
+```bash
+docker compose up --build
+```
+
+打开 `http://localhost:3000`。该模式不会启动 PostgreSQL；生成素材和 board 仍保存在当前浏览器配置文件中。
+
 仓库内置 Cloudflare Pages 工作流。推送到 `main` 后，在配置好下面的 GitHub secret 和 variable 时，会构建 Pages 输出并部署到 `imagine-workbench` Cloudflare Pages 项目：
 
 - `CLOUDFLARE_API_TOKEN`
@@ -99,7 +107,7 @@ pnpm run test:providers
 pnpm run pages:deploy
 ```
 
-如需启用基于 PostgreSQL 和服务端媒体卷的局域网/自托管团队工作区，请查看[本地团队部署](docs/zh-CN/deployment/team-local.md)。浏览器 IndexedDB 仍是默认存储模式。
+如需启用基于 PostgreSQL 和服务端媒体卷的局域网/自托管团队工作区，请使用 `docker-compose.team.yml`，并查看[本地团队部署](docs/zh-CN/deployment/team-local.md)。浏览器 IndexedDB 仍是默认存储模式。
 
 ## 许可证
 
