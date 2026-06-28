@@ -25,6 +25,7 @@ import {
 
 interface ResultBoardNodeProps {
   boardId: string;
+  isBatchSelectionActive?: boolean;
   isSelected?: boolean;
   isUnviewed?: boolean;
   node: BoardResultNode;
@@ -91,6 +92,7 @@ function resolveVideoCoverPreviewUrl(itemUrl: string, nodeUrl: string): string {
 
 const ResultBoardNode = memo(function ResultBoardNode({
   boardId,
+  isBatchSelectionActive = false,
   isSelected = false,
   isUnviewed = false,
   node,
@@ -210,6 +212,7 @@ const ResultBoardNode = memo(function ResultBoardNode({
       <BoardMediaNodeShell
         actionBar={<BoardMediaActionBar groups={actionGroups} visible={isSelected} />}
         activeStackAssetId={node.activeAssetId}
+        isBatchSelectionActive={isBatchSelectionActive}
         isSelected={isSelected}
         isUnviewed={isUnviewed}
         onSelectStackAsset={onSelectStackAsset}

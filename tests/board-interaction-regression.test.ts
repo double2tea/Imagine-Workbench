@@ -86,6 +86,28 @@ test("media node title chrome stays above the hover bridge for double-click rena
   assert.match(shellSource, /absolute bottom-full left-0 right-0 z-20 h-12/);
 });
 
+test("media node action bars are suppressed while batch selection toolbar is active", () => {
+  const workspaceSource = readWorkspaceFile("components/board/BoardWorkspace.tsx");
+  const nodeSource = readWorkspaceFile("components/board/BoardNode.tsx");
+  const shellSource = readWorkspaceFile("components/board/BoardMediaNodeShell.tsx");
+  const assetSource = readWorkspaceFile("components/board/AssetBoardNode.tsx");
+  const resultSource = readWorkspaceFile("components/board/ResultBoardNode.tsx");
+  const dataModel = sourceBetween(workspaceSource, "function sameFlowNodeDataModel", "function sameReusableFlowNodeData");
+
+  assert.match(workspaceSource, /const isBatchSelectionActive = selectedNodeIds\.length > 1/);
+  assert.match(workspaceSource, /isBatchSelectionActive,/);
+  assert.match(dataModel, /left\.isBatchSelectionActive === right\.isBatchSelectionActive/);
+  assert.match(workspaceSource, /existing\.isBatchSelectionActive === cachedData\.isBatchSelectionActive/);
+  assert.match(nodeSource, /const isBatchSelectionActive = data\.isBatchSelectionActive === true/);
+  assert.match(nodeSource, /isBatchSelectionActive=\{isBatchSelectionActive\}/);
+  assert.match(assetSource, /isBatchSelectionActive=\{isBatchSelectionActive\}/);
+  assert.match(resultSource, /isBatchSelectionActive=\{isBatchSelectionActive\}/);
+  assert.match(shellSource, /const shouldShowNodeControls = !isBatchSelectionActive/);
+  assert.match(shellSource, /const shouldMountActionBar = shouldShowNodeControls && \(isSelected \|\| isHovered \|\| hasFocusWithin\)/);
+  assert.match(shellSource, /const shouldShowStackControls = shouldShowNodeControls && hasStackSwitcher/);
+  assert.match(shellSource, /isProcessing && onCancelProcessing && shouldShowNodeControls/);
+});
+
 test("downloaded media filenames include a label and timestamp", () => {
   const downloadSource = readWorkspaceFile("lib/assets/download-zip.ts");
   const boardPageSource = readWorkspaceFile("components/board/BoardPageClient.tsx");

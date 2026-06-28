@@ -435,6 +435,7 @@ function sameFlowNodeDataModel(left: BoardFlowNode["data"], right: BoardFlowNode
     sameBoardNodeRenderModel(left.node, right.node) &&
     left.connectedResultNodeId === right.connectedResultNodeId &&
     left.hasResultConnection === right.hasResultConnection &&
+    left.isBatchSelectionActive === right.isBatchSelectionActive &&
     left.isUnviewedGeneratedAsset === right.isUnviewedGeneratedAsset &&
     left.compareReferenceUrl === right.compareReferenceUrl &&
     sameGenerateInputSummary(left.generateInputSummary, right.generateInputSummary) &&
@@ -460,6 +461,7 @@ function sameReusableFlowNodeData(
     sameGenerateInputSummary(existing.generateInputSummary, cachedData.generateInputSummary) &&
     existing.connectedResultNodeId === cachedData.connectedResultNodeId &&
     existing.hasResultConnection === cachedData.hasResultConnection &&
+    existing.isBatchSelectionActive === cachedData.isBatchSelectionActive &&
     existing.isUnviewedGeneratedAsset === cachedData.isUnviewedGeneratedAsset &&
     sameResultItemList(existing.resultItems, cachedData.resultItems) &&
     sameResultItemList(existing.assetStackItems, cachedData.assetStackItems) &&
@@ -2096,9 +2098,11 @@ export default function BoardWorkspace({
 
   const flowNodeDataById = useMemo(() => {
     const dataById = new Map<string, BoardFlowNode["data"]>();
+    const isBatchSelectionActive = selectedNodeIds.length > 1;
     for (const node of board.nodes) {
       dataById.set(node.id, {
         boardId: board.id,
+        isBatchSelectionActive,
         node,
         ...referenceFlowDataByNodeId.get(node.id),
         ...mediaFlowDataByNodeId.get(node.id),
@@ -2107,7 +2111,7 @@ export default function BoardWorkspace({
     return dataById;
     // board.nodes read inside; graph content gates data shape, geometry is merged in flowNodes
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [board.id, boardGraphContentKey, referenceFlowDataByNodeId, mediaFlowDataByNodeId]);
+  }, [board.id, boardGraphContentKey, referenceFlowDataByNodeId, mediaFlowDataByNodeId, selectedNodeIds.length]);
 
   const boardNodeCallbacks = useMemo<BoardNodeCallbacks>(() => ({
     onCaptureVideoFrame,

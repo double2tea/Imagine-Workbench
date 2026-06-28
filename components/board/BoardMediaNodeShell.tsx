@@ -11,6 +11,7 @@ interface BoardMediaNodeShellProps {
   actionBar: ReactNode;
   activeStackAssetId: string;
   children: ReactNode;
+  isBatchSelectionActive?: boolean;
   isSelected: boolean;
   isUnviewed?: boolean;
   onDoubleClick?: () => void;
@@ -38,6 +39,7 @@ export default function BoardMediaNodeShell({
   actionBar,
   activeStackAssetId,
   children,
+  isBatchSelectionActive = false,
   isSelected,
   isUnviewed = false,
   onDoubleClick,
@@ -55,7 +57,9 @@ export default function BoardMediaNodeShell({
   const [hasFocusWithin, setHasFocusWithin] = useState(false);
   const [isStackExpanded, setIsStackExpanded] = useState(false);
   const hasStackSwitcher = stackItems.length > 1;
-  const shouldMountActionBar = isSelected || isHovered || hasFocusWithin;
+  const shouldShowNodeControls = !isBatchSelectionActive;
+  const shouldMountActionBar = shouldShowNodeControls && (isSelected || isHovered || hasFocusWithin);
+  const shouldShowStackControls = shouldShowNodeControls && hasStackSwitcher;
   const isProcessing = status === "pending" || status === "processing";
   const isFailed = status === "failed";
   const visualStatus = isFailed ? "failed" : isProcessing ? "processing" : status === "complete" ? "complete" : "idle";
@@ -66,8 +70,8 @@ export default function BoardMediaNodeShell({
       : processingLabel ?? t('mediaNode.processing');
 
   useEffect(() => {
-    if (!hasStackSwitcher || (!isSelected && !isHovered && !hasFocusWithin)) setIsStackExpanded(false);
-  }, [hasFocusWithin, hasStackSwitcher, isHovered, isSelected]);
+    if (!shouldShowStackControls || (!isSelected && !isHovered && !hasFocusWithin)) setIsStackExpanded(false);
+  }, [hasFocusWithin, isHovered, isSelected, shouldShowStackControls]);
 
   const handleSelectStackAsset = (assetId: string) => {
     onSelectStackAsset?.(assetId);
@@ -130,7 +134,7 @@ export default function BoardMediaNodeShell({
       ) : null}
       <div className="board-media-commit-surface imagine-motion-media-reveal relative flex h-full min-h-0 items-center justify-center overflow-hidden bg-[var(--iw-panel-soft)]">
         <span className="board-media-commit-flash pointer-events-none absolute inset-0 z-30 opacity-0" />
-        {hasStackSwitcher && (
+        {shouldShowStackControls && (
           <button
             type="button"
             aria-expanded={isStackExpanded}
@@ -166,7 +170,7 @@ export default function BoardMediaNodeShell({
                 <span className="truncate">{statusTitle}</span>
               </div>
             </div>
-            {isProcessing && onCancelProcessing ? (
+            {isProcessing && onCancelProcessing && shouldShowNodeControls ? (
               <button
                 type="button"
                 className="imagine-motion-interactive nodrag pointer-events-auto absolute right-3 top-3 flex h-7 w-7 items-center justify-center rounded-full border border-white/18 bg-black/28 text-white/80 shadow-lg backdrop-blur transition hover:border-rose-300/50 hover:bg-rose-500/80 hover:text-white"
@@ -183,7 +187,7 @@ export default function BoardMediaNodeShell({
           </div>
         )}
       </div>
-      {hasStackSwitcher && isStackExpanded && (
+      {shouldShowStackControls && isStackExpanded && (
         <div
           aria-label={t('mediaNode.versions')}
           className="board-media-stack-panel nodrag nopan absolute bottom-full right-0 z-50 mb-2 rounded-xl p-1.5 shadow-xl backdrop-blur"
@@ -243,7 +247,7 @@ export default function BoardMediaNodeShell({
           </div>
         </div>
       )}
-      {hasStackSwitcher && (
+      {shouldShowStackControls && (
         <div
           data-visible={isSelected ? "true" : "false"}
           className={[

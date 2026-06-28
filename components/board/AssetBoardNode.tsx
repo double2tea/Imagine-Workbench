@@ -28,6 +28,7 @@ interface AssetBoardNodeProps {
   activeStackAssetId?: string;
   boardId: string;
   compareReferenceUrl?: string | null;
+  isBatchSelectionActive?: boolean;
   isSelected?: boolean;
   isUnviewed?: boolean;
   node: BoardAssetNode;
@@ -94,6 +95,7 @@ const AssetBoardNode = memo(function AssetBoardNode({
   activeStackAssetId,
   boardId,
   compareReferenceUrl,
+  isBatchSelectionActive = false,
   isSelected = false,
   isUnviewed = false,
   node,
@@ -251,6 +253,7 @@ const AssetBoardNode = memo(function AssetBoardNode({
       <BoardMediaNodeShell
         actionBar={<BoardMediaActionBar groups={actionGroups} visible={isSelected} />}
         activeStackAssetId={activeStackAssetId ?? node.asset.assetId}
+        isBatchSelectionActive={isBatchSelectionActive}
         isSelected={isSelected}
         isUnviewed={isUnviewed}
         onCancelProcessing={onCancelProcessing ? () => onCancelProcessing(node.id) : undefined}

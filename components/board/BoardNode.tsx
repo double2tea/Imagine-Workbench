@@ -33,6 +33,7 @@ export interface BoardFlowNodeData extends Record<string, unknown> {
   generateTaskSummary?: BoardGenerateTaskSummary;
   connectedResultNodeId?: string;
   hasResultConnection?: boolean;
+  isBatchSelectionActive?: boolean;
   isUnviewedGeneratedAsset?: boolean;
   node: BoardNodeModel;
   promptReferences?: BoardPromptReference[];
@@ -239,6 +240,7 @@ function BoardNode({ data, selected }: NodeProps<BoardFlowNode>) {
   const connectedResultNodeId = data.connectedResultNodeId;
   const focusConnectedResultNode = connectedResultNodeId ? () => c.onFocusNode(connectedResultNodeId) : undefined;
   const isMediaNode = node.kind === "asset" || node.kind === "result";
+  const isBatchSelectionActive = data.isBatchSelectionActive === true;
   const [isEditingTitle, setIsEditingTitle] = useState(false);
   const [draftTitle, setDraftTitle] = useState(node.title);
   const ports = useMemo(
@@ -436,6 +438,7 @@ function BoardNode({ data, selected }: NodeProps<BoardFlowNode>) {
         {node.kind === "asset" && (
           <AssetBoardNode
             boardId={data.boardId}
+            isBatchSelectionActive={isBatchSelectionActive}
             isSelected={selected === true}
             isUnviewed={data.isUnviewedGeneratedAsset === true}
             node={node}
@@ -461,6 +464,7 @@ function BoardNode({ data, selected }: NodeProps<BoardFlowNode>) {
         {node.kind === "result" && (
           <ResultBoardNode
             boardId={data.boardId}
+            isBatchSelectionActive={isBatchSelectionActive}
             isSelected={selected === true}
             isUnviewed={data.isUnviewedGeneratedAsset === true}
             node={node}
