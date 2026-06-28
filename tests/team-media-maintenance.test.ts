@@ -105,6 +105,10 @@ test("cleanupTeamMediaMaintenance deletes asset rows with missing payload files"
       queries.filter(query => query.text.startsWith("delete from assets")).map(query => query.values),
       [[WORKSPACE_ID, "asset_missing"]],
     );
+    assert.match(
+      queries.find(query => query.text.includes("from asset_payloads"))?.text ?? "",
+      /assets\.workspace_id = asset_payloads\.workspace_id/,
+    );
     assert.deepEqual(
       queries.find(query => query.text.startsWith("insert into audit_events"))?.values?.slice(0, 3),
       [WORKSPACE_ID, "user_1", "team_media.cleanup"],
@@ -151,6 +155,14 @@ test("cleanupTeamMediaMaintenance deletes missing preview refs without deleting 
     assert.deepEqual(
       queries.filter(query => query.text.startsWith("delete from asset_previews")).map(query => query.values),
       [[WORKSPACE_ID, "asset_missing_preview"]],
+    );
+    assert.match(
+      queries.find(query => query.text.startsWith("delete from asset_previews"))?.text ?? "",
+      /asset_previews\.workspace_id = assets\.workspace_id/,
+    );
+    assert.match(
+      queries.find(query => query.text.includes("from asset_previews"))?.text ?? "",
+      /assets\.workspace_id = asset_previews\.workspace_id/,
     );
     assert.equal(queries.some(query => query.text.startsWith("delete from assets")), false);
     assert.deepEqual(

@@ -90,7 +90,7 @@ export async function saveTeamProviderTarget(
     const result = await context.queryable.query<TeamProviderTargetRow>(
       `insert into saved_provider_targets (id, workspace_id, provider, target, is_secret, updated_at)
        values ($1, $2, $3, $4::jsonb, true, now())
-       on conflict (id) do update set
+       on conflict (workspace_id, id) do update set
          provider = excluded.provider,
          target = excluded.target,
          is_secret = true,

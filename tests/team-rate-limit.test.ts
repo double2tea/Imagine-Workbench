@@ -37,13 +37,27 @@ test("team rate limiter locks after repeated failures and resets after the windo
   assert.doesNotThrow(() => assertTeamRateLimit(key, POLICY, 6_100));
 });
 
-test("team rate limiter keys include client address and normalized identifier", () => {
+test("team rate limiter keys use a shared client bucket and normalized identifier", () => {
   const request = new Request("http://localhost:3000/api/storage/team/session", {
     headers: { "x-forwarded-for": "192.168.1.7, 10.0.0.1" },
   });
   assert.equal(
     teamRequestRateLimitKey(request, "team-login", " Owner@Example.COM "),
-    "team-login:192.168.1.7:owner@example.com",
+    "team-login:shared-client:owner@example.com",
+  );
+});
+
+test("team rate limiter ignores spoofable forwarded address headers", () => {
+  const firstRequest = new Request("http://localhost:3000/api/storage/team/session", {
+    headers: { "x-forwarded-for": "198.51.100.1", "x-real-ip": "198.51.100.2" },
+  });
+  const secondRequest = new Request("http://localhost:3000/api/storage/team/session", {
+    headers: { "x-forwarded-for": "203.0.113.1", "x-real-ip": "203.0.113.2" },
+  });
+
+  assert.equal(
+    teamRequestRateLimitKey(firstRequest, "team-login", "owner@example.com"),
+    teamRequestRateLimitKey(secondRequest, "team-login", "owner@example.com"),
   );
 });
 

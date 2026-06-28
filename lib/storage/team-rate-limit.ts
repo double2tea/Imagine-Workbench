@@ -86,7 +86,6 @@ function readCurrentEntry(
 }
 
 function readClientAddress(request: Request): string {
-  const forwardedFor = request.headers.get("x-forwarded-for")?.split(",")[0]?.trim();
-  if (forwardedFor) return forwardedFor;
-  return request.headers.get("x-real-ip")?.trim() || "unknown";
+  void request;
+  return "shared-client";
 }

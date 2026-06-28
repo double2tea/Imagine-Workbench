@@ -4,6 +4,7 @@ on:
   push:
     branches:
       - main
+  workflow_dispatch:
 
 concurrency:
   group: cloudflare-pages-${{ github.ref }}
@@ -14,6 +15,7 @@ env:
 
 jobs:
   deploy:
+    if: ${{ vars.ENABLE_CLOUDFLARE_PAGES_DEPLOY == 'true' }}
     runs-on: ubuntu-latest
     permissions:
       contents: read
@@ -40,6 +42,10 @@ jobs:
 
       - name: Check Cloudflare credentials
         run: |
+          if [ -z "$CLOUDFLARE_ACCOUNT_ID" ]; then
+            echo "Missing GitHub variable: CLOUDFLARE_ACCOUNT_ID"
+            exit 1
+          fi
           if [ -z "$CLOUDFLARE_API_TOKEN" ]; then
             echo "Missing GitHub secret: CLOUDFLARE_API_TOKEN"
             exit 1
@@ -48,8 +54,11 @@ jobs:
       - name: Install dependencies
         run: pnpm install --frozen-lockfile
 
-      - name: Lint
-        run: pnpm run lint
+      - name: Check
+        run: pnpm run check
+
+      - name: Provider tests
+        run: pnpm run test:providers
 
       - name: Build Cloudflare Pages output
         run: pnpm run pages:build

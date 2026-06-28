@@ -108,7 +108,7 @@ export function createPostgresWorkspaceStorageRepository(
       queryable,
       new LocalFilePayloadStore(config.mediaDir, { maxPayloadBytes: config.maxMediaPayloadBytes }),
     ),
-    previews: new PostgresAssetPreviewRepository(queryable),
+    previews: new PostgresAssetPreviewRepository(queryable, workspaceId),
     safetySnapshots: new PostgresSafetySnapshotRepository(queryable, workspaceId),
     schemaVersion: WORKSPACE_STORAGE_SCHEMA_VERSION,
     settings: new PostgresSettingsRepository(queryable, workspaceId),
@@ -148,9 +148,9 @@ class PostgresAssetLibraryRepository implements WorkspaceAssetLibraryRepository 
     await this.queryable.query(
       `insert into asset_library (id, workspace_id, asset_id, record, created_at, updated_at)
        values ($1, $2, $3, $4, $5, $6)
-       on conflict (id) do update
+       on conflict (workspace_id, id) do update
          set asset_id = excluded.asset_id, record = excluded.record, updated_at = excluded.updated_at
-         where asset_library.workspace_id = excluded.workspace_id`,
+       returning id`,
       [
         record.record.id,
         this.workspaceId,
@@ -182,7 +182,7 @@ class PostgresAssetRepository implements WorkspaceAssetRepository {
     if (!meta) return null;
     return {
       meta,
-      payload: await readAssetPayloadRef(this.queryable, id),
+      payload: await readAssetPayloadRef(this.queryable, this.workspaceId, id),
     };
   }
 
@@ -212,7 +212,7 @@ class PostgresAssetRepository implements WorkspaceAssetRepository {
     );
     return Promise.all(result.rows.map(async row => ({
       meta: row.meta,
-      payload: await readAssetPayloadRef(this.queryable, row.meta.id),
+      payload: await readAssetPayloadRef(this.queryable, this.workspaceId, row.meta.id),
     })));
   }
 
@@ -220,11 +220,13 @@ class PostgresAssetRepository implements WorkspaceAssetRepository {
     await this.queryable.query(
       `insert into assets (id, workspace_id, meta, updated_at)
        values ($1, $2, $3, now())
-       on conflict (id) do update set meta = excluded.meta, version = assets.version + 1, updated_at = now()`,
+       on conflict (workspace_id, id) do update
+         set meta = excluded.meta, version = assets.version + 1, updated_at = now()
+      returning id`,
       [record.meta.id, this.workspaceId, record.meta],
     );
     if (record.payload) {
-      await upsertAssetPayloadRef(this.queryable, record.meta.id, record.payload);
+      await upsertAssetPayloadRef(this.queryable, this.workspaceId, record.meta.id, record.payload);
     }
   }
 }
@@ -254,30 +256,34 @@ class PostgresAssetPayloadRepository implements WorkspaceAssetPayloadRepository 
 }
 
 class PostgresAssetPreviewRepository implements WorkspaceAssetPreviewRepository {
-  constructor(private readonly queryable: PostgresQueryable) {}
+  constructor(
+    private readonly queryable: PostgresQueryable,
+    private readonly workspaceId: string,
+  ) {}
 
   async delete(assetId: string): Promise<void> {
-    await this.queryable.query("delete from asset_previews where asset_id = $1", [assetId]);
+    await this.queryable.query("delete from asset_previews where workspace_id = $1 and asset_id = $2", [this.workspaceId, assetId]);
   }
 
   async get(assetId: string): Promise<WorkspaceAssetPreviewRecord | null> {
     const result = await this.queryable.query<PreviewRow>(
-      "select preview, storage_kind, storage_key from asset_previews where asset_id = $1",
-      [assetId],
+      "select preview, storage_kind, storage_key from asset_previews where workspace_id = $1 and asset_id = $2",
+      [this.workspaceId, assetId],
     );
     return previewRecordFromRow(result.rows[0]);
   }
 
   async put(record: WorkspaceAssetPreviewRecord): Promise<void> {
     await this.queryable.query(
-      `insert into asset_previews (asset_id, preview, storage_kind, storage_key, created_at, updated_at)
-       values ($1, $2, $3, $4, $5, now())
-       on conflict (asset_id) do update
+      `insert into asset_previews (workspace_id, asset_id, preview, storage_kind, storage_key, created_at, updated_at)
+       values ($1, $2, $3, $4, $5, $6, now())
+       on conflict (workspace_id, asset_id) do update
          set preview = excluded.preview,
            storage_kind = excluded.storage_kind,
            storage_key = excluded.storage_key,
            updated_at = now()`,
       [
+        this.workspaceId,
         record.preview.assetId,
         previewMetadataForStorage(record.preview),
         record.ref?.kind ?? null,
@@ -302,7 +308,7 @@ class PostgresBoardRepository implements WorkspaceBoardRepository {
     const result = await this.queryable.query<BoardRow>(
       `select boards.board, board_summaries.summary
        from boards
-       left join board_summaries on board_summaries.board_id = boards.id
+       left join board_summaries on board_summaries.workspace_id = boards.workspace_id and board_summaries.board_id = boards.id
        where boards.workspace_id = $1 and boards.id = $2`,
       [this.workspaceId, id],
     );
@@ -322,7 +328,7 @@ class PostgresBoardRepository implements WorkspaceBoardRepository {
     const result = await this.queryable.query<BoardRow>(
       `select boards.board, board_summaries.summary
        from boards
-       left join board_summaries on board_summaries.board_id = boards.id
+       left join board_summaries on board_summaries.workspace_id = boards.workspace_id and board_summaries.board_id = boards.id
        ${where}
        order by boards.updated_at desc limit $${limitIndex} offset $${offsetIndex}`,
       values,
@@ -335,13 +341,17 @@ class PostgresBoardRepository implements WorkspaceBoardRepository {
     await this.queryable.query(
       `insert into boards (id, workspace_id, board, updated_at)
        values ($1, $2, $3, now())
-       on conflict (id) do update set board = excluded.board, version = boards.version + 1, updated_at = now()`,
+       on conflict (workspace_id, id) do update
+         set board = excluded.board, version = boards.version + 1, updated_at = now()
+       returning id`,
       [board.id, this.workspaceId, board],
     );
     await this.queryable.query(
       `insert into board_summaries (board_id, workspace_id, summary, updated_at)
        values ($1, $2, $3, now())
-       on conflict (board_id) do update set summary = excluded.summary, updated_at = now()`,
+       on conflict (workspace_id, board_id) do update
+         set summary = excluded.summary, updated_at = now()
+       returning board_id`,
       [board.id, this.workspaceId, summary],
     );
   }
@@ -397,7 +407,9 @@ class PostgresGenerationTaskRepository implements WorkspaceGenerationTaskReposit
     await this.queryable.query(
       `insert into generation_tasks (id, workspace_id, task, status, board_id, updated_at)
        values ($1, $2, $3, $4, $5, now())
-       on conflict (id) do update set task = excluded.task, status = excluded.status, board_id = excluded.board_id, updated_at = now()`,
+       on conflict (workspace_id, id) do update
+         set task = excluded.task, status = excluded.status, board_id = excluded.board_id, updated_at = now()
+       returning id`,
       [task.id, this.workspaceId, task, task.status, task.source.boardId ?? null],
     );
   }
@@ -491,7 +503,9 @@ class PostgresSafetySnapshotRepository implements WorkspaceSafetySnapshotReposit
     await this.queryable.query(
       `insert into safety_snapshots (id, workspace_id, snapshot, created_at)
        values ($1, $2, $3, $4)
-       on conflict (id) do update set snapshot = excluded.snapshot, created_at = excluded.created_at`,
+       on conflict (workspace_id, id) do update
+         set snapshot = excluded.snapshot, created_at = excluded.created_at
+       returning id`,
       [record.id, this.workspaceId, record, record.createdAt],
     );
   }
@@ -528,9 +542,9 @@ class PostgresVoiceProfileRepository implements WorkspaceVoiceProfileRepository 
     await this.queryable.query(
       `insert into voice_profiles (id, workspace_id, profile, created_at, updated_at)
        values ($1, $2, $3, $4, $5)
-       on conflict (id) do update
+       on conflict (workspace_id, id) do update
          set profile = excluded.profile, updated_at = excluded.updated_at
-         where voice_profiles.workspace_id = excluded.workspace_id`,
+       returning id`,
       [
         record.profile.id,
         this.workspaceId,
@@ -544,12 +558,13 @@ class PostgresVoiceProfileRepository implements WorkspaceVoiceProfileRepository 
 
 async function readAssetPayloadRef(
   queryable: PostgresQueryable,
+  workspaceId: string,
   assetId: string,
 ): Promise<WorkspaceAssetPayloadRef | undefined> {
   const result = await queryable.query<PayloadRow>(
     `select content_hash, mime_type, size_bytes, storage_kind, storage_key
-     from asset_payloads where asset_id = $1 order by created_at desc limit 1`,
-    [assetId],
+     from asset_payloads where workspace_id = $1 and asset_id = $2 order by created_at desc limit 1`,
+    [workspaceId, assetId],
   );
   const row = result.rows[0];
   if (!row) return undefined;
@@ -558,14 +573,15 @@ async function readAssetPayloadRef(
 
 async function upsertAssetPayloadRef(
   queryable: PostgresQueryable,
+  workspaceId: string,
   assetId: string,
   ref: WorkspaceAssetPayloadRef,
 ): Promise<void> {
-  await queryable.query("delete from asset_payloads where asset_id = $1", [assetId]);
+  await queryable.query("delete from asset_payloads where workspace_id = $1 and asset_id = $2", [workspaceId, assetId]);
   await queryable.query(
-    `insert into asset_payloads (asset_id, content_hash, mime_type, size_bytes, storage_kind, storage_key)
-     values ($1, $2, $3, $4, $5, $6)`,
-    [assetId, ref.contentHash ?? null, ref.mimeType ?? null, ref.sizeBytes ?? null, ref.kind, ref.uri],
+    `insert into asset_payloads (workspace_id, asset_id, content_hash, mime_type, size_bytes, storage_kind, storage_key)
+     values ($1, $2, $3, $4, $5, $6, $7)`,
+    [workspaceId, assetId, ref.contentHash ?? null, ref.mimeType ?? null, ref.sizeBytes ?? null, ref.kind, ref.uri],
   );
 }
 

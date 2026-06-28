@@ -5,6 +5,9 @@ import path from "node:path";
 import test from "node:test";
 import type { QueryResult, QueryResultRow } from "pg";
 
+import type { BoardDocument } from "../lib/board/types";
+import type { StorageItemMeta } from "../lib/db";
+import type { GenerationTask } from "../lib/generation-tasks";
 import {
   assertPostgresMediaDirectoryAccess,
   DEFAULT_POSTGRES_CONNECTION_TIMEOUT_MS,
@@ -261,7 +264,7 @@ test("getPostgresMigrationStatus reports pending migrations when schema table is
   assert.equal(status.schemaTableExists, false);
   assert.equal(status.currentSchemaVersion, null);
   assert.deepEqual(status.appliedMigrationIds, []);
-  assert.deepEqual(status.pendingMigrationIds, ["0001_initial_team_storage"]);
+  assert.deepEqual(status.pendingMigrationIds, ["0001_initial_team_storage", "0002_scope_team_storage_ids"]);
   assert.equal(status.unsupportedNewerSchema, false);
 });
 
@@ -331,12 +334,12 @@ test("applyPostgresMigrations records a non-secret system audit event", async ()
   const status = await applyPostgresMigrations(queryable, "0.1.0");
   const audit = queries.find(query => query.text.includes("insert into audit_events"));
 
-  assert.deepEqual(status.appliedMigrationIds, ["0001_initial_team_storage"]);
+  assert.deepEqual(status.appliedMigrationIds, ["0001_initial_team_storage", "0002_scope_team_storage_ids"]);
   assert.deepEqual(audit?.values?.slice(0, 3), [null, null, "team_migrations.apply"]);
   assert.deepEqual(JSON.parse(String(audit?.values?.[3])) as unknown, {
     appVersion: "0.1.0",
-    appliedCount: 1,
-    appliedMigrationIds: ["0001_initial_team_storage"],
+    appliedCount: 2,
+    appliedMigrationIds: ["0001_initial_team_storage", "0002_scope_team_storage_ids"],
   });
   assert.equal(queries[0]?.text, "begin");
   assert.equal(queries.some(query => query.text === "commit"), true);
@@ -383,8 +386,22 @@ test("initial PostgreSQL migration contains the team storage foundation tables",
   assert.match(sql, /app_schema_version integer not null/);
   assert.match(sql, /team_memberships[\s\S]*role text not null check \(role in \('owner', 'admin', 'editor', 'viewer'\)\)/);
   assert.match(sql, /assets[\s\S]*owner_user_id uuid references users\(id\) on delete set null/);
+  assert.match(sql, /assets[\s\S]*primary key \(workspace_id, id\)/);
+  assert.match(sql, /boards[\s\S]*primary key \(workspace_id, id\)/);
+  assert.match(sql, /generation_tasks[\s\S]*primary key \(workspace_id, id\)/);
   assert.match(sql, /asset_payloads[\s\S]*storage_kind text not null[\s\S]*storage_key text not null/);
+  assert.match(sql, /asset_payloads[\s\S]*foreign key \(workspace_id, asset_id\) references assets\(workspace_id, id\) on delete cascade/);
   assert.match(sql, /asset_previews[\s\S]*storage_kind text[\s\S]*storage_key text/);
+});
+
+test("PostgreSQL scoped id migration converts global keys to workspace keys", () => {
+  const sql = POSTGRES_SCHEMA_MIGRATIONS[1].sql;
+
+  assert.match(sql, /alter table asset_payloads add column if not exists workspace_id uuid/);
+  assert.match(sql, /alter table assets add constraint assets_pkey primary key \(workspace_id, id\)/);
+  assert.match(sql, /alter table boards add constraint boards_pkey primary key \(workspace_id, id\)/);
+  assert.match(sql, /alter table generation_tasks add constraint generation_tasks_pkey primary key \(workspace_id, id\)/);
+  assert.match(sql, /foreign key \(workspace_id, asset_id\) references assets\(workspace_id, id\) on delete cascade/);
 });
 
 test("PostgreSQL payload repository stages local files without committing asset payload refs", async () => {
@@ -418,6 +435,49 @@ test("PostgreSQL payload repository stages local files without committing asset 
   } finally {
     await rm(mediaDir, { force: true, recursive: true });
   }
+});
+
+test("PostgreSQL repositories scope colliding record ids by workspace", async () => {
+  const queries: Array<{ text: string; values?: readonly unknown[] }> = [];
+  const queryable: PostgresQueryable = {
+    query: async <T extends QueryResultRow = QueryResultRow>(text: string, values?: unknown[]) => {
+      queries.push({ text, values });
+      if (text.includes("returning")) return typedQueryResult<T>([{ id: values?.[0], board_id: values?.[0] }]);
+      return typedQueryResult<T>([]);
+    },
+  };
+  const repository = createPostgresWorkspaceStorageRepository(
+    queryable,
+    { databaseUrl: "postgres://localhost/imagine", mediaDir: "/srv/imagine/media" },
+    "workspace_1",
+  );
+
+  await repository.assets.put({
+    meta: createAssetMeta("shared_asset"),
+    payload: {
+      kind: "local-file",
+      mimeType: "image/png",
+      uri: "originals/image/shared_asset.png",
+    },
+  });
+  await repository.boards.put(createBoardDocument("shared_board"));
+  await repository.generationTasks.put(createGenerationTask("shared_task"));
+
+  const assetWrite = queries.find(query => query.text.includes("insert into assets"));
+  const payloadDelete = queries.find(query => query.text.startsWith("delete from asset_payloads"));
+  const payloadInsert = queries.find(query => query.text.includes("insert into asset_payloads"));
+  const boardWrite = queries.find(query => query.text.includes("insert into boards"));
+  const summaryWrite = queries.find(query => query.text.includes("insert into board_summaries"));
+  const taskWrite = queries.find(query => query.text.includes("insert into generation_tasks"));
+
+  assert.match(assetWrite?.text ?? "", /on conflict \(workspace_id, id\) do update/);
+  assert.deepEqual(assetWrite?.values?.slice(0, 2), ["shared_asset", "workspace_1"]);
+  assert.deepEqual(payloadDelete?.values, ["workspace_1", "shared_asset"]);
+  assert.match(payloadInsert?.text ?? "", /insert into asset_payloads \(workspace_id, asset_id,/);
+  assert.deepEqual(payloadInsert?.values?.slice(0, 2), ["workspace_1", "shared_asset"]);
+  assert.match(boardWrite?.text ?? "", /on conflict \(workspace_id, id\) do update/);
+  assert.match(summaryWrite?.text ?? "", /on conflict \(workspace_id, board_id\) do update/);
+  assert.match(taskWrite?.text ?? "", /on conflict \(workspace_id, id\) do update/);
 });
 
 test("PostgreSQL preview repository stores preview records and refs", async () => {
@@ -471,7 +531,7 @@ test("PostgreSQL preview repository stores preview records and refs", async () =
 
   assert.deepEqual(
     queries.find(query => query.text.includes("insert into asset_previews"))?.values,
-    ["asset_1", previewMetadata, "local-file", "previews/image/asset_1.webp", "2026-06-27T00:00:00.000Z"],
+    ["workspace_1", "asset_1", previewMetadata, "local-file", "previews/image/asset_1.webp", "2026-06-27T00:00:00.000Z"],
   );
   assert.equal(Object.hasOwn(storedPreview?.preview ?? {}, "dataUrl"), false);
   assert.deepEqual(storedPreview?.ref, {
@@ -481,7 +541,7 @@ test("PostgreSQL preview repository stores preview records and refs", async () =
   });
   assert.deepEqual(
     queries.find(query => query.text.startsWith("delete from asset_previews"))?.values,
-    ["asset_1"],
+    ["workspace_1", "asset_1"],
   );
 });
 
@@ -561,3 +621,52 @@ test("PostgreSQL voice profile repository scopes profile rows", async () => {
     ["workspace_1", "voice_profile_1"],
   );
 });
+
+function createAssetMeta(id: string): StorageItemMeta {
+  return {
+    aspectRatio: "1:1",
+    boardId: "",
+    createdAt: "2026-06-27T00:00:00.000Z",
+    hasBlob: true,
+    id,
+    model: "model_1",
+    progress: 100,
+    prompt: "prompt",
+    scope: "workspace",
+    status: "complete",
+    type: "image",
+  };
+}
+
+function createBoardDocument(id: string): BoardDocument {
+  return {
+    config: {
+      showGrid: true,
+      showMiniMap: true,
+      snapToGrid: true,
+    },
+    createdAt: "2026-06-27T00:00:00.000Z",
+    edges: [],
+    id,
+    nodes: [],
+    title: "Board",
+    updatedAt: "2026-06-27T00:00:00.000Z",
+    viewport: { x: 0, y: 0, zoom: 1 },
+  };
+}
+
+function createGenerationTask(id: string): GenerationTask {
+  return {
+    canCancelRemote: false,
+    createdAt: "2026-06-27T00:00:00.000Z",
+    id,
+    mediaType: "image",
+    model: "model_1",
+    progress: 0,
+    prompt: "prompt",
+    resultAssetIds: [],
+    source: { surface: "workspace" },
+    status: "pending",
+    updatedAt: "2026-06-27T00:00:00.000Z",
+  };
+}

@@ -134,6 +134,8 @@ export interface TeamAssetListOptions {
   statuses?: StorageItemMeta["status"][];
 }
 
+type TeamAssetPagedListOptions = Omit<TeamAssetListOptions, "limit" | "offset">;
+
 export interface TeamBoardSummaryListOptions {
   ids?: string[];
   limit?: number;
@@ -176,7 +178,7 @@ export function teamAssetRecordToStorageItem(record: PublicTeamAssetRecord): Sto
 }
 
 export async function fetchTeamWorkspaceGalleryItems(fetcher: Fetcher = fetch): Promise<StorageItem[]> {
-  const result = await fetchTeamAssets({ boardId: "", limit: 200 }, fetcher);
+  const result = await fetchAllTeamAssets({ boardId: "" }, fetcher);
   return result.assets
     .filter(record => !record.meta.libraryItemId)
     .map(teamAssetRecordToStorageItem);
@@ -399,12 +401,19 @@ export async function fetchTeamSafetySnapshot(fetcher: Fetcher = fetch): Promise
 
 export async function downloadTeamWorkspaceBackup(
   includeCredentials: boolean,
+  csrfToken: string | null = "",
   fetcher: Fetcher = fetch,
 ): Promise<WorkspaceExportResult> {
   const url = includeCredentials
     ? `${API_ROUTES.storage.teamBackup}?includeCredentials=1`
     : API_ROUTES.storage.teamBackup;
-  const response = await fetcher(url, { cache: "no-store" });
+  const headers: Record<string, string> = {};
+  if (includeCredentials) {
+    const token = csrfToken?.trim() ?? "";
+    if (!token) throw new Error("CSRF token is required");
+    headers["x-imagine-csrf-token"] = token;
+  }
+  const response = await fetcher(url, { cache: "no-store", headers });
   if (!response.ok) throw new Error(await readFetchError(response, "Team backup export failed"));
   const blob = await response.blob();
   const fileName = response.headers.get("x-imagine-backup-file-name") ?? "Imagine_Team_Backup.zip";
@@ -763,6 +772,51 @@ export async function fetchTeamAssets(
   return parseTeamAssetListResult(body);
 }
 
+export async function fetchAllTeamAssets(
+  options: TeamAssetPagedListOptions = {},
+  fetcher: Fetcher = fetch,
+): Promise<TeamAssetListResult> {
+  const pageSize = 200;
+  const assets: TeamAssetListResult["assets"] = [];
+  let workspaceId = "";
+  for (let offset = 0; ; offset += pageSize) {
+    const page = await fetchTeamAssets({ ...options, limit: pageSize, offset }, fetcher);
+    workspaceId = page.workspaceId;
+    assets.push(...page.assets);
+    if (page.assets.length < pageSize) {
+      return {
+        assets,
+        limit: pageSize,
+        offset: 0,
+        targetKind: "postgres",
+        workspaceId,
+      };
+    }
+  }
+}
+
+export async function fetchTeamAssetsByIds(
+  ids: string[],
+  fetcher: Fetcher = fetch,
+): Promise<TeamAssetListResult> {
+  const pageSize = 200;
+  const assets: TeamAssetListResult["assets"] = [];
+  let workspaceId = "";
+  for (let offset = 0; offset < ids.length; offset += pageSize) {
+    const chunk = ids.slice(offset, offset + pageSize);
+    const page = await fetchTeamAssets({ ids: chunk, limit: chunk.length }, fetcher);
+    workspaceId = page.workspaceId;
+    assets.push(...page.assets);
+  }
+  return {
+    assets,
+    limit: pageSize,
+    offset: 0,
+    targetKind: "postgres",
+    workspaceId,
+  };
+}
+
 export async function fetchTeamAssetLibrary(
   options: { limit?: number; offset?: number } = {},
   fetcher: Fetcher = fetch,
@@ -774,6 +828,28 @@ export async function fetchTeamAssetLibrary(
     throw new Error(error);
   }
   return parseTeamAssetLibraryListResult(body);
+}
+
+export async function fetchAllTeamAssetLibrary(
+  fetcher: Fetcher = fetch,
+): Promise<TeamAssetLibraryListResult> {
+  const pageSize = 200;
+  const entries: TeamAssetLibraryListResult["entries"] = [];
+  let workspaceId = "";
+  for (let offset = 0; ; offset += pageSize) {
+    const page = await fetchTeamAssetLibrary({ limit: pageSize, offset }, fetcher);
+    workspaceId = page.workspaceId;
+    entries.push(...page.entries);
+    if (page.entries.length < pageSize) {
+      return {
+        entries,
+        limit: pageSize,
+        offset: 0,
+        targetKind: "postgres",
+        workspaceId,
+      };
+    }
+  }
 }
 
 export async function saveTeamAssetLibraryRecord(

@@ -109,6 +109,42 @@ test("deleting or detaching result nodes clears source result metadata", () => {
   assert.doesNotMatch(page, /onDeleteEdge=\{boardController\.deleteEdge\}/);
 });
 
+test("board warning save call sites use the active board asset save function", () => {
+  const page = readWorkspaceFile("components/board/BoardPageClient.tsx");
+  const saveWrapper = sourceBetween(page, "async function saveItemOrWarn", "function readFileAsDataUrl");
+  const callMatches = Array.from(page.matchAll(/saveItemOrWarn\(([^;]+)\);/g))
+    .map(match => match[1] ?? "")
+    .filter(call => !call.includes("item: StorageItem"));
+
+  assert.match(saveWrapper, /saveItem: \(item: StorageItem\) => Promise<StorageItem>/);
+  assert.doesNotMatch(saveWrapper, /saveItemWithPreview\(item\)/);
+  assert.equal(callMatches.length, 9);
+  assert.ok(callMatches.every(call => call.includes("saveBoardAssetWithPreview")));
+});
+
+test("team board asset loading uses complete paginated team asset reads", () => {
+  const hook = readWorkspaceFile("hooks/useBoardAssetStore.ts");
+  const page = readWorkspaceFile("components/board/BoardPageClient.tsx");
+  const loader = sourceBetween(hook, "async function loadTeamBoardAssetItems", "export function useBoardAssetStore");
+  const pruneEffect = sourceBetween(page, "const videoPreviewUpdates = items", "useMediaPolling({");
+
+  assert.match(loader, /fetchAllTeamAssets\(\{ boardId \}\)/);
+  assert.match(loader, /fetchTeamAssetsByIds\(referencedAssetIds\)/);
+  assert.doesNotMatch(loader, /limit: 200/);
+  assert.match(pruneEffect, /!isBoardAssetScopeLoaded/);
+});
+
+test("team asset library reads all paginated entries for reload and duplicate checks", () => {
+  const hook = readWorkspaceFile("hooks/useAssetLibrary.ts");
+  const reload = sourceBetween(hook, "const reload = useCallback", "useEffect(() =>");
+  const addSource = sourceBetween(hook, "async function addSourceAssetToTeamLibrary", "async function importFilesToTeamLibrary");
+
+  assert.match(reload, /fetchAllTeamAssetLibrary\(\)/);
+  assert.match(addSource, /fetchAllTeamAssetLibrary\(\)/);
+  assert.doesNotMatch(reload, /fetchTeamAssetLibrary\(\{ limit: 200 \}\)/);
+  assert.doesNotMatch(addSource, /fetchTeamAssetLibrary\(\{ limit: 200 \}\)/);
+});
+
 test("reconnecting or restoring result edges keeps result ownership metadata consistent", () => {
   const source = readWorkspaceFile("hooks/useBoardState.ts");
   const reconnectEdge = sourceBetween(source, "const reconnectEdge", "const restoreNodeWithEdges");

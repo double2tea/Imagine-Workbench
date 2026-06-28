@@ -154,7 +154,8 @@ async function deleteMissingPreviewRefs(
     await queryable.query(
       `delete from asset_previews
        using assets
-       where asset_previews.asset_id = assets.id
+       where asset_previews.workspace_id = assets.workspace_id
+         and asset_previews.asset_id = assets.id
          and assets.workspace_id = $1
          and asset_previews.asset_id = $2`,
       [workspaceId, assetId],
@@ -193,7 +194,7 @@ async function readTeamPreviewStorageKeyRows(
   const result = await queryable.query<PreviewStorageKeyRow>(
     `select asset_previews.asset_id, asset_previews.storage_kind, asset_previews.storage_key
      from asset_previews
-     inner join assets on assets.id = asset_previews.asset_id
+     inner join assets on assets.workspace_id = asset_previews.workspace_id and assets.id = asset_previews.asset_id
      where assets.workspace_id = $1`,
     [workspaceId],
   );
@@ -207,7 +208,7 @@ async function readTeamPayloadStorageKeyRows(
   const result = await queryable.query<PayloadStorageKeyRow>(
     `select assets.id as asset_id, asset_payloads.storage_kind, asset_payloads.storage_key
      from asset_payloads
-     inner join assets on assets.id = asset_payloads.asset_id
+     inner join assets on assets.workspace_id = asset_payloads.workspace_id and assets.id = asset_payloads.asset_id
      where assets.workspace_id = $1`,
     [workspaceId],
   );
@@ -222,14 +223,14 @@ async function readTeamMediaConsistencyRefs(
     queryable.query<PayloadStorageKeyRow>(
       `select assets.id as asset_id, asset_payloads.storage_kind, asset_payloads.storage_key
        from asset_payloads
-       inner join assets on assets.id = asset_payloads.asset_id
+       inner join assets on assets.workspace_id = asset_payloads.workspace_id and assets.id = asset_payloads.asset_id
        where assets.workspace_id = $1`,
       [workspaceId],
     ),
     queryable.query<PreviewStorageKeyRow>(
       `select asset_previews.asset_id, asset_previews.storage_kind, asset_previews.storage_key
        from asset_previews
-       inner join assets on assets.id = asset_previews.asset_id
+       inner join assets on assets.workspace_id = asset_previews.workspace_id and assets.id = asset_previews.asset_id
        where assets.workspace_id = $1`,
       [workspaceId],
     ),

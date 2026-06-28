@@ -473,9 +473,8 @@ async function restoreTeamPromptTemplates(
     await queryable.query(
       `insert into prompt_templates (id, workspace_id, template, created_at, updated_at)
        values ($1, $2, $3, $4, $5)
-       on conflict (id) do update
-         set template = excluded.template, updated_at = excluded.updated_at
-         where prompt_templates.workspace_id = excluded.workspace_id`,
+       on conflict (workspace_id, id) do update
+         set template = excluded.template, updated_at = excluded.updated_at`,
       [template.id, workspaceId, template, template.createdAt, template.updatedAt],
     );
   }
@@ -505,7 +504,7 @@ async function restoreTeamProviderTargets(
     await queryable.query(
       `insert into saved_provider_targets (id, workspace_id, provider, target, is_secret, updated_at)
        values ($1, $2, $3, $4::jsonb, true, now())
-       on conflict (id) do update set
+       on conflict (workspace_id, id) do update set
          provider = excluded.provider,
          target = excluded.target,
          is_secret = true,

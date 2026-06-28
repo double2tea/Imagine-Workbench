@@ -22,7 +22,10 @@ import {
   fetchTeamBoardDocument,
   fetchTeamMembers,
   fetchTeamAssets,
+  fetchAllTeamAssets,
+  fetchAllTeamAssetLibrary,
   fetchTeamAssetLibrary,
+  fetchTeamAssetsByIds,
   fetchTeamBoardSummaries,
   fetchTeamGenerationTasks,
   fetchTeamSecrets,
@@ -277,7 +280,7 @@ test("downloadTeamWorkspaceBackup downloads zip responses and parses counts", as
   const restoreDom = installDownloadDom();
   try {
     let requestedUrl = "";
-    const result = await downloadTeamWorkspaceBackup(false, async input => {
+    const result = await downloadTeamWorkspaceBackup(false, "", async input => {
       requestedUrl = String(input);
       return new Response(new Blob(["zip"]), {
         headers: {
@@ -306,7 +309,7 @@ test("downloadTeamWorkspaceBackup downloads zip responses and parses counts", as
     assert.equal(downloadState.clicked, true);
 
     await assert.rejects(
-      downloadTeamWorkspaceBackup(false, async () => jsonResponse({ error: "no backup" }, { status: 500 })),
+      downloadTeamWorkspaceBackup(false, "", async () => jsonResponse({ error: "no backup" }, { status: 500 })),
       /no backup/,
     );
   } finally {
@@ -446,56 +449,118 @@ test("fetchTeamAssets sends list filters and rejects payload storage keys", asyn
   );
 });
 
-test("fetchTeamWorkspaceGalleryItems reads workspace-global team assets", async () => {
-  let requestedUrl = "";
-  const result = await fetchTeamWorkspaceGalleryItems(async input => {
-    requestedUrl = String(input);
+test("fetchAllTeamAssets paginates board assets beyond one page", async () => {
+  const requestedUrls: string[] = [];
+  const result = await fetchAllTeamAssets({ boardId: "board_1" }, async input => {
+    const requestedUrl = String(input);
+    requestedUrls.push(requestedUrl);
+    const url = new URL(requestedUrl, "http://localhost");
+    const offset = Number(url.searchParams.get("offset") ?? "0");
+    const limit = Number(url.searchParams.get("limit") ?? "0");
+    const total = 450;
+    const count = Math.max(0, Math.min(limit, total - offset));
     return jsonResponse({
-      assets: [
-        {
-          mediaUrl: "/api/storage/team/assets/workspace_asset/media",
-          meta: {
-            aspectRatio: "1:1",
-            boardId: "",
-            createdAt: "2026-06-27T00:00:00.000Z",
-            hasBlob: true,
-            id: "workspace_asset",
-            model: "model",
-            progress: 100,
-            prompt: "prompt",
-            scope: "workspace",
-            status: "complete",
-            type: "image",
-          },
+      assets: Array.from({ length: count }, (_, index) => ({
+        mediaUrl: `/api/storage/team/assets/asset_${offset + index}/media`,
+        meta: {
+          hasBlob: true,
+          id: `asset_${offset + index}`,
+          status: "complete",
+          type: "image",
         },
-        {
-          mediaUrl: "/api/storage/team/assets/library_backing/media",
-          meta: {
-            aspectRatio: "1:1",
-            boardId: "",
-            createdAt: "2026-06-27T00:00:00.000Z",
-            hasBlob: true,
-            id: "library_backing",
-            libraryItemId: "library_1",
-            model: "model",
-            progress: 100,
-            prompt: "prompt",
-            scope: "workspace",
-            status: "complete",
-            type: "image",
-          },
+      })),
+      limit,
+      offset,
+      targetKind: "postgres",
+      workspaceId: "workspace_1",
+    });
+  });
+
+  assert.deepEqual(requestedUrls, [
+    "/api/storage/team/assets?boardId=board_1&limit=200&offset=0",
+    "/api/storage/team/assets?boardId=board_1&limit=200&offset=200",
+    "/api/storage/team/assets?boardId=board_1&limit=200&offset=400",
+  ]);
+  assert.equal(result.assets.length, 450);
+  assert.equal(result.assets[449]?.meta.id, "asset_449");
+});
+
+test("fetchTeamAssetsByIds batches reference ids beyond one request", async () => {
+  const requestedIdGroups: string[][] = [];
+  const ids = Array.from({ length: 401 }, (_, index) => `asset_${index}`);
+  const result = await fetchTeamAssetsByIds(ids, async input => {
+    const url = new URL(String(input), "http://localhost");
+    const requestedIds = url.searchParams.getAll("id");
+    requestedIdGroups.push(requestedIds);
+    return jsonResponse({
+      assets: requestedIds.map(id => ({
+        mediaUrl: `/api/storage/team/assets/${id}/media`,
+        meta: {
+          hasBlob: true,
+          id,
+          status: "complete",
+          type: "image",
         },
-      ],
-      limit: 200,
+      })),
+      limit: Number(url.searchParams.get("limit") ?? "0"),
       offset: 0,
       targetKind: "postgres",
       workspaceId: "workspace_1",
     });
   });
 
-  assert.equal(requestedUrl, "/api/storage/team/assets?boardId=&limit=200");
-  assert.deepEqual(result.map(item => item.id), ["workspace_asset"]);
-  assert.equal(result[0]?.url, "/api/storage/team/assets/workspace_asset/media");
+  assert.deepEqual(requestedIdGroups.map(group => group.length), [200, 200, 1]);
+  assert.equal(result.assets.length, 401);
+  assert.equal(result.assets[400]?.meta.id, "asset_400");
+});
+
+test("fetchTeamWorkspaceGalleryItems reads workspace-global team assets", async () => {
+  const requestedUrls: string[] = [];
+  const result = await fetchTeamWorkspaceGalleryItems(async input => {
+    const requestedUrl = String(input);
+    requestedUrls.push(requestedUrl);
+    const url = new URL(requestedUrl, "http://localhost");
+    const offset = Number(url.searchParams.get("offset") ?? "0");
+    const limit = Number(url.searchParams.get("limit") ?? "0");
+    const count = offset === 0 ? 200 : 2;
+    return jsonResponse({
+      assets: Array.from({ length: count }, (_, index) => {
+        const assetIndex = offset + index;
+        const id = assetIndex === 201 ? "library_backing" : `workspace_asset_${assetIndex}`;
+        return {
+          mediaUrl: `/api/storage/team/assets/${id}/media`,
+          meta: {
+            aspectRatio: "1:1",
+            boardId: "",
+            createdAt: "2026-06-27T00:00:00.000Z",
+            hasBlob: true,
+            id,
+            ...(assetIndex === 201 ? { libraryItemId: "library_1" } : {}),
+            model: "model",
+            progress: 100,
+            prompt: "prompt",
+            scope: "workspace",
+            status: "complete",
+            type: "image",
+          },
+        };
+      }),
+      limit,
+      offset,
+      targetKind: "postgres",
+      workspaceId: "workspace_1",
+    });
+  });
+
+  assert.deepEqual(requestedUrls, [
+    "/api/storage/team/assets?boardId=&limit=200&offset=0",
+    "/api/storage/team/assets?boardId=&limit=200&offset=200",
+  ]);
+  assert.equal(result.length, 201);
+  assert.equal(result[0]?.id, "workspace_asset_0");
+  assert.equal(result[200]?.id, "workspace_asset_200");
+  assert.equal(result.some(item => item.id === "library_backing"), false);
+  assert.equal(result[0]?.url, "/api/storage/team/assets/workspace_asset_0/media");
 });
 
 test("team asset library client sends filters and rejects payload storage keys", async () => {
@@ -599,6 +664,49 @@ test("team asset library client sends filters and rejects payload storage keys",
     deleteTeamAssetLibraryRecord("library_1", " "),
     /CSRF token is required/,
   );
+});
+
+test("fetchAllTeamAssetLibrary paginates library entries beyond one page", async () => {
+  const requestedUrls: string[] = [];
+  const result = await fetchAllTeamAssetLibrary(async input => {
+    const requestedUrl = String(input);
+    requestedUrls.push(requestedUrl);
+    const url = new URL(requestedUrl, "http://localhost");
+    const offset = Number(url.searchParams.get("offset") ?? "0");
+    const limit = Number(url.searchParams.get("limit") ?? "0");
+    const total = 405;
+    const count = Math.max(0, Math.min(limit, total - offset));
+    return jsonResponse({
+      entries: Array.from({ length: count }, (_, index) => ({
+        asset: {
+          mediaUrl: `/api/storage/team/assets/asset_${offset + index}/media`,
+          meta: {
+            hasBlob: true,
+            id: `asset_${offset + index}`,
+            status: "complete",
+            type: "image",
+          },
+        },
+        record: createLibraryAssetRecord({
+          assetId: `asset_${offset + index}`,
+          id: `library_${offset + index}`,
+          sourceAssetId: `asset_${offset + index}`,
+        }),
+      })),
+      limit,
+      offset,
+      targetKind: "postgres",
+      workspaceId: "workspace_1",
+    });
+  });
+
+  assert.deepEqual(requestedUrls, [
+    "/api/storage/team/asset-library?limit=200&offset=0",
+    "/api/storage/team/asset-library?limit=200&offset=200",
+    "/api/storage/team/asset-library?limit=200&offset=400",
+  ]);
+  assert.equal(result.entries.length, 405);
+  assert.equal(result.entries[404]?.record.id, "library_404");
 });
 
 test("deleteTeamAsset sends CSRF header to encoded asset route", async () => {

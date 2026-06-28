@@ -54,7 +54,7 @@ export async function getTeamBoardDocument(
   const result = await context.queryable.query<TeamBoardDocumentRow>(
     `select boards.board, boards.version, board_summaries.summary
      from boards
-     left join board_summaries on board_summaries.board_id = boards.id
+     left join board_summaries on board_summaries.workspace_id = boards.workspace_id and board_summaries.board_id = boards.id
      where boards.workspace_id = $1 and boards.id = $2`,
     [context.session.workspaceId, boardId],
   );
@@ -84,7 +84,7 @@ export async function createTeamBoardDocument(
     const insertResult = await context.queryable.query<TeamBoardVersionRow>(
       `insert into boards (id, workspace_id, board, updated_at)
        values ($1, $2, $3, now())
-       on conflict (id) do nothing
+       on conflict (workspace_id, id) do nothing
        returning version`,
       [board.id, context.session.workspaceId, board],
     );
@@ -260,7 +260,8 @@ async function upsertTeamBoardSummary(
   await queryable.query(
     `insert into board_summaries (board_id, workspace_id, summary, updated_at)
      values ($1, $2, $3, now())
-     on conflict (board_id) do update set summary = excluded.summary, updated_at = now()`,
+     on conflict (workspace_id, board_id) do update
+       set summary = excluded.summary, updated_at = now()`,
     [boardId, workspaceId, summary],
   );
 }

@@ -72,6 +72,8 @@ Docker Compose 启动、环境变量、migrations、首个 owner 引导、备份
 - 如果对外开放 `/v1/*`，应使用 `OPENAI_COMPAT_API_KEY` 保护；
 - 供应商 key 应视为密钥，不应提交到仓库或暴露在客户端可见代码中。
 
+当仍存在非团队本地的 Node runtime 供应商路由时，Cloudflare Pages 构建会直接失败，而不是部署缺失供应商 API 的 Pages 应用。
+
 ## 当前限制
 
 - 浏览器模式没有内置用户账号或跨设备同步。

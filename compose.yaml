@@ -3,12 +3,20 @@ services:
     build:
       context: .
     environment:
-      APP_URL: http://localhost:3000
-      DATABASE_URL: postgresql://imagine:imagine_password@db:5432/imagine_workbench
+      APP_URL: ${APP_URL:?APP_URL is required}
+      DATABASE_URL: ${DATABASE_URL:?DATABASE_URL is required}
+      IMAGINE_MAX_MEDIA_PAYLOAD_BYTES: ${IMAGINE_MAX_MEDIA_PAYLOAD_BYTES:?IMAGINE_MAX_MEDIA_PAYLOAD_BYTES is required}
       IMAGINE_MEDIA_DIR: /data/imagine-media
+      IMAGINE_MEDIA_USAGE_WARNING_BYTES: ${IMAGINE_MEDIA_USAGE_WARNING_BYTES:-}
+      IMAGINE_POSTGRES_CONNECTION_TIMEOUT_MS: ${IMAGINE_POSTGRES_CONNECTION_TIMEOUT_MS:-3000}
+      IMAGINE_POSTGRES_IDLE_TIMEOUT_MS: ${IMAGINE_POSTGRES_IDLE_TIMEOUT_MS:-1000}
+      IMAGINE_POSTGRES_POOL_MAX: ${IMAGINE_POSTGRES_POOL_MAX:-5}
+      IMAGINE_POSTGRES_QUERY_TIMEOUT_MS: ${IMAGINE_POSTGRES_QUERY_TIMEOUT_MS:-30000}
       IMAGINE_STORAGE_TARGET: postgres
-      IMAGINE_TEAM_SETUP_TOKEN: replace_with_a_long_random_setup_token
-      NEXT_PUBLIC_APP_VERSION: ${NEXT_PUBLIC_APP_VERSION:-0.1.0}
+      IMAGINE_TEAM_SECRET_ENCRYPTION_KEY: ${IMAGINE_TEAM_SECRET_ENCRYPTION_KEY:?IMAGINE_TEAM_SECRET_ENCRYPTION_KEY is required}
+      IMAGINE_TEAM_SETUP_TOKEN: ${IMAGINE_TEAM_SETUP_TOKEN:?IMAGINE_TEAM_SETUP_TOKEN is required}
+      IMAGINE_TRUSTED_ORIGINS: ${IMAGINE_TRUSTED_ORIGINS:-}
+      NEXT_PUBLIC_APP_VERSION: ${NEXT_PUBLIC_APP_VERSION:-0.2.0}
     ports:
       - "3000:3000"
     depends_on:
@@ -20,11 +28,11 @@ services:
   db:
     image: postgres:17-alpine
     environment:
-      POSTGRES_DB: imagine_workbench
-      POSTGRES_USER: imagine
-      POSTGRES_PASSWORD: imagine_password
+      POSTGRES_DB: ${POSTGRES_DB:?POSTGRES_DB is required}
+      POSTGRES_USER: ${POSTGRES_USER:?POSTGRES_USER is required}
+      POSTGRES_PASSWORD: ${POSTGRES_PASSWORD:?POSTGRES_PASSWORD is required}
     healthcheck:
-      test: ["CMD-SHELL", "pg_isready -U imagine -d imagine_workbench"]
+      test: ["CMD-SHELL", "pg_isready -U ${POSTGRES_USER:?POSTGRES_USER is required} -d ${POSTGRES_DB:?POSTGRES_DB is required}"]
       interval: 5s
       timeout: 5s
       retries: 12

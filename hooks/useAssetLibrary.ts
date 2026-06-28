@@ -20,7 +20,7 @@ import {
 import { t } from "@/lib/i18n-core";
 import {
   deleteTeamAssetLibraryRecord,
-  fetchTeamAssetLibrary,
+  fetchAllTeamAssetLibrary,
   fetchWorkspaceStorageRuntimeStatus,
   readTeamCsrfToken,
   saveTeamAsset,
@@ -91,7 +91,7 @@ export function useAssetLibrary() {
       const nextRecords: LibraryAssetRecord[] = [];
       const items: StorageItem[] = [];
       if (storageTarget === "postgres") {
-        const result = await fetchTeamAssetLibrary({ limit: 200 });
+        const result = await fetchAllTeamAssetLibrary();
         nextRecords.push(...result.entries.map(entry => entry.record));
         items.push(...result.entries.flatMap(entry => entry.asset ? [teamAssetRecordToStorageItem(entry.asset)] : []));
       } else {
@@ -211,7 +211,7 @@ export function useAssetLibrary() {
 async function addSourceAssetToTeamLibrary(
   source: StorageItem,
 ): Promise<{ record: LibraryAssetRecord; created: boolean }> {
-  const result = await fetchTeamAssetLibrary({ limit: 200 });
+  const result = await fetchAllTeamAssetLibrary();
   const existing = result.entries.find(entry => entry.record.sourceAssetId === source.id)?.record;
   if (existing) return { record: existing, created: false };
   const record = createTeamLibraryRecordFromSource(source);

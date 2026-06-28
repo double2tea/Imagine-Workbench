@@ -16,6 +16,7 @@ import {
   encryptWorkspaceSecret,
   isEncryptedWorkspaceSecret,
 } from "../lib/storage/team-secret-crypto";
+import { GET as getTeamBackup } from "../app/api/storage/team/backup/route";
 import {
   exportTeamWorkspaceBackup,
   restoreTeamWorkspaceBackup,
@@ -37,6 +38,36 @@ const RAW_SESSION_TOKEN = "raw-session-token";
 const WORKSPACE_ID = "workspace_1";
 const CREATED_AT = "2026-06-27T00:00:00.000Z";
 const ENCRYPTION_KEY = "team-backup-encryption-key";
+
+test("team backup GET with credentials requires trusted origin and CSRF before export", async () => {
+  const originalAppUrl = process.env.APP_URL;
+  const originalStorageTarget = process.env.IMAGINE_STORAGE_TARGET;
+  try {
+    process.env.APP_URL = "http://localhost:3000";
+    delete process.env.IMAGINE_STORAGE_TARGET;
+
+    const missingOrigin = await getTeamBackup(new Request(
+      "http://localhost:3000/api/storage/team/backup?includeCredentials=1",
+    ));
+    assert.equal(missingOrigin.status, 403);
+    assert.equal((await missingOrigin.json() as { code?: string }).code, "untrusted_origin");
+
+    const missingCsrf = await getTeamBackup(new Request(
+      "http://localhost:3000/api/storage/team/backup?includeCredentials=1",
+      {
+        headers: {
+          cookie: "imagine_team_csrf=csrf-token",
+          origin: "http://localhost:3000",
+        },
+      },
+    ));
+    assert.equal(missingCsrf.status, 403);
+    assert.equal((await missingCsrf.json() as { code?: string }).code, "invalid_csrf");
+  } finally {
+    restoreEnv("APP_URL", originalAppUrl);
+    restoreEnv("IMAGINE_STORAGE_TARGET", originalStorageTarget);
+  }
+});
 
 function queryResult<T extends QueryResultRow>(rows: T[]): QueryResult<T> {
   return {
@@ -175,10 +206,10 @@ test("restoreTeamWorkspaceBackup replaces team workspace records and stores a sa
     assert.equal(queries.some(query => query.text === "rollback"), false);
     assert.ok(queries.some(query => query.text.startsWith("insert into safety_snapshots")));
     assert.ok(queries.some(query => query.values?.[2] === "team_backup.restore"));
-    const payloadInsert = queries.find(query => query.text.includes("insert into asset_payloads") && query.values?.[0] === "asset_1");
+    const payloadInsert = queries.find(query => query.text.includes("insert into asset_payloads") && query.values?.[1] === "asset_1");
     assert.ok(payloadInsert);
-    assert.equal(payloadInsert.values?.[2], "image/png");
-    assert.equal(await readFile(path.join(mediaDir, ...String(payloadInsert.values?.[5]).split("/")), "utf8"), "image-bytes");
+    assert.equal(payloadInsert.values?.[3], "image/png");
+    assert.equal(await readFile(path.join(mediaDir, ...String(payloadInsert.values?.[6]).split("/")), "utf8"), "image-bytes");
   });
 });
 
@@ -451,8 +482,9 @@ function createTeamBackupQueryable(
       if (text.startsWith("insert into safety_snapshots") && options.failSafetySnapshotPut === true) {
         throw new Error("safety snapshot write failed");
       }
+      if (text.includes("returning")) return typedQueryResult<T>([{ id: values?.[0], board_id: values?.[0] }]);
       if (text.includes("select meta from assets")) return typedQueryResult<T>(existingRecords ? [{ meta: ASSET_META }] : []);
-      if (text.includes("from asset_payloads where asset_id")) {
+      if (text.includes("from asset_payloads where workspace_id")) {
         return typedQueryResult<T>(existingRecords ? [{
           content_hash: "hash",
           mime_type: "image/png",
@@ -672,3 +704,11 @@ const RUNNINGHUB_SAVED_TARGET = {
   targetType: "ai-app",
   updatedAt: CREATED_AT,
 };
+
+function restoreEnv(key: string, value: string | undefined): void {
+  if (value === undefined) {
+    delete process.env[key];
+    return;
+  }
+  process.env[key] = value;
+}

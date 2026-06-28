@@ -447,7 +447,9 @@ export default function SettingsModal({
       return;
     }
     if (!teamSession) throw new Error(t("dataManagement.teamSessionRequired"));
-    await downloadTeamWorkspaceBackup(includeCredentials);
+    const csrfToken = includeCredentials ? readTeamCsrfToken() : "";
+    if (includeCredentials && !csrfToken) throw new Error(t("dataManagement.teamSessionCsrfMissing"));
+    await downloadTeamWorkspaceBackup(includeCredentials, csrfToken);
     await refreshDataSummary();
   }, [onExportWorkspace, refreshDataSummary, storageStatus?.mode, t, teamSession]);
 

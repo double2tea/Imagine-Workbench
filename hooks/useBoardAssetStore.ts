@@ -16,7 +16,7 @@ import {
   type StorageItem,
   type StorageItemMeta,
 } from "@/lib/db";
-import { fetchTeamAssets, teamAssetRecordToStorageItem } from "@/lib/storage/team-client";
+import { fetchAllTeamAssets, fetchTeamAssetsByIds, teamAssetRecordToStorageItem } from "@/lib/storage/team-client";
 
 interface UseBoardAssetStoreResult {
   items: StorageItem[];
@@ -84,9 +84,9 @@ async function loadTeamBoardAssetItems(
   referencedAssetIds: string[],
 ): Promise<{ items: StorageItem[]; metas: StorageItemMeta[] }> {
   const [boardAssets, referencedAssets] = await Promise.all([
-    fetchTeamAssets({ boardId, limit: 200 }),
+    fetchAllTeamAssets({ boardId }),
     referencedAssetIds.length > 0
-      ? fetchTeamAssets({ ids: referencedAssetIds, limit: Math.max(100, Math.min(200, referencedAssetIds.length)) })
+      ? fetchTeamAssetsByIds(referencedAssetIds)
       : Promise.resolve(null),
   ]);
   const items = mergeStorageItems(

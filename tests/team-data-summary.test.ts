@@ -85,6 +85,14 @@ test("getTeamWorkspaceDataSummary returns PostgreSQL workspace data health stats
       queries.find(query => query.text.includes("select meta from assets"))?.values,
       [WORKSPACE_ID],
     );
+    assert.match(
+      queries.find(query => query.text.includes("from asset_payloads"))?.text ?? "",
+      /assets\.workspace_id = asset_payloads\.workspace_id/,
+    );
+    assert.match(
+      queries.find(query => query.text.includes("from asset_previews"))?.text ?? "",
+      /assets\.workspace_id = asset_previews\.workspace_id/,
+    );
   });
 });
 

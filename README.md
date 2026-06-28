@@ -82,14 +82,14 @@ pnpm run lint
 pnpm run typecheck
 pnpm run check
 pnpm run build
-pnpm run pages:build
 pnpm run test:providers
 ```
 
 ## Deployment
 
-The repository includes a Cloudflare Pages workflow. Pushes to `main` build the Pages output and deploy to the `imagine-workbench` Cloudflare Pages project when the required GitHub secret and variable are configured:
+The repository includes an opt-in Cloudflare Pages workflow. Pushes to `main` build and deploy to the `imagine-workbench` Cloudflare Pages project only when Pages deployment is explicitly enabled and the required GitHub settings are configured:
 
+- `ENABLE_CLOUDFLARE_PAGES_DEPLOY=true`
 - `CLOUDFLARE_API_TOKEN`
 - `CLOUDFLARE_ACCOUNT_ID`
 
@@ -98,6 +98,9 @@ Manual deploy:
 ```bash
 pnpm run pages:deploy
 ```
+
+Cloudflare Pages builds fail fast while non-team Node runtime API routes exist, so provider APIs are not silently omitted from a Pages deployment.
+Run `pnpm run pages:build` as the Cloudflare compatibility check before enabling or manually running Pages deployment.
 
 For opt-in LAN/self-hosted team workspaces backed by PostgreSQL and a server media volume, see [Local team deployment](docs/deployment/team-local.md). Browser IndexedDB remains the default storage mode.
 

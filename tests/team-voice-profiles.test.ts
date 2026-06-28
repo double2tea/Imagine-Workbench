@@ -215,6 +215,9 @@ function createTeamVoiceProfilesQueryable(
           workspace_id: WORKSPACE_ID,
         }]);
       }
+      if (text.includes("insert into voice_profiles")) {
+        return typedQueryResult<T>([{ id: PROFILE.id }]);
+      }
       if (text.startsWith("select profile from voice_profiles")) {
         return typedQueryResult<T>([{ profile: PROFILE }]);
       }

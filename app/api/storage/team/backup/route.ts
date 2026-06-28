@@ -15,8 +15,15 @@ export const dynamic = "force-dynamic";
 
 export async function GET(request: Request): Promise<Response> {
   try {
-    const config = resolvePostgresStorageConfig(process.env);
     const includeCredentials = new URL(request.url).searchParams.get("includeCredentials") === "1";
+    if (includeCredentials) {
+      assertTrustedTeamRequestOrigin(request, {
+        APP_URL: process.env.APP_URL,
+        IMAGINE_TRUSTED_ORIGINS: process.env.IMAGINE_TRUSTED_ORIGINS,
+      });
+      assertTeamCsrf(request);
+    }
+    const config = resolvePostgresStorageConfig(process.env);
     const result = await withPostgresClient(config, client => exportTeamWorkspaceBackup(
       client,
       config,

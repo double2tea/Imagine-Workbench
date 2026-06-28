@@ -88,7 +88,7 @@ export async function getTeamWorkspaceDataSummary(
     context.queryable.query<PayloadRow>(
       `select asset_payloads.asset_id, asset_payloads.size_bytes, asset_payloads.storage_kind, asset_payloads.storage_key
        from asset_payloads
-       inner join assets on assets.id = asset_payloads.asset_id
+       inner join assets on assets.workspace_id = asset_payloads.workspace_id and assets.id = asset_payloads.asset_id
        where assets.workspace_id = $1`,
       [workspaceId],
     ),
@@ -107,7 +107,7 @@ export async function getTeamWorkspaceDataSummary(
     context.queryable.query<PreviewRow>(
       `select asset_previews.storage_kind, asset_previews.storage_key
        from asset_previews
-       inner join assets on assets.id = asset_previews.asset_id
+       inner join assets on assets.workspace_id = asset_previews.workspace_id and assets.id = asset_previews.asset_id
        where assets.workspace_id = $1`,
       [workspaceId],
     ),

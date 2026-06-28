@@ -81,8 +81,9 @@ test("team boards route rejects invalid query params before opening a database c
 });
 
 test("getTeamBoardDocument returns a redacted versioned board document", async () => {
+  const queries: Array<{ text: string; values?: readonly unknown[] }> = [];
   const result = await getTeamBoardDocument(
-    createTeamBoardsQueryable(),
+    createTeamBoardsQueryable(queries),
     { databaseUrl: "postgres://localhost/imagine", mediaDir: "/srv/imagine/media" },
     requestWithSession(),
     BOARD_ID,
@@ -92,6 +93,10 @@ test("getTeamBoardDocument returns a redacted versioned board document", async (
   assert.equal(result.board.nodes[0]?.kind, "runninghub-app");
   assert.equal("accessPassword" in (result.board.nodes[0] ?? {}), false);
   assert.deepEqual(result.summary, createBoardSummary());
+  assert.match(
+    queries.find(query => query.text.includes("left join board_summaries"))?.text ?? "",
+    /board_summaries\.workspace_id = boards\.workspace_id/,
+  );
 });
 
 test("createTeamBoardDocument inserts a new editor-scoped board", async () => {
@@ -106,6 +111,9 @@ test("createTeamBoardDocument inserts a new editor-scoped board", async () => {
 
   assert.equal(result.version, 1);
   const insertQuery = queries.find(query => query.text.trim().startsWith("insert into boards"));
+  const summaryQuery = queries.find(query => query.text.trim().startsWith("insert into board_summaries"));
+  assert.match(insertQuery?.text ?? "", /on conflict \(workspace_id, id\) do nothing/);
+  assert.match(summaryQuery?.text ?? "", /on conflict \(workspace_id, board_id\) do update/);
   assert.deepEqual(insertQuery?.values, [BOARD_ID, WORKSPACE_ID, board]);
   assert.equal(queries.at(-1)?.text, "commit");
 });

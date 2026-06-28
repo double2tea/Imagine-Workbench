@@ -236,8 +236,9 @@ test("saveTeamAsset writes an editor-scoped asset payload and metadata", async (
     assert.equal(savedMeta?.url, undefined);
     assert.equal(savedMeta?.hasBlob, true);
     assert.equal(savedMeta?.contentHash?.startsWith("sha256:"), true);
-    assert.equal(payloadInsert?.values?.[0], ASSET_ID);
-    assert.equal(payloadInsert?.values?.[2], "image/png");
+    assert.equal(payloadInsert?.values?.[0], WORKSPACE_ID);
+    assert.equal(payloadInsert?.values?.[1], ASSET_ID);
+    assert.equal(payloadInsert?.values?.[3], "image/png");
   } finally {
     await rm(mediaDir, { force: true, recursive: true });
   }
@@ -336,7 +337,7 @@ test("saveTeamAsset preserves rich generation metadata and transcript assets", a
     const transcriptPayload = transcriptQueries.find(query => query.text.includes("insert into asset_payloads"));
     assert.equal(transcriptMeta?.type, "transcript");
     assert.equal(transcriptMeta?.generationRequest?.referenceMedia?.[0]?.type, "audio");
-    assert.equal(transcriptPayload?.values?.[2], "text/plain");
+    assert.equal(transcriptPayload?.values?.[3], "text/plain");
   } finally {
     await rm(mediaDir, { force: true, recursive: true });
   }

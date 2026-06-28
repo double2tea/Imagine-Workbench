@@ -346,12 +346,13 @@ function readRunningHubAppSchemaResult(value: unknown): { name?: string; nodeInf
 
 async function saveItemOrWarn(
   item: StorageItem,
+  saveItem: (item: StorageItem) => Promise<StorageItem>,
   pushWorkspaceNotice: (type: NoticeType, message: string) => void,
 ): Promise<StorageItem | null> {
   try {
-    return await saveItemWithPreview(item);
+    return await saveItem(item);
   } catch (error) {
-    pushWorkspaceNotice("error", `Local storage failed, may be lost after refresh: ${toErrorMessage(error, "IndexedDB write failed")}`);
+    pushWorkspaceNotice("error", `Storage save failed, may be lost after refresh: ${toErrorMessage(error, "Storage write failed")}`);
     return null;
   }
 }
@@ -2463,7 +2464,7 @@ export default function BoardPage({ boardId = DEFAULT_BOARD_ID }: BoardPageProps
       },
       { boardId: resolvedBoardId },
     );
-    const savedItem = await saveItemOrWarn(item, pushWorkspaceNotice);
+    const savedItem = await saveItemOrWarn(item, saveBoardAssetWithPreview, pushWorkspaceNotice);
     if (!savedItem) return null;
     setItems(prev => [savedItem, ...prev]);
     const nodeId = boardController.addAssetNodeWithConnection(
@@ -2498,7 +2499,7 @@ export default function BoardPage({ boardId = DEFAULT_BOARD_ID }: BoardPageProps
       },
       { boardId: resolvedBoardId },
     );
-    const savedItem = await saveItemOrWarn(nextItem, pushWorkspaceNotice);
+    const savedItem = await saveItemOrWarn(nextItem, saveBoardAssetWithPreview, pushWorkspaceNotice);
     if (!savedItem) return;
     setItems(prev => prev.map(current => current.id === savedItem.id ? savedItem : current));
     boardController.updateAssetNodeAsset(nodeId, storageItemToBoardAssetReference(savedItem));
@@ -2516,7 +2517,7 @@ export default function BoardPage({ boardId = DEFAULT_BOARD_ID }: BoardPageProps
       },
       { boardId: resolvedBoardId },
     );
-    const savedItem = await saveItemOrWarn(nextItem, pushWorkspaceNotice);
+    const savedItem = await saveItemOrWarn(nextItem, saveBoardAssetWithPreview, pushWorkspaceNotice);
     if (!savedItem) return;
     setItems(prev => prev.map(current => current.id === savedItem.id ? savedItem : current));
     boardController.updateAssetNodeAsset(nodeId, storageItemToBoardAssetReference(savedItem));
@@ -2736,7 +2737,7 @@ export default function BoardPage({ boardId = DEFAULT_BOARD_ID }: BoardPageProps
         },
         { boardId: resolvedBoardId },
       );
-      const savedEditedItem = await saveItemOrWarn(editedItem, pushWorkspaceNotice);
+      const savedEditedItem = await saveItemOrWarn(editedItem, saveBoardAssetWithPreview, pushWorkspaceNotice);
       if (!savedEditedItem) return;
       setItems(prev => [savedEditedItem, ...prev]);
       const editedNodeId = boardController.addAssetNode({
@@ -4105,7 +4106,7 @@ export default function BoardPage({ boardId = DEFAULT_BOARD_ID }: BoardPageProps
         },
         { boardId: boardController.board.id },
       );
-      const savedItem = await saveItemOrWarn(item, pushWorkspaceNotice);
+      const savedItem = await saveItemOrWarn(item, saveBoardAssetWithPreview, pushWorkspaceNotice);
       if (!savedItem) return;
       setItems(prev => [savedItem, ...prev]);
       addAssetToBoard(savedItem, {
@@ -4116,7 +4117,7 @@ export default function BoardPage({ boardId = DEFAULT_BOARD_ID }: BoardPageProps
     } catch (error) {
       pushWorkspaceNotice("error", error instanceof Error ? error.message : t("board.import.multiGridExportFailed"));
     }
-  }, [addAssetToBoard, boardController.board, pushWorkspaceNotice, t]);
+  }, [addAssetToBoard, boardController.board, pushWorkspaceNotice, saveBoardAssetWithPreview, t]);
 
   const handleCaptureVideoFrame = useCallback(async (
     sourceNodeId: string,
@@ -4128,7 +4129,7 @@ export default function BoardPage({ boardId = DEFAULT_BOARD_ID }: BoardPageProps
     }
 
     const frameItem = createVideoFrameStorageItem(item, frame, makeClientId("frame"));
-    const savedFrameItem = await saveItemOrWarn(frameItem, pushWorkspaceNotice);
+    const savedFrameItem = await saveItemOrWarn(frameItem, saveBoardAssetWithPreview, pushWorkspaceNotice);
     if (!savedFrameItem) return;
     setItems(prev => [savedFrameItem, ...prev]);
 
@@ -4138,7 +4139,7 @@ export default function BoardPage({ boardId = DEFAULT_BOARD_ID }: BoardPageProps
       : undefined;
     addAssetToBoard(savedFrameItem, position);
     pushWorkspaceNotice("success", t("board.import.frameSavedToBoard", { label: getVideoFrameCaptureLabel(frame.mode) }));
-  }, [addAssetToBoard, boardController.board.nodes, pushWorkspaceNotice, t]);
+  }, [addAssetToBoard, boardController.board.nodes, pushWorkspaceNotice, saveBoardAssetWithPreview, t]);
 
   const handleSavePanoramaScreenshots = useCallback(async (
     item: StorageItem,
@@ -4162,7 +4163,7 @@ export default function BoardPage({ boardId = DEFAULT_BOARD_ID }: BoardPageProps
         makeClientId(`pano_${index}`),
         { boardId: resolvedBoardId, sourceBoardNodeId: sourceNodeId },
       );
-      const savedScreenshotItem = await saveItemOrWarn(screenshotItem, pushWorkspaceNotice);
+      const savedScreenshotItem = await saveItemOrWarn(screenshotItem, saveBoardAssetWithPreview, pushWorkspaceNotice);
       if (savedScreenshotItem) savedItems.push(savedScreenshotItem);
     }
     if (savedItems.length === 0) return;
@@ -4182,7 +4183,7 @@ export default function BoardPage({ boardId = DEFAULT_BOARD_ID }: BoardPageProps
       );
     });
     pushWorkspaceNotice("success", t("board.import.panoramaScreenshotsSaved", { count: savedItems.length }));
-  }, [addAssetToBoard, boardController.board.nodes, pushWorkspaceNotice, resolvedBoardId, t]);
+  }, [addAssetToBoard, boardController.board.nodes, pushWorkspaceNotice, resolvedBoardId, saveBoardAssetWithPreview, t]);
 
   const handleImportBoardFiles = useCallback(async (files: File[], position: BoardPoint): Promise<void> => {
     const boardFiles = files.filter(file => mediaReferenceTypeFromMime(file.type) !== null);
@@ -4203,7 +4204,7 @@ export default function BoardPage({ boardId = DEFAULT_BOARD_ID }: BoardPageProps
           resolvedBoardId,
         );
         const nodeSize = await boardImportNodeSize(item);
-        const savedItem = await saveItemOrWarn(item, pushWorkspaceNotice);
+        const savedItem = await saveItemOrWarn(item, saveBoardAssetWithPreview, pushWorkspaceNotice);
         if (!savedItem) continue;
         importedItems.push({ item: savedItem, nodeSize });
       } catch (error) {
@@ -4228,7 +4229,7 @@ export default function BoardPage({ boardId = DEFAULT_BOARD_ID }: BoardPageProps
       ...prev.filter(item => !importedItems.some(imported => imported.item.id === item.id)),
     ]);
     pushWorkspaceNotice("success", t("board.import.filesImported", { count: importedItems.length }));
-  }, [boardController, pushWorkspaceNotice, resolvedBoardId, t]);
+  }, [boardController, pushWorkspaceNotice, resolvedBoardId, saveBoardAssetWithPreview, t]);
 
   const useSelectedBoardAssetAsReference = () => {
     const references = activeBoardReference(boardController.board.nodes, boardController.board.edges, boardController.selectedNodeId, items, resolveBoardReferenceUrl);
@@ -4963,7 +4964,7 @@ export default function BoardPage({ boardId = DEFAULT_BOARD_ID }: BoardPageProps
           makeClientId(boardUploadIdPrefix(mediaType, index).replace("board_", "local_")),
           { boardId: resolvedBoardId },
         );
-        const savedItem = await saveItemOrWarn(item, pushWorkspaceNotice);
+        const savedItem = await saveItemOrWarn(item, saveBoardAssetWithPreview, pushWorkspaceNotice);
         if (!savedItem) continue;
         importedItems.push(savedItem);
       } catch (error) {
@@ -4976,7 +4977,7 @@ export default function BoardPage({ boardId = DEFAULT_BOARD_ID }: BoardPageProps
       ...prev.filter(item => !importedItems.some(importedItem => importedItem.id === item.id)),
     ]);
     pushWorkspaceNotice("success", `Imported ${importedItems.length} local media`);
-  }, [pushWorkspaceNotice, resolvedBoardId, t]);
+  }, [pushWorkspaceNotice, resolvedBoardId, saveBoardAssetWithPreview, t]);
 
   const handleDataCleanupAssets = useCallback(async (kind: WorkspaceCleanupKind) => {
     if (!requireBrowserDataManagementAction()) return;

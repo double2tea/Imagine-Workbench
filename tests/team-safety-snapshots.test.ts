@@ -173,6 +173,9 @@ function createTeamSafetySnapshotsQueryable(
           workspace_id: WORKSPACE_ID,
         }]);
       }
+      if (text.includes("insert into safety_snapshots")) {
+        return typedQueryResult<T>([{ id: SNAPSHOT.id }]);
+      }
       if (text.includes("from safety_snapshots")) {
         return typedQueryResult<T>([{
           asset_count: SNAPSHOT.assetCount,
