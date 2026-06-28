@@ -8,8 +8,8 @@
 
 <!-- @@@auto:current-status -->
 - **Active File**: `journal-3.md`
-- **Total Sessions**: 169
-- **Last Active**: 2026-06-26
+- **Total Sessions**: 170
+- **Last Active**: 2026-06-28
 <!-- @@@/auto:current-status -->
 
 ---
@@ -19,7 +19,7 @@
 <!-- @@@auto:active-documents -->
 | File | Lines | Status |
 |------|-------|--------|
-| `journal-3.md` | ~1711 | Active |
+| `journal-3.md` | ~1751 | Active |
 | `journal-2.md` | ~1973 | Archived |
 | `journal-1.md` | ~1988 | Archived |
 <!-- @@@/auto:active-documents -->
@@ -31,6 +31,7 @@
 <!-- @@@auto:session-history -->
 | # | Date | Title | Commits | Branch |
 |---|------|-------|---------|--------|
+| 170 | 2026-06-28 | Add prompt templates | `9ba15312` | `main` |
 | 169 | 2026-06-26 | Unify board media source rules | `900a2ad0`, `63f54d82` | `main` |
 | 168 | 2026-06-26 | Fix board prompt reference forwarding | `d044733f` | `main` |
 | 167 | 2026-06-24 | Automatic multi-grid splitting | `b57a1244` | `main` |

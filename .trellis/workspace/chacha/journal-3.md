@@ -1716,3 +1716,36 @@ Unified board generated media around source-connected media nodes, fixed source 
 ### Next Steps
 
 - None - task complete
+
+
+## Session 170: Add prompt templates
+
+**Date**: 2026-06-28
+**Task**: Add prompt templates
+**Branch**: `main`
+
+### Summary
+
+Added built-in prompt templates for Img2Img image repair and PREVIS Seedance storyboard sheets; lint passed, typecheck remained blocked by unrelated board callback work.
+
+### Main Changes
+
+(Add details)
+
+### Git Commits
+
+| Hash | Message |
+|------|---------|
+| `9ba15312` | (see git log) |
+
+### Testing
+
+- [OK] (Add test results)
+
+### Status
+
+[OK] **Completed**
+
+### Next Steps
+
+- None - task complete
