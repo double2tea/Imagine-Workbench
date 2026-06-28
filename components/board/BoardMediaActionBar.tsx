@@ -1,4 +1,4 @@
-import { useState, type ReactNode } from "react";
+import { useEffect, useRef, useState, type ReactNode } from "react";
 import { useTranslations } from "@/lib/i18n";
 
 export interface BoardMediaMenuItem {
@@ -32,12 +32,33 @@ interface BoardMediaActionBarProps {
 export default function BoardMediaActionBar({ groups, visible = false }: BoardMediaActionBarProps) {
   const { t } = useTranslations("board");
   const [openMenuId, setOpenMenuId] = useState<string | null>(null);
+  const closeMenuTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
+  useEffect(() => () => {
+    if (closeMenuTimerRef.current === null) return;
+    clearTimeout(closeMenuTimerRef.current);
+  }, []);
+
   const visibleGroups = groups.filter(group => group.actions.length > 0);
   if (visibleGroups.length === 0) return null;
   const actionCount = visibleGroups.reduce((count, group) => count + group.actions.length, 0);
-  const visibilityClass = visible
+  const shouldShowControls = visible || openMenuId !== null;
+  const visibilityClass = shouldShowControls
     ? "pointer-events-auto opacity-100"
     : "pointer-events-none opacity-0 group-hover/board-video:pointer-events-auto group-hover/board-video:opacity-100";
+
+  const cancelCloseMenuTimer = () => {
+    if (closeMenuTimerRef.current === null) return;
+    clearTimeout(closeMenuTimerRef.current);
+    closeMenuTimerRef.current = null;
+  };
+
+  const closeMenuSoon = () => {
+    cancelCloseMenuTimer();
+    closeMenuTimerRef.current = setTimeout(() => {
+      setOpenMenuId(null);
+      closeMenuTimerRef.current = null;
+    }, 180);
+  };
 
   const groupLabels: Record<BoardMediaActionGroupId, string> = {
     assist: t('mediaActionBar.assist'),
@@ -54,7 +75,8 @@ export default function BoardMediaActionBar({ groups, visible = false }: BoardMe
       className={`board-media-controls board-media-top-actions nodrag nopan absolute bottom-full left-1/2 right-auto z-40 mb-12 flex w-max max-w-none flex-nowrap items-center justify-center whitespace-nowrap [translate:-50%_0] transition-opacity duration-200 ${visibilityClass}`}
       onPointerDown={event => event.stopPropagation()}
       onDoubleClick={event => event.stopPropagation()}
-      onPointerLeave={() => setOpenMenuId(null)}
+      onPointerEnter={cancelCloseMenuTimer}
+      onPointerLeave={closeMenuSoon}
     >
       {visibleGroups.map(group => (
         <div
@@ -76,6 +98,7 @@ export default function BoardMediaActionBar({ groups, visible = false }: BoardMe
                   aria-haspopup={hasMenu ? "menu" : undefined}
                   onClick={() => {
                     if (hasMenu) {
+                      cancelCloseMenuTimer();
                       setOpenMenuId(currentId => currentId === menuId ? null : menuId);
                       return;
                     }
@@ -91,6 +114,8 @@ export default function BoardMediaActionBar({ groups, visible = false }: BoardMe
                 {hasMenu && isMenuOpen ? (
                   <div
                     role="menu"
+                    onPointerEnter={cancelCloseMenuTimer}
+                    onPointerLeave={closeMenuSoon}
                     className="imagine-floating-card-actions absolute left-1/2 top-full z-50 mt-2 flex -translate-x-1/2 items-center gap-1 rounded-xl border border-[var(--iw-border)] bg-[var(--iw-panel)] p-1 shadow-2xl shadow-black/40"
                   >
                     {action.menuItems?.map(item => (

@@ -31,6 +31,18 @@ function syntheticGridImage(width: number, height: number, rects: BoardImageSpli
   return { data, height, width };
 }
 
+function solidImage(width: number, height: number, value: number): { data: Uint8ClampedArray; height: number; width: number } {
+  const data = new Uint8ClampedArray(width * height * 4);
+  for (let index = 0; index < width * height; index += 1) {
+    const offset = index * 4;
+    data[offset] = value;
+    data[offset + 1] = value;
+    data[offset + 2] = value;
+    data[offset + 3] = 255;
+  }
+  return { data, height, width };
+}
+
 test("preset grid rects are deterministic row-major crops", () => {
   assert.deepEqual(createPresetBoardImageGridRects(90, 60, 3), [
     { x: 0, y: 0, width: 30, height: 20 },
@@ -54,4 +66,49 @@ test("auto grid detection supports irregular rectangular panels", () => {
   const imageData = syntheticGridImage(130, 80, panels);
 
   assert.deepEqual(detectBoardImageGridRects(imageData), panels);
+});
+
+test("auto grid detection does not split images made only of separator pixels", () => {
+  assert.deepEqual(detectBoardImageGridRects(solidImage(120, 80, 0)), []);
+  assert.deepEqual(detectBoardImageGridRects(solidImage(120, 80, 255)), []);
+});
+
+test("auto grid detection splits local separators even when panel content bridges them", () => {
+  const panels = [
+    { x: 4, y: 4, width: 100, height: 30 },
+    { x: 108, y: 4, width: 108, height: 30 },
+    { x: 4, y: 38, width: 62, height: 30 },
+    { x: 70, y: 38, width: 62, height: 30 },
+    { x: 136, y: 38, width: 80, height: 30 },
+    { x: 4, y: 72, width: 100, height: 34 },
+    { x: 108, y: 72, width: 108, height: 34 },
+  ];
+  const imageData = syntheticGridImage(220, 110, panels);
+  const bridgeSpans = [
+    { x: 104, y: 18, width: 4, height: 2 },
+    { x: 66, y: 52, width: 4, height: 2 },
+    { x: 132, y: 52, width: 4, height: 2 },
+    { x: 104, y: 88, width: 4, height: 2 },
+  ];
+  for (const bridge of bridgeSpans) {
+    for (let y = bridge.y; y < bridge.y + bridge.height; y += 1) {
+      for (let x = bridge.x; x < bridge.x + bridge.width; x += 1) {
+        const offset = (y * imageData.width + x) * 4;
+        imageData.data[offset] = 160;
+        imageData.data[offset + 1] = 160;
+        imageData.data[offset + 2] = 160;
+        imageData.data[offset + 3] = 255;
+      }
+    }
+  }
+
+  assert.deepEqual(detectBoardImageGridRects(imageData), [
+    { x: 0, y: 0, width: 106, height: 36 },
+    { x: 106, y: 0, width: 114, height: 36 },
+    { x: 0, y: 36, width: 68, height: 34 },
+    { x: 68, y: 36, width: 66, height: 34 },
+    { x: 134, y: 36, width: 86, height: 34 },
+    { x: 0, y: 70, width: 106, height: 40 },
+    { x: 106, y: 70, width: 114, height: 40 },
+  ]);
 });

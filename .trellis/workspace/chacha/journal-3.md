@@ -1782,3 +1782,72 @@ Implemented Prompt node text execution that sends connected media to the selecte
 ### Next Steps
 
 - None - task complete
+
+
+## Session 172: Local database and Docker deployment usability
+
+**Date**: 2026-06-28
+**Task**: Local database and Docker deployment usability
+**Branch**: `main`
+
+### Summary
+
+Completed PostgreSQL team-storage/local-database usability wrap-up, hid default IndexedDB badges, added personal Docker deployment, hardened Docker Compose with APP_PORT, healthchecks, HOSTNAME binding, check:docker validation, and deployment documentation. Verification included lint, typecheck, check:version, check:docker, Docker build/run on APP_PORT=3010, healthy container status, and browser-mode storage status API.
+
+### Main Changes
+
+(Add details)
+
+### Git Commits
+
+| Hash | Message |
+|------|---------|
+| `2ca06d3d` | (see git log) |
+| `517fdf0b` | (see git log) |
+| `d154a821` | (see git log) |
+| `85fc8399` | (see git log) |
+
+### Testing
+
+- [OK] (Add test results)
+
+### Status
+
+[OK] **Completed**
+
+### Next Steps
+
+- None - task complete
+
+
+## Session 173: Fix board generation result stack sync
+
+**Date**: 2026-06-28
+**Task**: Fix board generation result stack sync
+**Branch**: `main`
+
+### Summary
+
+Fixed board generation writeback and processing indicators to use resolved result stack keys, preventing stale completed result nodes from showing as generating and allowing unkeyed source nodes to adopt explicit event stack keys.
+
+### Main Changes
+
+(Add details)
+
+### Git Commits
+
+| Hash | Message |
+|------|---------|
+| `9ca30129` | (see git log) |
+
+### Testing
+
+- [OK] (Add test results)
+
+### Status
+
+[OK] **Completed**
+
+### Next Steps
+
+- None - task complete

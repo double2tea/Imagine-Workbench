@@ -34,6 +34,7 @@ const COMPONENT_SEPARATOR_DARK_LUMA = 32;
 const COMPONENT_SEPARATOR_LIGHT_LUMA = 250;
 const MIN_CELL_SIZE = 24;
 const MIN_COMPONENT_AREA_RATIO = 0.01;
+const LOCAL_SEPARATOR_RATIO_THRESHOLD = 0.7;
 
 function loadImage(url: string): Promise<HTMLImageElement> {
   return new Promise((resolve, reject) => {
@@ -115,6 +116,32 @@ function separatorCentersForAxis(
   return groupedLineCenters(candidates);
 }
 
+function separatorCentersForRect(
+  imageData: BoardImageGridPixelData,
+  rect: BoardImageSplitRect,
+  axis: "x" | "y",
+): number[] {
+  const { data, width } = imageData;
+  const length = axis === "x" ? rect.width : rect.height;
+  const crossLength = axis === "x" ? rect.height : rect.width;
+  if (length < MIN_CELL_SIZE * 2 || crossLength < MIN_CELL_SIZE) return [];
+  const start = (axis === "x" ? rect.x : rect.y) + MIN_CELL_SIZE;
+  const end = (axis === "x" ? rect.x + rect.width : rect.y + rect.height) - MIN_CELL_SIZE;
+  const crossStart = axis === "x" ? rect.y : rect.x;
+  const candidates: number[] = [];
+  for (let line = start; line < end; line += 1) {
+    let separatorPixels = 0;
+    for (let cross = 0; cross < crossLength; cross += 1) {
+      const x = axis === "x" ? line : crossStart + cross;
+      const y = axis === "x" ? crossStart + cross : line;
+      const offset = (y * width + x) * 4;
+      if (isSeparatorPixel(data, offset)) separatorPixels += 1;
+    }
+    if (separatorPixels / crossLength >= LOCAL_SEPARATOR_RATIO_THRESHOLD) candidates.push(line);
+  }
+  return groupedLineCenters(candidates);
+}
+
 function sortRectsByReadingOrder(rects: BoardImageSplitRect[]): BoardImageSplitRect[] {
   const medianHeight = [...rects].sort((left, right) => left.height - right.height)[Math.floor(rects.length / 2)]?.height ?? MIN_CELL_SIZE;
   const rowTolerance = Math.max(MIN_CELL_SIZE, Math.round(medianHeight * 0.35));
@@ -158,6 +185,44 @@ function rectsFromSeparators(width: number, height: number, verticalLines: numbe
     }
   }
   return sortRectsByReadingOrder(rects);
+}
+
+function splitRectAtCenters(rect: BoardImageSplitRect, axis: "x" | "y", centers: number[]): BoardImageSplitRect[] {
+  const start = axis === "x" ? rect.x : rect.y;
+  const end = axis === "x" ? rect.x + rect.width : rect.y + rect.height;
+  const bounds = [start, ...centers, end];
+  const rects: BoardImageSplitRect[] = [];
+  for (let index = 0; index < bounds.length - 1; index += 1) {
+    const from = bounds[index] ?? start;
+    const to = bounds[index + 1] ?? end;
+    const size = to - from;
+    if (size < MIN_CELL_SIZE) continue;
+    rects.push(axis === "x"
+      ? { x: from, y: rect.y, width: size, height: rect.height }
+      : { x: rect.x, y: from, width: rect.width, height: size });
+  }
+  return rects;
+}
+
+function recursiveSeparatorRectsForRegion(imageData: BoardImageGridPixelData, rect: BoardImageSplitRect): BoardImageSplitRect[] {
+  const horizontalCenters = separatorCentersForRect(imageData, rect, "y");
+  if (horizontalCenters.length > 0) {
+    return splitRectAtCenters(rect, "y", horizontalCenters).flatMap(child => recursiveSeparatorRectsForRegion(imageData, child));
+  }
+  const verticalCenters = separatorCentersForRect(imageData, rect, "x");
+  if (verticalCenters.length > 0) {
+    return splitRectAtCenters(rect, "x", verticalCenters).flatMap(child => recursiveSeparatorRectsForRegion(imageData, child));
+  }
+  return [rect];
+}
+
+function recursiveSeparatorRects(imageData: BoardImageGridPixelData): BoardImageSplitRect[] {
+  return sortRectsByReadingOrder(recursiveSeparatorRectsForRegion(imageData, {
+    x: 0,
+    y: 0,
+    width: imageData.width,
+    height: imageData.height,
+  }));
 }
 
 export function createPresetBoardImageGridRects(width: number, height: number, gridSize: BoardImageGridSplitPreset): BoardImageSplitRect[] {
@@ -235,6 +300,15 @@ function componentRects(imageData: BoardImageGridPixelData): BoardImageSplitRect
 
 export function detectBoardImageGridRects(imageData: BoardImageGridPixelData): BoardImageSplitRect[] {
   const connectedRects = componentRects(imageData);
+  if (connectedRects.length === 0) return [];
+  const recursiveRects = recursiveSeparatorRects(imageData);
+  if (
+    recursiveRects.length >= 2 &&
+    recursiveRects.length <= BOARD_IMAGE_GRID_SPLIT_MAX_CROPS &&
+    recursiveRects.length > connectedRects.length
+  ) {
+    return recursiveRects;
+  }
   if (connectedRects.length >= 2 && connectedRects.length <= BOARD_IMAGE_GRID_SPLIT_MAX_CROPS) {
     return connectedRects;
   }

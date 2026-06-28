@@ -8,7 +8,7 @@
 
 <!-- @@@auto:current-status -->
 - **Active File**: `journal-3.md`
-- **Total Sessions**: 171
+- **Total Sessions**: 173
 - **Last Active**: 2026-06-28
 <!-- @@@/auto:current-status -->
 
@@ -19,7 +19,7 @@
 <!-- @@@auto:active-documents -->
 | File | Lines | Status |
 |------|-------|--------|
-| `journal-3.md` | ~1784 | Active |
+| `journal-3.md` | ~1853 | Active |
 | `journal-2.md` | ~1973 | Archived |
 | `journal-1.md` | ~1988 | Archived |
 <!-- @@@/auto:active-documents -->
@@ -31,6 +31,8 @@
 <!-- @@@auto:session-history -->
 | # | Date | Title | Commits | Branch |
 |---|------|-------|---------|--------|
+| 173 | 2026-06-28 | Fix board generation result stack sync | `9ca30129` | `main` |
+| 172 | 2026-06-28 | Local database and Docker deployment usability | `2ca06d3d`, `517fdf0b`, `d154a821`, `85fc8399` | `main` |
 | 171 | 2026-06-28 | Run prompt nodes to notes | `686cb334` | `main` |
 | 170 | 2026-06-28 | Add prompt templates | `9ba15312` | `main` |
 | 169 | 2026-06-26 | Unify board media source rules | `900a2ad0`, `63f54d82` | `main` |
