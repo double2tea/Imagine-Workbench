@@ -352,6 +352,11 @@
         "scene": "Character movement, product usage, action scenes",
         "parameterHint": "Best for video generation prompts"
       },
+      "storyboard-previs-seedance": {
+        "title": "PREVIS Seedance Storyboard",
+        "scene": "GPT Image 2 + Seedance 2.0 controllable storyboard sheets",
+        "parameterHint": "Best at 16:9 for GPT Image 2 + Seedance 2.0 planning"
+      },
       "character-consistency": {
         "title": "Character Consistency",
         "scene": "Character design, IP extension, multi-image consistency"
@@ -450,6 +455,11 @@
       "custom-reference-remix": {
         "title": "Reference Remix",
         "scene": "Image-to-image, style continuation, subject preservation"
+      },
+      "custom-image-repair-img2img": {
+        "title": "Img2Img Image Repair",
+        "scene": "Image repair, material realism, low-denoise repainting",
+        "parameterHint": "Best for Img2Img denoise 0.25-0.4"
       }
     }
   },

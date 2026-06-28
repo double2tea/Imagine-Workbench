@@ -182,6 +182,15 @@ export const PROMPT_TEMPLATES: PromptTemplate[] = [
     parameterHint: "Best for video generation prompts",
   },
   {
+    id: "storyboard-previs-seedance",
+    category: "storyboard",
+    title: "PREVIS Seedance Storyboard",
+    scene: "GPT Image 2 + Seedance 2.0 controllable storyboard sheets",
+    positivePrompt:
+      "你是专业的电影 PREVIS 导演分镜艺术家，擅长为 GPT Image 2 + Seedance 2.0 工作流生成高可控性故事板，生成一张 16:9 故事板纸，包含 [X] 个电影式面板，或者包含以下剧情「[填写剧情]」，整体为轻量、动态、未完成的早期分镜绘画风格，面板内必须纯黑白，粗铅笔线条，细节最少，快速手势绘画能量，简单解剖结构，强烈轮廓可读性，使用参考图像作为角色，确保所有面板角色外观、比例、服装完全一致，颜色注释系统叠加在版面上，红色箭头 = 身体运动 / 表演动作，蓝色箭头 = 摄像机运动，绿色标记 = 构图 / 构图笔记，橙色标记 = 光线方向，紫色标记 = 歌声 / 情感强调，黑色文字 = 镜头参数 + 面板标签，保持电影式镜头节奏、清晰面板边界、可读动作线和导演级 PREVIS 可控性",
+    parameterHint: "Best at 16:9 for GPT Image 2 + Seedance 2.0 planning",
+  },
+  {
     id: "character-consistency",
     category: "character",
     title: "Character Consistency",
@@ -394,6 +403,15 @@ export const PROMPT_TEMPLATES: PromptTemplate[] = [
     positivePrompt:
       "Keep from reference: [subject / composition / color palette to keep]\nChange: [elements to change]\nStyle direction: [target style]\nComposition: [image structure]\nQuality target: coherent identity, stable details, natural lighting, production-ready finish",
     negativePrompt: "identity drift, inconsistent structure, unwanted object changes, low fidelity to reference",
+  },
+  {
+    id: "custom-image-repair-img2img",
+    category: "custom",
+    title: "Img2Img Image Repair",
+    scene: "Image repair, material realism, low-denoise repainting",
+    positivePrompt:
+      "核心主体：[根据参考图识别并填写人物肖像、商业产品、室内外场景或具体物体]，保留原始构图、主体比例、姿态、视角和主要轮廓，彻底忽略参考图当前存在的涂抹痕迹、噪点、塑料感、脏乱背景和画质损伤，按真实物理规律重新塑造画面，皮肤呈现真实毛孔、细腻纹理、自然肤色过渡和次表面散射，头发具有清晰发丝层次、自然油脂高光和真实束感，衣物具有明确纤维编织纹理、布料厚度、褶皱张力和自然磨砂反射，金属表面具有准确镜面反射、边缘高光和细微使用痕迹，玻璃与透明材质具有正确透光、折射、反射和厚度感，塑料或产品涂层保持真实材质硬度、干净平整表面和自然高光衰减，背景为 clean, pure smooth background, 简洁专业、纯净干净、完全无噪点，专业影棚布光，光线均匀柔和，无明显杂乱阴影，高光自然通透，立体感强，主体边缘清晰，焦点准确，85mm镜头，f/1.8大光圈，中画幅摄影，极致清晰，电影级写实主义，8K UHD，真实物理材质，photorealistic, sharp focus, completely noise-free, no artifacts, no grain, 无涂抹痕迹，无塑料假面感，无脏污背景，无压缩噪点，适合低去噪强度0.25-0.4的Img2Img重绘，在保留原构图的同时大幅提升画质、真实感和专业质感",
+    parameterHint: "Best for Img2Img denoise 0.25-0.4",
   },
 ];
 

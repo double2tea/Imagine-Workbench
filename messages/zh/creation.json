@@ -352,6 +352,11 @@
         "scene": "人物移动、产品使用、动作场景",
         "parameterHint": "适合视频生成提示词"
       },
+      "storyboard-previs-seedance": {
+        "title": "PREVIS Seedance 分镜纸",
+        "scene": "GPT Image 2 + Seedance 2.0 高可控故事板",
+        "parameterHint": "适合 16:9 的 GPT Image 2 + Seedance 2.0 规划"
+      },
       "character-consistency": {
         "title": "角色一致性",
         "scene": "角色设定、IP 延展、多图统一"
@@ -450,6 +455,11 @@
       "custom-reference-remix": {
         "title": "参考图再创作",
         "scene": "图生图、风格延续、主体保持"
+      },
+      "custom-image-repair-img2img": {
+        "title": "图生图画质修复",
+        "scene": "图片修复、真实材质、低去噪重绘",
+        "parameterHint": "适合 Img2Img 去噪强度 0.25-0.4"
       }
     }
   },
