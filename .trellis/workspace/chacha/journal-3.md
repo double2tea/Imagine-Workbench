@@ -1749,3 +1749,36 @@ Added built-in prompt templates for Img2Img image repair and PREVIS Seedance sto
 ### Next Steps
 
 - None - task complete
+
+
+## Session 171: Run prompt nodes to notes
+
+**Date**: 2026-06-28
+**Task**: Run prompt nodes to notes
+**Branch**: `main`
+
+### Summary
+
+Implemented Prompt node text execution that sends connected media to the selected chat model and writes generated text into a connected or newly created Note. Fixed Prompt-to-Note port validation so reused note-in semantics require matching portKind.
+
+### Main Changes
+
+(Add details)
+
+### Git Commits
+
+| Hash | Message |
+|------|---------|
+| `686cb334` | (see git log) |
+
+### Testing
+
+- [OK] (Add test results)
+
+### Status
+
+[OK] **Completed**
+
+### Next Steps
+
+- None - task complete
