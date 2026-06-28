@@ -42,7 +42,7 @@ import { downloadStorageItemsZip, storageItemDownloadFileName } from "@/lib/asse
 import { saveItemWithPreview } from "@/lib/assets/previews";
 import { resolveAssetOriginalUrl } from "@/lib/assets/resolve-url";
 import { estimateBoardNoteSize, estimateBoardPromptSize } from "@/lib/board/text-node-size";
-import { findConnectedResultNodeForSourceStack } from "@/lib/board/utils";
+import { findConnectedResultNodeForSourceStack, resolveGenerationEventResultStackKey } from "@/lib/board/utils";
 import { buildBoardResultStackKey, type BoardResultStackValue } from "@/lib/board/result-stack";
 import { generateReferenceCandidates } from "@/lib/board/prompt-references";
 import { useBoardState } from "@/hooks/useBoardState";
@@ -1401,20 +1401,32 @@ function findExecutableNodeById(nodes: BoardDocument["nodes"], nodeId: string): 
   return isExecutableBoardNode(node) ? node : undefined;
 }
 
-function isSourceStackItem(item: StorageItem, sourceNode: ExecutableBoardNode): boolean {
-  return item.sourceBoardNodeId === sourceNode.id && (!sourceNode.resultStackKey || item.sourceBoardResultStackKey === sourceNode.resultStackKey);
+function sourceNodeStackKey(sourceNode: ExecutableBoardNode): string {
+  return sourceNode.resultStackKey ?? "";
 }
 
-function hasActiveSourceItems(items: StorageItem[], sourceNode: ExecutableBoardNode): boolean {
-  return items.some(item => isSourceStackItem(item, sourceNode) && (item.status === "pending" || item.status === "processing"));
+function sourceStackKeyForItem(item: StorageItem, sourceNode: ExecutableBoardNode): string | undefined {
+  return resolveGenerationEventResultStackKey(sourceNode.resultStackKey, item.sourceBoardResultStackKey);
 }
 
-function isSourceStackTask(task: GenerationTask, sourceNode: ExecutableBoardNode): boolean {
-  return task.source.boardNodeId === sourceNode.id && (!sourceNode.resultStackKey || task.source.resultStackKey === sourceNode.resultStackKey);
+function sourceStackKeyForTask(task: GenerationTask, sourceNode: ExecutableBoardNode): string | undefined {
+  return resolveGenerationEventResultStackKey(sourceNode.resultStackKey, task.source.resultStackKey);
 }
 
-function hasActiveSourceTasks(tasks: GenerationTask[], sourceNode: ExecutableBoardNode): boolean {
-  return tasks.some(task => isSourceStackTask(task, sourceNode) && (task.status === "pending" || task.status === "processing"));
+function isSourceStackItem(item: StorageItem, sourceNode: ExecutableBoardNode, resultStackKey = sourceNodeStackKey(sourceNode)): boolean {
+  return item.sourceBoardNodeId === sourceNode.id && (!resultStackKey || item.sourceBoardResultStackKey === resultStackKey);
+}
+
+function hasActiveSourceItems(items: StorageItem[], sourceNode: ExecutableBoardNode, resultStackKey = sourceNodeStackKey(sourceNode)): boolean {
+  return items.some(item => isSourceStackItem(item, sourceNode, resultStackKey) && (item.status === "pending" || item.status === "processing"));
+}
+
+function isSourceStackTask(task: GenerationTask, sourceNode: ExecutableBoardNode, resultStackKey = sourceNodeStackKey(sourceNode)): boolean {
+  return task.source.boardNodeId === sourceNode.id && (!resultStackKey || task.source.resultStackKey === resultStackKey);
+}
+
+function hasActiveSourceTasks(tasks: GenerationTask[], sourceNode: ExecutableBoardNode, resultStackKey = sourceNodeStackKey(sourceNode)): boolean {
+  return tasks.some(task => isSourceStackTask(task, sourceNode, resultStackKey) && (task.status === "pending" || task.status === "processing"));
 }
 
 function nextSourceNodeStatus(
@@ -1422,9 +1434,10 @@ function nextSourceNodeStatus(
   tasks: GenerationTask[],
   sourceNode: ExecutableBoardNode,
   itemStatus: StorageItem["status"],
+  resultStackKey = sourceNodeStackKey(sourceNode),
 ): BoardGenerationStatus {
-  if (hasActiveSourceItems(items, sourceNode) || hasActiveSourceTasks(tasks, sourceNode)) return "processing";
-  if (items.some(item => isSourceStackItem(item, sourceNode) && item.status === "complete")) return "complete";
+  if (hasActiveSourceItems(items, sourceNode, resultStackKey) || hasActiveSourceTasks(tasks, sourceNode, resultStackKey)) return "processing";
+  if (items.some(item => isSourceStackItem(item, sourceNode, resultStackKey) && item.status === "complete")) return "complete";
   return itemStatus === "failed" ? "failed" : "complete";
 }
 
@@ -1438,11 +1451,12 @@ function activeProcessingSourceStackItems(
   items: StorageItem[],
   tasks: GenerationTask[],
   sourceNode: ExecutableBoardNode,
+  resultStackKey = sourceNodeStackKey(sourceNode),
 ): StorageItem[] {
   const activeItems = items
-    .filter(item => item.type !== "transcript" && isSourceStackItem(item, sourceNode) && (item.status === "pending" || item.status === "processing"));
+    .filter(item => item.type !== "transcript" && isSourceStackItem(item, sourceNode, resultStackKey) && (item.status === "pending" || item.status === "processing"));
   const activeTaskItems = tasks
-    .filter(task => isSourceStackTask(task, sourceNode) && (task.status === "pending" || task.status === "processing"))
+    .filter(task => isSourceStackTask(task, sourceNode, resultStackKey) && (task.status === "pending" || task.status === "processing"))
     .map(generationTaskToGalleryItem)
     .filter((item): item is StorageItem => item !== null && item.type !== "transcript");
   const sortedItems = [...activeItems, ...activeTaskItems]
@@ -1606,17 +1620,27 @@ function pruneUnavailableRunningHubResultAssets(
   return Object.keys(update).length > 0 ? update : null;
 }
 
-function sourceStackResultAssetIds(items: StorageItem[], sourceNode: ExecutableBoardNode, activeAssetId: string): string[] {
+function sourceStackResultAssetIds(
+  items: StorageItem[],
+  sourceNode: ExecutableBoardNode,
+  activeAssetId: string,
+  resultStackKey = sourceNodeStackKey(sourceNode),
+): string[] {
   const completedIds = items
-    .filter(item => item.type !== "transcript" && isSourceStackItem(item, sourceNode) && item.status === "complete")
+    .filter(item => item.type !== "transcript" && isSourceStackItem(item, sourceNode, resultStackKey) && item.status === "complete")
     .sort((left, right) => new Date(left.createdAt).getTime() - new Date(right.createdAt).getTime())
     .map(item => item.id);
-  return completedIds.includes(activeAssetId) ? completedIds : appendResultAssetId(sourceNode, activeAssetId);
+  if (completedIds.includes(activeAssetId)) return completedIds;
+  return sourceNodeStackKey(sourceNode) === resultStackKey ? appendResultAssetId(sourceNode, activeAssetId) : [activeAssetId];
 }
 
-function latestCompleteSourceStackItem(items: StorageItem[], sourceNode: ExecutableBoardNode): StorageItem | undefined {
+function latestCompleteSourceStackItem(
+  items: StorageItem[],
+  sourceNode: ExecutableBoardNode,
+  resultStackKey = sourceNodeStackKey(sourceNode),
+): StorageItem | undefined {
   return items
-    .filter(item => item.type !== "transcript" && isSourceStackItem(item, sourceNode) && item.status === "complete")
+    .filter(item => item.type !== "transcript" && isSourceStackItem(item, sourceNode, resultStackKey) && item.status === "complete")
     .sort((left, right) => new Date(right.createdAt).getTime() - new Date(left.createdAt).getTime())[0];
 }
 
@@ -1631,21 +1655,25 @@ function terminalResultUpdate(
   terminalItem: StorageItem,
   status: BoardGenerationStatus,
   errorMessage: string,
+  resultStackKey = sourceNodeStackKey(sourceNode),
 ) {
-  const activeCompleteItem = latestCompleteSourceStackItem(items, sourceNode);
-  const activeProcessingItems = status === "processing" && !activeCompleteItem ? activeProcessingSourceStackItems(items, tasks, sourceNode) : [];
+  const activeCompleteItem = latestCompleteSourceStackItem(items, sourceNode, resultStackKey);
+  const activeProcessingItems = status === "processing" && !activeCompleteItem ? activeProcessingSourceStackItems(items, tasks, sourceNode, resultStackKey) : [];
   const activeItem = activeCompleteItem ?? activeProcessingItems[activeProcessingItems.length - 1] ?? terminalItem;
   const activeProcessingIds = activeProcessingItems.map(item => item.id);
   const resultAssetIds = activeCompleteItem
-    ? sourceStackResultAssetIds(items, sourceNode, activeCompleteItem.id)
+    ? sourceStackResultAssetIds(items, sourceNode, activeCompleteItem.id, resultStackKey)
     : activeProcessingIds.length > 0
       ? appendUniqueResultAssetId(activeProcessingIds, terminalItem.id)
-    : appendResultAssetId(sourceNode, terminalItem.id);
+      : sourceNodeStackKey(sourceNode) === resultStackKey
+        ? appendResultAssetId(sourceNode, terminalItem.id)
+        : [terminalItem.id];
   return {
     asset: storageItemToBoardAssetReference(activeItem),
     errorMessage: status === "failed" ? errorMessage : undefined,
     resultAssetId: activeItem.id,
     resultAssetIds,
+    resultStackKey,
     status,
   };
 }
@@ -4806,24 +4834,26 @@ export default function BoardPage({ boardId = DEFAULT_BOARD_ID }: BoardPageProps
       if (sourceBoardNodeId) {
         if (item.status === "pending" || item.status === "processing") {
           const sourceNode = findExecutableNodeById(boardController.board.nodes, sourceBoardNodeId);
-          if (sourceNode && !isSourceStackItem(item, sourceNode)) continue;
           if (sourceNode && item.type !== "transcript") {
-            const activeCompleteItem = latestCompleteSourceStackItem(items, sourceNode);
+            const resultStackKey = sourceStackKeyForItem(item, sourceNode);
+            if (resultStackKey === undefined) continue;
+            const activeCompleteItem = latestCompleteSourceStackItem(items, sourceNode, resultStackKey);
             if (!activeCompleteItem) {
-              const activeItems = activeProcessingSourceStackItems(items, generationTasks, sourceNode);
+              const activeItems = activeProcessingSourceStackItems(items, generationTasks, sourceNode, resultStackKey);
               const activeItem = activeItems[activeItems.length - 1] ?? item;
               boardController.completeGenerationResult(
                 sourceBoardNodeId,
                 {
                   asset: storageItemToBoardAssetReference(activeItem),
                   resultAssetId: activeItem.id,
-                  resultAssetIds: activeItems.length > 0 ? activeItems.map(active => active.id) : appendResultAssetId(sourceNode, item.id),
+                  resultAssetIds: activeItems.length > 0 ? activeItems.map(active => active.id) : [item.id],
+                  resultStackKey,
                   status: "processing",
                 },
               );
             }
           }
-          if (sourceNode && (sourceNode.status !== "processing" || sourceNode.errorMessage)) {
+          if (sourceNode && isSourceStackItem(item, sourceNode) && (sourceNode.status !== "processing" || sourceNode.errorMessage)) {
             const update = {
               errorMessage: undefined,
               status: "processing",
@@ -4843,18 +4873,22 @@ export default function BoardPage({ boardId = DEFAULT_BOARD_ID }: BoardPageProps
       if (sourceBoardNodeId && item.status === "complete") {
         const sourceNode = findExecutableNodeById(boardController.board.nodes, sourceBoardNodeId);
         if (!sourceNode) continue;
-        if (!isSourceStackItem(item, sourceNode)) continue;
+        const resultStackKey = sourceStackKeyForItem(item, sourceNode);
+        if (resultStackKey === undefined) continue;
+        const itemMatchesCurrentStack = isSourceStackItem(item, sourceNode);
         handledBoardItems.add(item.id);
-        const nextStatus = nextSourceNodeStatus(items, generationTasks, sourceNode, item.status);
+        const nextStatus = nextSourceNodeStatus(items, generationTasks, sourceNode, item.status, resultStackKey);
         if (item.type === "transcript") {
-          const update = {
-            errorMessage: undefined,
-            status: nextStatus,
-          } as const;
-          if (sourceNode.kind === "runninghub-app") {
-            boardController.updateRunningHubAppNode(sourceBoardNodeId, update);
-          } else {
-            boardController.updateGenerateNode(sourceBoardNodeId, update);
+          if (itemMatchesCurrentStack) {
+            const update = {
+              errorMessage: undefined,
+              status: nextStatus,
+            } as const;
+            if (sourceNode.kind === "runninghub-app") {
+              boardController.updateRunningHubAppNode(sourceBoardNodeId, update);
+            } else {
+              boardController.updateGenerateNode(sourceBoardNodeId, update);
+            }
           }
           if (!hasTranscriptNoteForAsset(boardController.board.nodes, item.id)) {
             boardController.addNoteNodeWithConnection(
@@ -4875,13 +4909,14 @@ export default function BoardPage({ boardId = DEFAULT_BOARD_ID }: BoardPageProps
           }
           continue;
         }
-        const resultAssetIds = sourceStackResultAssetIds(items, sourceNode, item.id);
+        const resultAssetIds = sourceStackResultAssetIds(items, sourceNode, item.id, resultStackKey);
         const activeResultAssetId = resultAssetIds[resultAssetIds.length - 1] ?? item.id;
         const activeResultItem = items.find(candidate => candidate.id === activeResultAssetId && candidate.status === "complete") ?? item;
         const update = {
           asset: storageItemToBoardAssetReference(activeResultItem),
           resultAssetId: activeResultAssetId,
           resultAssetIds,
+          resultStackKey,
           status: nextStatus,
         };
         boardController.completeGenerationResult(
@@ -4894,23 +4929,27 @@ export default function BoardPage({ boardId = DEFAULT_BOARD_ID }: BoardPageProps
       if (sourceBoardNodeId && item.status === "failed") {
         const sourceNode = findExecutableNodeById(boardController.board.nodes, sourceBoardNodeId);
         if (!sourceNode) continue;
-        if (!isSourceStackItem(item, sourceNode)) continue;
+        const resultStackKey = sourceStackKeyForItem(item, sourceNode);
+        if (resultStackKey === undefined) continue;
+        const itemMatchesCurrentStack = isSourceStackItem(item, sourceNode);
         handledBoardItems.add(item.id);
-        const nextStatus = nextSourceNodeStatus(items, generationTasks, sourceNode, item.status);
+        const nextStatus = nextSourceNodeStatus(items, generationTasks, sourceNode, item.status, resultStackKey);
         if (item.type !== "transcript") {
           boardController.completeGenerationResult(
             sourceBoardNodeId,
-            terminalResultUpdate(items, generationTasks, sourceNode, item, nextStatus, item.errorMessage ?? t("common.failedTitles.default")),
+            terminalResultUpdate(items, generationTasks, sourceNode, item, nextStatus, item.errorMessage ?? t("common.failedTitles.default"), resultStackKey),
           );
         }
-        const update = {
-          errorMessage: nextStatus === "failed" ? item.errorMessage ?? t("common.failedTitles.default") : undefined,
-          status: nextStatus,
-        };
-        if (sourceNode.kind === "runninghub-app") {
-          boardController.updateRunningHubAppNode(sourceBoardNodeId, update);
-        } else {
-          boardController.updateGenerateNode(sourceBoardNodeId, update);
+        if (itemMatchesCurrentStack) {
+          const update = {
+            errorMessage: nextStatus === "failed" ? item.errorMessage ?? t("common.failedTitles.default") : undefined,
+            status: nextStatus,
+          };
+          if (sourceNode.kind === "runninghub-app") {
+            boardController.updateRunningHubAppNode(sourceBoardNodeId, update);
+          } else {
+            boardController.updateGenerateNode(sourceBoardNodeId, update);
+          }
         }
         continue;
       }
@@ -4927,27 +4966,30 @@ export default function BoardPage({ boardId = DEFAULT_BOARD_ID }: BoardPageProps
       if (!sourceBoardNodeId) continue;
       const sourceNode = findExecutableNodeById(boardController.board.nodes, sourceBoardNodeId);
       if (!sourceNode) continue;
-      if (!isSourceStackTask(task, sourceNode)) continue;
+      const resultStackKey = sourceStackKeyForTask(task, sourceNode);
+      if (resultStackKey === undefined) continue;
+      const taskMatchesCurrentStack = isSourceStackTask(task, sourceNode);
 
       if (task.status === "pending" || task.status === "processing") {
         const taskItem = generationTaskToGalleryItem(task);
         if (taskItem && taskItem.type !== "transcript") {
-          const activeCompleteItem = latestCompleteSourceStackItem(items, sourceNode);
+          const activeCompleteItem = latestCompleteSourceStackItem(items, sourceNode, resultStackKey);
           if (!activeCompleteItem) {
-            const activeItems = activeProcessingSourceStackItems(items, generationTasks, sourceNode);
+            const activeItems = activeProcessingSourceStackItems(items, generationTasks, sourceNode, resultStackKey);
             const activeItem = activeItems[activeItems.length - 1] ?? taskItem;
             boardController.completeGenerationResult(
               sourceBoardNodeId,
               {
                 asset: storageItemToBoardAssetReference(activeItem),
                 resultAssetId: activeItem.id,
-                resultAssetIds: activeItems.length > 0 ? activeItems.map(active => active.id) : appendResultAssetId(sourceNode, taskItem.id),
+                resultAssetIds: activeItems.length > 0 ? activeItems.map(active => active.id) : [taskItem.id],
+                resultStackKey,
                 status: "processing",
               },
             );
           }
         }
-        if (sourceNode.status !== "processing" || sourceNode.errorMessage) {
+        if (taskMatchesCurrentStack && (sourceNode.status !== "processing" || sourceNode.errorMessage)) {
           const update = {
             errorMessage: undefined,
             status: "processing",
@@ -4967,9 +5009,9 @@ export default function BoardPage({ boardId = DEFAULT_BOARD_ID }: BoardPageProps
       handledBoardTasks.add(task.id);
       const taskItem = generationTaskToGalleryItem(task);
       const nextStatus: BoardGenerationStatus =
-        hasActiveSourceItems(items, sourceNode) || hasActiveSourceTasks(generationTasks, sourceNode)
+        hasActiveSourceItems(items, sourceNode, resultStackKey) || hasActiveSourceTasks(generationTasks, sourceNode, resultStackKey)
           ? "processing"
-          : items.some(item => isSourceStackItem(item, sourceNode) && item.status === "complete")
+          : items.some(item => isSourceStackItem(item, sourceNode, resultStackKey) && item.status === "complete")
             ? "complete"
             : "failed";
       if (taskItem && taskItem.type !== "transcript") {
@@ -4982,17 +5024,20 @@ export default function BoardPage({ boardId = DEFAULT_BOARD_ID }: BoardPageProps
             taskItem,
             nextStatus,
             task.errorMessage ?? (task.status === "canceled" ? t("board.agent.taskCanceledLocally") : t("common.failedTitles.default")),
+            resultStackKey,
           ),
         );
       }
-      const update = {
-        errorMessage: nextStatus === "failed" ? task.errorMessage ?? (task.status === "canceled" ? t("board.agent.taskCanceledLocally") : t("common.failedTitles.default")) : undefined,
-        status: nextStatus,
-      };
-      if (sourceNode.kind === "runninghub-app") {
-        boardController.updateRunningHubAppNode(sourceBoardNodeId, update);
-      } else {
-        boardController.updateGenerateNode(sourceBoardNodeId, update);
+      if (taskMatchesCurrentStack) {
+        const update = {
+          errorMessage: nextStatus === "failed" ? task.errorMessage ?? (task.status === "canceled" ? t("board.agent.taskCanceledLocally") : t("common.failedTitles.default")) : undefined,
+          status: nextStatus,
+        };
+        if (sourceNode.kind === "runninghub-app") {
+          boardController.updateRunningHubAppNode(sourceBoardNodeId, update);
+        } else {
+          boardController.updateGenerateNode(sourceBoardNodeId, update);
+        }
       }
     }
   }, [boardAssetsLoading, boardController, generationTasks, isBoardAssetScopeLoaded, items]);

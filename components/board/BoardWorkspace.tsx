@@ -111,7 +111,7 @@ import {
   isValidBoardConnection as isValidBoardPortConnection,
 } from "@/lib/board/ports";
 import { BOARD_INSERT_CATALOG, type BoardInsertKind } from "@/lib/board/insert-catalog";
-import { findConnectedResultNodeForSourceStack, selectedNodeIdsForContextMenu } from "@/lib/board/utils";
+import { findConnectedResultNodeForSourceStack, resolveGenerationEventResultStackKey, selectedNodeIdsForContextMenu } from "@/lib/board/utils";
 import { t, useTranslations } from "@/lib/i18n";
 import { findAvailableBoardNodePosition } from "@/lib/board/placement";
 import type { GenerationTask } from "@/lib/generation-tasks";
@@ -1377,7 +1377,6 @@ export default function BoardWorkspace({
   const protectedEdgeSelectionRef = useRef<string | null>(null);
   const isSyncingFlowNodesRef = useRef(false);
   const prevFlowDataRef = useRef<Map<string, BoardFlowNode["data"]>>(new Map());
-  const prevFlowNodesRef = useRef<BoardFlowNode[] | null>(null);
   const [quickInsertMenu, setQuickInsertMenu] = useState<QuickInsertMenu | null>(null);
   const [nodeContextMenu, setNodeContextMenu] = useState<BoardNodeContextMenuState | null>(null);
   const [selectedNodeIds, setSelectedNodeIds] = useState<string[]>([]);
@@ -2000,6 +1999,27 @@ export default function BoardWorkspace({
     return sourceIds;
   }, [board.edges]);
 
+  const activeResultSourceStacks = useMemo(() => {
+    const sourceStacks = new Set<string>();
+    for (const item of galleryItems) {
+      if (!item.sourceBoardNodeId || !isActiveGenerateTask(item)) continue;
+      const sourceNode = boardPromptReferenceGraphIndex.nodeById.get(item.sourceBoardNodeId);
+      if (!isResultSourceNode(sourceNode)) continue;
+      const resultStackKey = resolveGenerationEventResultStackKey(sourceNode.resultStackKey, item.sourceBoardResultStackKey);
+      if (resultStackKey === undefined) continue;
+      sourceStacks.add(resultSourceStackMapKey(sourceNode.id, resultStackKey));
+    }
+    for (const task of generationTasks) {
+      if (!isActiveBoardGenerationTask(task) || !task.source.boardNodeId) continue;
+      const sourceNode = boardPromptReferenceGraphIndex.nodeById.get(task.source.boardNodeId);
+      if (!isResultSourceNode(sourceNode)) continue;
+      const resultStackKey = resolveGenerationEventResultStackKey(sourceNode.resultStackKey, task.source.resultStackKey);
+      if (resultStackKey === undefined) continue;
+      sourceStacks.add(resultSourceStackMapKey(sourceNode.id, resultStackKey));
+    }
+    return sourceStacks;
+  }, [boardPromptReferenceGraphIndex, galleryItems, generationTasks]);
+
   const referenceFlowDataByNodeId = useMemo(() => {
     const dataById = new Map<string, BoardReferenceFlowData>();
     for (const node of board.nodes) {
@@ -2280,20 +2300,17 @@ export default function BoardWorkspace({
   useLayoutEffect(() => {
     reactFlowNodesRef.current = reactFlowNodes;
   }, [reactFlowNodes]);
-  const hasInitialSyncRef = useRef(false);
   useLayoutEffect(() => {
     if (isNodeDragActiveRef.current) return;
-    if (
-      flowNodes === prevFlowNodesRef.current &&
-      hasInitialSyncRef.current
-    ) return;
-    prevFlowNodesRef.current = flowNodes;
+    const nextNodes = syncReactFlowNodesFromBoard(reactFlowNodesRef.current, flowNodes, selectedNodeId, selectedNodeIds);
+    if (nextNodes === reactFlowNodesRef.current) {
+      return;
+    }
     skipPositionSyncRef.current = true;
     isSyncingFlowNodesRef.current = true;
-    setReactFlowNodes(current => syncReactFlowNodesFromBoard(current, flowNodes, selectedNodeId, selectedNodeIds));
+    setReactFlowNodes(nextNodes);
     queueMicrotask(() => {
       isSyncingFlowNodesRef.current = false;
-      hasInitialSyncRef.current = true;
       skipPositionSyncRef.current = false;
     });
   }, [flowNodes, selectedNodeId, selectedNodeIds, setReactFlowNodes]);
@@ -2324,7 +2341,11 @@ export default function BoardWorkspace({
           targetPortKind === null ||
           !isValidBoardPortConnection(board.nodes, edge.from, edge.to)
         ) continue;
-        const processing = isResultSourceNode(sourceNode) && sourceNode.status === "processing";
+        const processing =
+          edge.kind === "result" &&
+          targetNode.kind === "result" &&
+          targetNode.sourceNodeId === sourceNode.id &&
+          activeResultSourceStacks.has(resultSourceStackMapKey(sourceNode.id, targetNode.resultStackKey ?? ""));
         const isSelected = selectedEdgeId === edge.id;
         result.push({
           id: edge.id,
@@ -2342,7 +2363,7 @@ export default function BoardWorkspace({
       return result;
     },
     // eslint-disable-next-line react-hooks/exhaustive-deps -- graph key gates processing animation without position churn
-    [board.nodes, boardGraphContentKey, boardPromptReferenceGraphIndex, resultSourceNodes, selectedEdgeId],
+    [activeResultSourceStacks, board.nodes, boardGraphContentKey, boardPromptReferenceGraphIndex, resultSourceNodes, selectedEdgeId],
   );
 
   const isValidBoardConnection = useCallback<IsValidConnection<BoardFlowEdge>>((connection) => {

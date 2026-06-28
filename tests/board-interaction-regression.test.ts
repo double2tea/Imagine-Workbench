@@ -18,6 +18,37 @@ test("board edges keep a large clickable interaction path and protected click se
   assert.match(selectionHandler, /ids\.length === 0 && !edgeId && protectedEdgeSelectionRef\.current/);
 });
 
+test("board result edge processing is scoped to active result stacks", () => {
+  const source = readWorkspaceFile("components/board/BoardWorkspace.tsx");
+  const flowEdges = sourceBetween(source, "const flowEdges = useMemo<BoardFlowEdge[]>", "const isValidBoardConnection");
+
+  assert.match(source, /const activeResultSourceStacks = useMemo/);
+  assert.match(flowEdges, /targetNode\.kind === "result"/);
+  assert.match(flowEdges, /activeResultSourceStacks\.has\(resultSourceStackMapKey\(sourceNode\.id, targetNode\.resultStackKey \?\? ""\)\)/);
+  assert.doesNotMatch(flowEdges, /sourceNode\.status === "processing"/);
+});
+
+test("board React Flow node sync skips no-op updates before calling setNodes", () => {
+  const source = readWorkspaceFile("components/board/BoardWorkspace.tsx");
+  const syncEffect = sourceBetween(source, "useLayoutEffect(() => {\n    if (isNodeDragActiveRef.current) return;", "  }, [flowNodes, selectedNodeId, selectedNodeIds, setReactFlowNodes]);");
+
+  assert.match(syncEffect, /const nextNodes = syncReactFlowNodesFromBoard\(reactFlowNodesRef\.current, flowNodes, selectedNodeId, selectedNodeIds\)/);
+  assert.match(syncEffect, /if \(nextNodes === reactFlowNodesRef\.current\) \{/);
+  assert.match(syncEffect, /setReactFlowNodes\(nextNodes\)/);
+  assert.doesNotMatch(syncEffect, /setReactFlowNodes\(current =>/);
+});
+
+test("board result completion can target the event stack without overwriting another active stack", () => {
+  const source = readWorkspaceFile("hooks/useBoardState.ts");
+  const completeGenerationResult = sourceBetween(source, "const completeGenerationResult = useCallback", "const addPromptNode = useCallback");
+
+  assert.match(completeGenerationResult, /const \{ resultStackKey: inputResultStackKey, \.\.\.sourceUpdate \} = input/);
+  assert.match(completeGenerationResult, /const shouldAdoptResultStackKey = sourceResultStackKey === "" && hasInputResultStackKey/);
+  assert.match(completeGenerationResult, /const shouldUpdateSourceResult = sourceResultStackKey === resultStackKey \|\| shouldAdoptResultStackKey/);
+  assert.match(completeGenerationResult, /\.\.\.\(shouldAdoptResultStackKey \? \{ resultStackKey \} : \{\}\)/);
+  assert.match(completeGenerationResult, /node\.id === sourceNodeId && shouldUpdateSourceResult/);
+});
+
 test("board blank connection drop opens the typed quick-insert menu", () => {
   const source = readWorkspaceFile("components/board/BoardWorkspace.tsx");
   const connectEndHandler = sourceBetween(source, "const handleConnectEnd", "const openQuickInsertMenu");

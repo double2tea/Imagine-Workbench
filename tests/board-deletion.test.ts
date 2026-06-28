@@ -4,6 +4,7 @@ import test from "node:test";
 import {
   findConnectedResultNodeForSourceStack,
   findResultNodeForSourceStack,
+  resolveGenerationEventResultStackKey,
   resultNodeIdsOwnedBySource,
   selectedNodeIdsForContextMenu,
 } from "../lib/board/utils";
@@ -117,6 +118,14 @@ test("findConnectedResultNodeForSourceStack skips earlier detached nodes in the 
   ];
 
   assert.equal(findConnectedResultNodeForSourceStack(nodes, edges, "generate_1", "stack_a")?.id, "result_connected");
+});
+
+test("resolveGenerationEventResultStackKey rejects unkeyed events after a source stack exists", () => {
+  assert.equal(resolveGenerationEventResultStackKey("stack_b", undefined), undefined);
+  assert.equal(resolveGenerationEventResultStackKey("stack_b", ""), undefined);
+  assert.equal(resolveGenerationEventResultStackKey("stack_b", "stack_a"), "stack_a");
+  assert.equal(resolveGenerationEventResultStackKey(undefined, undefined), "");
+  assert.equal(resolveGenerationEventResultStackKey(undefined, ""), "");
 });
 
 test("selectedNodeIdsForContextMenu preserves multi-select when opening a selected node", () => {

@@ -59,6 +59,14 @@ export function resultNodeIdsOwnedBySource(nodes: readonly BoardNode[], sourceNo
     .map(node => node.id);
 }
 
+export function resolveGenerationEventResultStackKey(
+  sourceResultStackKey: string | undefined,
+  eventResultStackKey: string | undefined,
+): string | undefined {
+  if (eventResultStackKey) return eventResultStackKey;
+  return sourceResultStackKey ? undefined : "";
+}
+
 export function selectedNodeIdsForContextMenu(currentNodeIds: readonly string[], contextNodeId: string): string[] {
   if (currentNodeIds.length > 1 && currentNodeIds.includes(contextNodeId)) return [...currentNodeIds];
   return [contextNodeId];

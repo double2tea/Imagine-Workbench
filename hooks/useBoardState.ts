@@ -104,6 +104,7 @@ interface CompleteGenerationResultUpdate {
   errorMessage?: string;
   resultAssetId: string;
   resultAssetIds: string[];
+  resultStackKey?: string;
   status: BoardGenerationStatus;
 }
 
@@ -2033,7 +2034,12 @@ export function useBoardState(
       const sourceNode = currentBoard.nodes.find(node => node.id === sourceNodeId);
       if (!isResultSourceNode(sourceNode)) return currentBoard;
       const updatedAt = nowIso();
-      const resultStackKey = sourceNode.resultStackKey ?? "";
+      const { resultStackKey: inputResultStackKey, ...sourceUpdate } = input;
+      const sourceResultStackKey = sourceNode.resultStackKey ?? "";
+      const hasInputResultStackKey = inputResultStackKey !== undefined && inputResultStackKey !== "";
+      const resultStackKey = hasInputResultStackKey ? inputResultStackKey : sourceResultStackKey;
+      const shouldAdoptResultStackKey = sourceResultStackKey === "" && hasInputResultStackKey;
+      const shouldUpdateSourceResult = sourceResultStackKey === resultStackKey || shouldAdoptResultStackKey;
       const from: BoardPortRef = { nodeId: sourceNodeId, portId: BOARD_PORT_IDS.resultOut, portKind: "result" };
       const existingResultNode =
         findConnectedResultNodeForSourceStack(currentBoard.nodes, currentBoard.edges, sourceNodeId, resultStackKey) ??
@@ -2041,13 +2047,18 @@ export function useBoardState(
       const existingResultEdge = existingResultNode
         ? findMatchingEdge(currentBoard.edges, from, { nodeId: existingResultNode.id, portId: BOARD_PORT_IDS.assetIn, portKind: "asset" })
         : undefined;
-      const currentResultAssetIds = sourceNode.resultAssetIds ?? (sourceNode.resultAssetId ? [sourceNode.resultAssetId] : []);
+      const currentResultAssetIds = existingResultNode?.resultAssetIds ??
+        (shouldUpdateSourceResult ? sourceNode.resultAssetIds ?? (sourceNode.resultAssetId ? [sourceNode.resultAssetId] : []) : []);
       const resultAssetIds = mergeIdLists(currentResultAssetIds, input.resultAssetIds);
       const sourceAlreadyCurrent =
-        sourceNode.status === input.status &&
-        sourceNode.resultAssetId === input.resultAssetId &&
-        sameIdList(sourceNode.resultAssetIds, resultAssetIds) &&
-        (input.errorMessage === undefined || sourceNode.errorMessage === input.errorMessage);
+        !shouldUpdateSourceResult ||
+        (
+          sourceResultStackKey === resultStackKey &&
+          sourceNode.status === input.status &&
+          sourceNode.resultAssetId === input.resultAssetId &&
+          sameIdList(sourceNode.resultAssetIds, resultAssetIds) &&
+          (input.errorMessage === undefined || sourceNode.errorMessage === input.errorMessage)
+        );
       const resultAlreadyCurrent = existingResultNode !== undefined &&
         existingResultNode.activeAssetId === input.resultAssetId &&
         existingResultNode.resultStackKey === resultStackKey &&
@@ -2056,7 +2067,15 @@ export function useBoardState(
       if (sourceAlreadyCurrent && resultAlreadyCurrent && existingResultEdge) return currentBoard;
 
       let nextNodes = currentBoard.nodes.map(node =>
-        node.id === sourceNodeId ? { ...node, ...input, resultAssetIds, updatedAt } : node,
+        node.id === sourceNodeId && shouldUpdateSourceResult
+          ? {
+            ...node,
+            ...sourceUpdate,
+            resultAssetIds,
+            ...(shouldAdoptResultStackKey ? { resultStackKey } : {}),
+            updatedAt,
+          }
+          : node,
       );
       let nextEdges = currentBoard.edges;
       const sourcePosition = boardNodeAbsolutePosition(currentBoard.nodes, sourceNodeId) ?? sourceNode.position;
