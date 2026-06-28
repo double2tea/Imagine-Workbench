@@ -236,11 +236,13 @@ export default function BoardToolbar({
         <div className="contents">
           <WorkspaceTopBarBrand compact showBadge={false} />
 
-          <WorkspaceStorageModeBadge
-            label={storageModeLabel}
-            target={storageTarget}
-            title={mediaT.t("workspaceHeader.storageModeTitle", { mode: storageModeLabel })}
-          />
+          {storageTarget === "postgres" ? (
+            <WorkspaceStorageModeBadge
+              label={storageModeLabel}
+              target={storageTarget}
+              title={mediaT.t("workspaceHeader.storageModeTitle", { mode: storageModeLabel })}
+            />
+          ) : null}
 
           <span className="hidden h-7 w-px shrink-0 bg-[var(--iw-border)] md:block" aria-hidden="true" />
 

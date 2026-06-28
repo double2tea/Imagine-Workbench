@@ -51,11 +51,13 @@ export default function WorkspaceHeader({
       }
       end={
         <div className="z-10 flex shrink-0 items-center gap-1.5 sm:gap-2">
-          <WorkspaceStorageModeBadge
-            label={storageModeLabel}
-            target={storageTarget}
-            title={t("workspaceHeader.storageModeTitle", { mode: storageModeLabel })}
-          />
+          {storageTarget === "postgres" ? (
+            <WorkspaceStorageModeBadge
+              label={storageModeLabel}
+              target={storageTarget}
+              title={t("workspaceHeader.storageModeTitle", { mode: storageModeLabel })}
+            />
+          ) : null}
 
           <Link href="/board" className={workspaceTopBarButtonClass} title={t('workspaceHeader.boardLink')} aria-label={t('workspaceHeader.boardLink')}>
             <Grid2X2 className="h-3.5 w-3.5" />
