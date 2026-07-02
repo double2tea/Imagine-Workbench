@@ -67,7 +67,10 @@ async function listSingleProviderModels(
   kind: ModelKindFilter,
   gatewayKey: string | undefined,
 ) {
-  const config = await resolveProviderConfigForRequest(req, provider, { ignoredBearerToken: gatewayKey });
+  const config = await resolveProviderConfigForRequest(req, provider, {
+    allowAnonymousProviderCredentials: true,
+    ignoredBearerToken: gatewayKey,
+  });
   return listProviderModels(config, kind);
 }
 

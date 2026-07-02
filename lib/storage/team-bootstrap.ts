@@ -39,6 +39,8 @@ interface IdRow extends QueryResultRow {
   id: string;
 }
 
+const FIRST_OWNER_BOOTSTRAP_LOCK_ID = 2026070201;
+
 export async function bootstrapFirstTeamOwner(
   queryable: PostgresQueryable,
   input: BootstrapFirstOwnerInput,
@@ -55,6 +57,7 @@ export async function bootstrapFirstTeamOwner(
 
   await queryable.query("begin");
   try {
+    await queryable.query("select pg_advisory_xact_lock($1)", [FIRST_OWNER_BOOTSTRAP_LOCK_ID]);
     const ownerStatus = await queryable.query<ExistsRow>(
       "select exists (select 1 from team_memberships where role = 'owner') as owner_exists",
     );

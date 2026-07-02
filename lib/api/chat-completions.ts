@@ -15,10 +15,14 @@ const chatCompletionsBodySchema = z.object({
 
 export async function POST(req: Request) {
   try {
-    const gatewayKey = isV1Request(req) ? assertOpenAiCompatibleGatewayAccess(req) : undefined;
+    const isV1 = isV1Request(req);
+    const gatewayKey = isV1 ? assertOpenAiCompatibleGatewayAccess(req) : undefined;
     const body = chatCompletionsBodySchema.parse(await req.json());
     const parsed = parseProviderModel(body.model, "12ai");
-    const config = await resolveProviderConfigForRequest(req, parsed.provider, { ignoredBearerToken: gatewayKey });
+    const config = await resolveProviderConfigForRequest(req, parsed.provider, {
+      allowAnonymousProviderCredentials: isV1,
+      ignoredBearerToken: gatewayKey,
+    });
     const upstream = await fetch(providerChatCompletionsUrl(config), {
       method: "POST",
       headers: {

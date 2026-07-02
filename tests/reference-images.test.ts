@@ -20,6 +20,7 @@ import {
   dataUriByteSize,
   getReferenceImagePayloadError,
   getReferenceMediaPayloadError,
+  isSameOriginTeamAssetMediaUrl,
   scaleImageDimensions,
 } from "../lib/reference-images";
 
@@ -110,6 +111,13 @@ test("reference image compression attempts resize only after original-dimension 
 
 test("dataUriByteSize reads base64 payload bytes", () => {
   assert.equal(dataUriByteSize(makeDataUri(5)), 5);
+});
+
+test("isSameOriginTeamAssetMediaUrl accepts only team asset media routes", () => {
+  assert.equal(isSameOriginTeamAssetMediaUrl("/api/storage/team/assets/asset_1/media"), true);
+  assert.equal(isSameOriginTeamAssetMediaUrl("/api/storage/team/assets/asset%201/media?download=1"), true);
+  assert.equal(isSameOriginTeamAssetMediaUrl("/api/storage/team/assets/asset_1"), false);
+  assert.equal(isSameOriginTeamAssetMediaUrl("https://example.com/api/storage/team/assets/asset_1/media"), false);
 });
 
 test("getReferenceImagePayloadError rejects one oversized data URI", () => {

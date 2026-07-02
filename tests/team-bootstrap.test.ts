@@ -48,6 +48,8 @@ test("bootstrapFirstTeamOwner creates the first workspace team owner session and
   assert.equal(result.teamId, "team_1");
   assert.equal(result.sessionTokenExpiresAt.toISOString(), "2026-07-03T00:00:00.000Z");
   assert.equal(queries[0].text, "begin");
+  assert.equal(queries[1].text, "select pg_advisory_xact_lock($1)");
+  assert.deepEqual(queries[1].values, [2026070201]);
   assert.equal(queries.at(-1)?.text, "commit");
 
   const userInsert = queries.find(query => query.text.startsWith("insert into users"));
@@ -88,6 +90,7 @@ test("bootstrapFirstTeamOwner fails closed when an owner already exists", async 
   );
   assert.deepEqual(queries, [
     "begin",
+    "select pg_advisory_xact_lock($1)",
     "select exists (select 1 from team_memberships where role = 'owner') as owner_exists",
     "rollback",
   ]);

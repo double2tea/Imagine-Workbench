@@ -111,6 +111,71 @@ saveTeamSetting({ group: "provider", key: "provider:grok2api:baseUrl", value: ba
 saveTeamSecret({ group: "provider", key: "provider:grok2api:apiKey", value: apiKey }, csrfToken);
 ```
 
+### Scenario: Provider Config Resolution in PostgreSQL Team Mode
+
+#### 1. Scope / Trigger
+
+- Trigger: changing server-side provider config resolution, Workbench-internal provider routes under `/api/*`, or OpenAI-compatible external routes under `/v1/*`.
+- Goal: PostgreSQL team mode treats Workbench-internal provider calls as authenticated workspace operations, while preserving explicit request-credential behavior for external compatible API clients.
+
+#### 2. Signatures
+
+- Resolver: `resolveProviderConfigForRequest(req, provider, options?)`.
+- Option: `allowAnonymousProviderCredentials?: boolean`.
+- Internal routes: `/api/media/*`, `/api/image/edit`, `/api/prompts/optimize`, `/api/agent/respond`, `/api/board/prompt-text`, `/api/models`, and `/api/chat/completions`.
+- External compatible routes: `/v1/chat/completions`, `/v1/models`, `/v1/images/generations`, `/v1/images/edits`, `/v1/audio/speech`, and `/v1/audio/transcriptions`.
+
+#### 3. Contracts
+
+- Browser/IndexedDB mode keeps the existing `resolveProviderConfig()` behavior with env and request-scoped provider credentials.
+- In `IMAGINE_STORAGE_TARGET=postgres`, Workbench-internal `/api/*` provider-backed routes must require a valid `imagine_team_session` before reading request, env, or team provider credentials.
+- Internal team provider calls require at least `editor` role unless a route has an explicitly documented different role requirement.
+- `x-ai-api-key`, `x-ai-base-url`, and `x-ai-provider-label` must not bypass team session or role checks on internal `/api/*` routes.
+- After session/role checks pass, encrypted team provider API keys, non-secret base URLs, and custom provider labels may be resolved from PostgreSQL team settings/secrets.
+- External compatible `/v1/*` routes may set `allowAnonymousProviderCredentials: true` so API clients can continue to use env or explicit request credentials without a team session.
+- When `OPENAI_COMPAT_API_KEY` is configured, `/v1/*` treats `Authorization` as gateway auth; provider credentials must come from env or explicit provider headers, not the gateway bearer value.
+
+#### 4. Validation & Error Matrix
+
+- PostgreSQL mode, internal `/api/*`, no team session -> `401 unauthorized` before provider credential resolution.
+- PostgreSQL mode, internal `/api/*`, viewer session -> `403 forbidden` for provider spend/write paths that require editor.
+- PostgreSQL mode, internal `/api/*`, request includes `x-ai-api-key` but no session -> `401 unauthorized`.
+- PostgreSQL mode, `/v1/*`, `allowAnonymousProviderCredentials: true`, request includes `x-ai-api-key` -> resolve that request credential.
+- PostgreSQL mode, `/v1/*`, missing or wrong gateway key while `OPENAI_COMPAT_API_KEY` is configured -> `401` before body parsing or provider credential resolution.
+- Browser mode, any provider route -> existing request/env credential behavior is preserved.
+
+#### 5. Good/Base/Bad Cases
+
+- Good: logged-in editor runs `/api/media/generate-image`; resolver validates the team session, reads encrypted team provider settings, and calls the adapter.
+- Good: external SDK calls `/v1/images/generations` with `x-ai-api-key`; resolver accepts the explicit key without a team cookie.
+- Base: browser mode local development still accepts request headers and env provider keys without team auth.
+- Bad: unauthenticated `/api/media/generate-image` with `x-ai-api-key` spends provider credits in PostgreSQL team mode.
+
+#### 6. Tests Required
+
+- Unit: `resolveProviderConfigForRequest` rejects internal PostgreSQL requests with no team session even when request credentials are present.
+- Unit: `resolveProviderConfigForRequest` accepts anonymous request credentials only when `allowAnonymousProviderCredentials: true`.
+- Route: `/v1/chat/completions` checks gateway auth before parsing request bodies and does not forward the gateway bearer as a provider key.
+- Quality gates: `pnpm run check`, `pnpm run test:providers`, and `pnpm run build`.
+
+#### 7. Wrong vs Correct
+
+##### Wrong
+
+```typescript
+const config = await resolveProviderConfigForRequest(req, provider, {
+  allowAnonymousProviderCredentials: true,
+});
+```
+
+##### Correct
+
+```typescript
+const config = await resolveProviderConfigForRequest(req, provider);
+```
+
+Use the anonymous option only in `/v1/*` compatible route helpers, not in Workbench-internal `/api/*` route files.
+
 ### Scenario: PostgreSQL Team Safety Snapshots
 
 #### 1. Scope / Trigger

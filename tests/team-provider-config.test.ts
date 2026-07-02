@@ -6,11 +6,40 @@ import { ApiError } from "../lib/api/errors";
 import type { PostgresQueryable } from "../lib/storage/postgres/connection";
 import { hashTeamSessionToken } from "../lib/storage/team-auth";
 import { encryptWorkspaceSecret } from "../lib/storage/team-secret-crypto";
-import { readTeamProviderApiKey, readTeamProviderConfigOverrides } from "../lib/providers/team-config";
+import { readTeamProviderApiKey, readTeamProviderConfigOverrides, resolveProviderConfigForRequest } from "../lib/providers/team-config";
 
 const RAW_SESSION_TOKEN = "raw-session-token";
 const WORKSPACE_ID = "workspace_1";
 const ENCRYPTION_KEY = "workspace-secret-encryption-key";
+
+test("resolveProviderConfigForRequest requires team session before request credentials in postgres mode", async () => {
+  const originalStorageTarget = process.env.IMAGINE_STORAGE_TARGET;
+  try {
+    process.env.IMAGINE_STORAGE_TARGET = "postgres";
+    await assert.rejects(
+      () => resolveProviderConfigForRequest(new Request("http://localhost:3000/api/media/generate-image", {
+        headers: { "x-ai-api-key": "request-key" },
+      }), "12ai"),
+      (error: unknown) => error instanceof ApiError && error.status === 401 && error.code === "unauthorized",
+    );
+  } finally {
+    restoreEnv("IMAGINE_STORAGE_TARGET", originalStorageTarget);
+  }
+});
+
+test("resolveProviderConfigForRequest keeps anonymous request credentials when explicitly allowed", async () => {
+  const originalStorageTarget = process.env.IMAGINE_STORAGE_TARGET;
+  try {
+    process.env.IMAGINE_STORAGE_TARGET = "postgres";
+    const config = await resolveProviderConfigForRequest(new Request("http://localhost:3000/v1/images/generations", {
+      headers: { "x-ai-api-key": "request-key" },
+    }), "12ai", { allowAnonymousProviderCredentials: true });
+
+    assert.equal(config.apiKey, "request-key");
+  } finally {
+    restoreEnv("IMAGINE_STORAGE_TARGET", originalStorageTarget);
+  }
+});
 
 function queryResult<T extends QueryResultRow>(rows: T[]): QueryResult<T> {
   return {
@@ -209,4 +238,12 @@ function settingRow(key: string, value: string, isSecret: boolean): QueryResultR
     updated_at: "2026-06-27T00:00:00.000Z",
     value_text: value,
   };
+}
+
+function restoreEnv(key: string, value: string | undefined): void {
+  if (value === undefined) {
+    delete process.env[key];
+    return;
+  }
+  process.env[key] = value;
 }

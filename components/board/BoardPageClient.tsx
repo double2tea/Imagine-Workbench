@@ -31,7 +31,7 @@ import BoardWorkspace from "@/components/board/BoardWorkspace";
 import SettingsModal from "@/components/settings/SettingsModal";
 import WorkspaceNotices, { type WorkspaceNotice } from "@/components/workbench/WorkspaceNotices";
 import type { AgentBoardContext, AgentBoardContextSnapshot, AgentBoardNodeDetail, AgentBoardNodeParams, AgentBoardNodeSummary } from "@/lib/agent-context";
-import { getSendableAgentMediaReferences, type AgentReferenceInputSupport } from "@/lib/agent-chat-model";
+import { getSendableAgentMediaReferences, isSendableAgentMediaReference, type AgentReferenceInputSupport } from "@/lib/agent-chat-model";
 
 import { useAgentController } from "@/hooks/useAgentController";
 import { useAssetWorkspaceState } from "@/hooks/useAssetWorkspaceState";
@@ -777,7 +777,7 @@ function readAgentInputSupportPayload(payload: unknown): AgentReferenceInputSupp
 
 async function prepareAgentAnalysisReferences(references: ReferenceImageRef[]): Promise<ReferenceImageRef[]> {
   return Promise.all(references.map(async reference => {
-    if (getMediaReferenceType(reference) !== "audio") return reference;
+    if (isSendableAgentMediaReference(reference)) return reference;
     return { ...reference, url: await prepareReferenceMediaUrlForRequest(reference.url) };
   }));
 }

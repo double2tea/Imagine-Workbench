@@ -1,8 +1,8 @@
 import type { AiProvider } from "@/lib/providers/model-catalog";
 import type { ProviderConfig } from "@/lib/providers/types";
+import { ApiError } from "@/lib/api/errors";
 import { isCustomProviderDefinition } from "@/lib/providers/custom-providers";
 import {
-  readProviderRequestApiKey,
   resolveProviderConfig,
   type ResolveProviderConfigOptions,
 } from "@/lib/providers/utils";
@@ -16,6 +16,7 @@ import { decryptWorkspaceSecret, isEncryptedWorkspaceSecret } from "@/lib/storag
 import { readTeamSessionToken, type TeamRole } from "@/lib/storage/team-auth";
 
 export interface ResolveProviderConfigForRequestOptions extends ResolveProviderConfigOptions {
+  allowAnonymousProviderCredentials?: boolean;
   minimumTeamRole?: TeamRole;
 }
 
@@ -30,12 +31,13 @@ export async function resolveProviderConfigForRequest(
   provider: AiProvider,
   options: ResolveProviderConfigForRequestOptions = {},
 ): Promise<ProviderConfig> {
-  if (
-    readProviderRequestApiKey(req, options) ||
-    parseWorkspaceStorageMode(process.env[IMAGINE_STORAGE_TARGET_ENV]) !== "postgres" ||
-    !readTeamSessionToken(req)
-  ) {
+  if (parseWorkspaceStorageMode(process.env[IMAGINE_STORAGE_TARGET_ENV]) !== "postgres") {
     return resolveProviderConfig(req, provider, options);
+  }
+
+  if (!readTeamSessionToken(req)) {
+    if (options.allowAnonymousProviderCredentials) return resolveProviderConfig(req, provider, options);
+    throw new ApiError(401, "unauthorized", "Team session is required");
   }
 
   const config = resolvePostgresStorageConfig(process.env);

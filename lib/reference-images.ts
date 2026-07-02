@@ -53,6 +53,21 @@ export function isAudioDataUri(value: string): boolean {
   return /^data:audio\/[a-z0-9.+-]+;base64,/i.test(value);
 }
 
+export function isSameOriginTeamAssetMediaUrl(value: string): boolean {
+  const trimmed = value.trim();
+  if (!trimmed) return false;
+  if (trimmed.startsWith("/")) return isTeamAssetMediaPath(trimmed);
+
+  const origin = typeof window === "undefined" ? "" : window.location.origin;
+  if (!origin) return false;
+  try {
+    const url = new URL(trimmed);
+    return url.origin === origin && isTeamAssetMediaPath(`${url.pathname}${url.search}`);
+  } catch {
+    return false;
+  }
+}
+
 export function scaleImageDimensions(
   width: number,
   height: number,
@@ -224,6 +239,7 @@ export async function prepareReferenceMediaUrlForRequest(url: string): Promise<s
 
 async function fetchReferenceImageUrl(url: string): Promise<Response> {
   if (url.startsWith("blob:")) return fetch(url);
+  if (isSameOriginTeamAssetMediaUrl(url)) return fetch(url);
   if (url.startsWith("http://") || url.startsWith("https://")) {
     return fetch(API_ROUTES.media.referenceImage, {
       method: "POST",
@@ -236,8 +252,13 @@ async function fetchReferenceImageUrl(url: string): Promise<Response> {
 
 async function fetchReferenceMediaUrl(url: string): Promise<Response> {
   if (url.startsWith("blob:")) return fetch(url);
+  if (isSameOriginTeamAssetMediaUrl(url)) return fetch(url);
   if (url.startsWith("http://") || url.startsWith("https://")) return fetch(url);
   throw new Error(t("common.notices.referenceMediaMustBeSupported"));
+}
+
+function isTeamAssetMediaPath(value: string): boolean {
+  return /^\/api\/storage\/team\/assets\/[^/?#]+\/media(?:[?#].*)?$/.test(value);
 }
 
 async function readReferenceImageFetchError(response: Response): Promise<string> {
