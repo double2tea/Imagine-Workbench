@@ -72,7 +72,7 @@ For Cloudflare Pages, Vercel, Netlify, or other hosted deployments:
 - `/v1/*` should be protected with `OPENAI_COMPAT_API_KEY` if exposed to others;
 - provider keys should be treated as secrets and should not be committed or exposed in client-visible code.
 
-The Cloudflare Pages build fails fast while non-team Node runtime provider routes exist, instead of deploying a Pages app with missing provider APIs.
+Cloudflare Pages builds hide Node runtime API routes before generating the Pages output. Browser-first Pages deployments can update successfully, but Node-only provider/team APIs are not included there.
 
 ## Current Limitations
 

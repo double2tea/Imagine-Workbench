@@ -43,8 +43,8 @@ pnpm run pages:deploy
 
 The GitHub Actions workflow deploys `main` to Cloudflare Pages only when `ENABLE_CLOUDFLARE_PAGES_DEPLOY=true`, `CLOUDFLARE_ACCOUNT_ID`, and `CLOUDFLARE_API_TOKEN` are configured.
 
-Cloudflare Pages builds only browser-first routes. The build hides team-local PostgreSQL routes under `/api/storage/team/*` and fails fast if any other Node runtime API route would be omitted from the Pages deployment.
-Treat `pnpm run pages:build` as the compatibility gate before enabling the workflow or running a manual Pages deploy.
+Cloudflare Pages builds only browser-first routes. The build hides Node runtime API route files before running the Pages adapter, then restores them locally after the build. Node-only provider/team APIs are not included in the Pages output.
+Run `pnpm run pages:build` before enabling the workflow or running a manual Pages deploy.
 
 ## Dependency Notes
 

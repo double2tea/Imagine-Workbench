@@ -109,8 +109,8 @@ Manual deploy:
 pnpm run pages:deploy
 ```
 
-Cloudflare Pages builds fail fast while non-team Node runtime API routes exist, so provider APIs are not silently omitted from a Pages deployment.
-Run `pnpm run pages:build` as the Cloudflare compatibility check before enabling or manually running Pages deployment.
+Cloudflare Pages builds hide Node runtime API routes before running the Pages adapter, then restore them locally after the build. The Pages deployment is browser-first; Node-only provider/team APIs are not included in the Pages output.
+Run `pnpm run pages:build` before enabling or manually running Pages deployment.
 
 For opt-in LAN/self-hosted team workspaces backed by PostgreSQL and a server media volume, use `docker-compose.team.yml` and see [Local team deployment](docs/deployment/team-local.md). Browser IndexedDB remains the default storage mode.
 

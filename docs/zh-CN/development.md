@@ -43,8 +43,8 @@ pnpm run pages:deploy
 
 配置 `ENABLE_CLOUDFLARE_PAGES_DEPLOY=true`、`CLOUDFLARE_ACCOUNT_ID` 和 `CLOUDFLARE_API_TOKEN` 后，GitHub Actions 才会将 `main` 部署到 Cloudflare Pages。
 
-Cloudflare Pages 只构建 browser-first 路由。构建会隐藏 `/api/storage/team/*` 下的团队本地 PostgreSQL 路由；如果其他 Node runtime API 路由会在 Pages 部署中缺失，构建会直接失败。
-启用 workflow 或手动 Pages 部署前，将 `pnpm run pages:build` 作为兼容性门禁执行。
+Cloudflare Pages 只构建 browser-first 路由。构建会先隐藏 Node runtime API route 文件，运行 Pages adapter 后再在本地恢复它们；Node-only 的 provider/team API 不会包含在 Pages 输出中。
+启用 workflow 或手动 Pages 部署前，先运行 `pnpm run pages:build`。
 
 ## 依赖说明
 

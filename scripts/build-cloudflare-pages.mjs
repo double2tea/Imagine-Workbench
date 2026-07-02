@@ -3,7 +3,6 @@ import { access, readdir, readFile, rename, rm } from "node:fs/promises";
 import path from "node:path";
 
 const nodeRuntimeRoutePattern = /export\s+const\s+runtime\s*=\s*["']nodejs["']/;
-const teamLocalRoutePattern = /^app[/\\]api[/\\]storage[/\\]team[/\\]/;
 const staleDisabledRouteFiles = await findDisabledRouteFiles("app");
 if (staleDisabledRouteFiles.length > 0) {
   console.log(`Restoring ${staleDisabledRouteFiles.length} previously disabled Cloudflare route files...`);
@@ -16,8 +15,7 @@ if (staleDisabledRouteFiles.length > 0) {
   }
 }
 const nodeRuntimeRouteFiles = await findNodeRuntimeRouteFiles("app");
-const localOnlyRouteFiles = nodeRuntimeRouteFiles.filter(routeFilePath => teamLocalRoutePattern.test(routeFilePath));
-const unsupportedNodeRuntimeRouteFiles = nodeRuntimeRouteFiles.filter(routeFilePath => !teamLocalRoutePattern.test(routeFilePath));
+const localOnlyRouteFiles = nodeRuntimeRouteFiles;
 const movedRoutes = [];
 let restoring = false;
 
@@ -77,16 +75,7 @@ function run(command, args, env) {
 }
 
 async function moveRoutesOut() {
-  if (unsupportedNodeRuntimeRouteFiles.length > 0) {
-    throw new Error(
-      [
-        "Cloudflare Pages build blocked: non-team Node runtime API routes would be missing after deployment.",
-        "Make these routes Edge-compatible or deploy this app on a Node runtime instead:",
-        ...unsupportedNodeRuntimeRouteFiles.map(routeFilePath => `- ${routeFilePath}`),
-      ].join("\n"),
-    );
-  }
-  console.log(`Preparing Cloudflare Pages build routes (${localOnlyRouteFiles.length} team-local Node runtime routes hidden)...`);
+  console.log(`Preparing Cloudflare Pages build routes (${localOnlyRouteFiles.length} Node runtime routes hidden)...`);
   for (const routeFilePath of localOnlyRouteFiles) {
     await rename(routeFilePath, disabledRoutePath(routeFilePath));
     movedRoutes.push(routeFilePath);
