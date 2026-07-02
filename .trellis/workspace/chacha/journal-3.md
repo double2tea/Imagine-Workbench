@@ -1950,3 +1950,36 @@ Hardened PostgreSQL team-mode provider credential resolution for internal API ro
 ### Next Steps
 
 - None - task complete
+
+
+## Session 177: Restore Cloudflare Pages deploy
+
+**Date**: 2026-07-02
+**Task**: Restore Cloudflare Pages deploy
+**Branch**: `main`
+
+### Summary
+
+Restored Cloudflare Pages build behavior to hide all Node runtime route files during next-on-pages, updated deployment docs, restored deploy variable, verified local pages:build and check, and prepared the workflow to deploy main again.
+
+### Main Changes
+
+(Add details)
+
+### Git Commits
+
+| Hash | Message |
+|------|---------|
+| `a6364800` | (see git log) |
+
+### Testing
+
+- [OK] (Add test results)
+
+### Status
+
+[OK] **Completed**
+
+### Next Steps
+
+- None - task complete
