@@ -1917,3 +1917,36 @@ Suppressed per-media-node controls during board batch selection, fixed React Flo
 ### Next Steps
 
 - None - task complete
+
+
+## Session 176: Team mode security and board media refs
+
+**Date**: 2026-07-02
+**Task**: Team mode security and board media refs
+**Branch**: `codex/team-mode-security-board-polish`
+
+### Summary
+
+Hardened PostgreSQL team-mode provider credential resolution for internal API routes, preserved anonymous explicit credentials for OpenAI-compatible v1 routes, fixed board media reference preparation for same-origin team asset URLs, added first-owner bootstrap locking, Docker env ignores, regression tests, and spec notes.
+
+### Main Changes
+
+(Add details)
+
+### Git Commits
+
+| Hash | Message |
+|------|---------|
+| `bacc300d` | (see git log) |
+
+### Testing
+
+- [OK] (Add test results)
+
+### Status
+
+[OK] **Completed**
+
+### Next Steps
+
+- None - task complete
