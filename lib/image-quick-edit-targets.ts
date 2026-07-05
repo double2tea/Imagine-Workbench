@@ -1,5 +1,6 @@
 import { t as globalT, type TFunction } from "@/lib/i18n-core";
 import { API_ROUTES } from "./api/routes";
+import { browserByokFetch } from "./browser-byok-fetch";
 import { readFetchError } from "./client-fetch-error";
 import { readImageGenerationPayload } from "./client-image-response";
 import { normalizeImageEditAspectRatio, resolveImageEditResolutionForAspect } from "./image-edit-geometry";
@@ -188,7 +189,7 @@ export interface SubmitImageQuickEditInput {
 
 export async function submitImageQuickEdit(input: SubmitImageQuickEditInput): Promise<string> {
   const request = imageQuickEditRequest(input);
-  const response = await fetch(request.route, {
+  const response = await browserByokFetch(request.route, {
     method: "POST",
     headers: { "Content-Type": "application/json", ...input.buildProviderHeaders(request.headerTarget) },
     signal: input.signal,
@@ -249,7 +250,7 @@ function imageQuickEditRequest(input: SubmitImageQuickEditInput): {
 ): Promise<string> {
   for (let attempt = 0; attempt < 120; attempt += 1) {
     await delay(2000, signal);
-    const statusResponse = await fetch(API_ROUTES.media.status, {
+    const statusResponse = await browserByokFetch(API_ROUTES.media.status, {
       method: "POST",
       headers: { "Content-Type": "application/json", ...buildProviderHeaders(operationName) },
       signal,
@@ -272,7 +273,7 @@ async function downloadImageOperation(
   buildProviderHeaders: (target?: string) => Record<string, string>,
   signal: AbortSignal | undefined,
 ): Promise<string> {
-  const response = await fetch(API_ROUTES.media.imageDownload, {
+  const response = await browserByokFetch(API_ROUTES.media.imageDownload, {
     method: "POST",
     headers: { "Content-Type": "application/json", ...buildProviderHeaders(operationName) },
     signal,

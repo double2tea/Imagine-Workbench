@@ -188,6 +188,7 @@ import {
   type WorkspaceCleanupKind,
 } from "@/lib/data-management";
 import { API_ROUTES } from "@/lib/api/routes";
+import { browserByokFetch } from "@/lib/browser-byok-fetch";
 import { readFetchError, toErrorMessage } from "@/lib/client-fetch-error";
 import {
   cancelTeamGenerationTask,
@@ -2058,7 +2059,7 @@ export default function BoardPage({ boardId = DEFAULT_BOARD_ID }: BoardPageProps
     : videoCapabilities.referenceMode;
 
   const fetchRunningHubAppSchema = useCallback(async (webappId: string): Promise<BoardRunningHubAppSchemaResult> => {
-    const response = await fetch("/api/runninghub/ai-app-schema", {
+    const response = await browserByokFetch("/api/runninghub/ai-app-schema", {
       method: "POST",
       headers: {
         "Content-Type": "application/json",
@@ -2448,7 +2449,7 @@ export default function BoardPage({ boardId = DEFAULT_BOARD_ID }: BoardPageProps
     if (!promptToOptimize.trim()) return;
     setIsOptimizing(true);
     try {
-      const res = await fetch(API_ROUTES.prompts.optimize, {
+      const res = await browserByokFetch(API_ROUTES.prompts.optimize, {
         method: "POST",
         headers: { "Content-Type": "application/json", ...buildProviderHeaders(selectedChatModel) },
         body: JSON.stringify({ prompt: promptToOptimize, model: selectedChatModel }),
@@ -2944,7 +2945,7 @@ export default function BoardPage({ boardId = DEFAULT_BOARD_ID }: BoardPageProps
         throw new Error("Current media cannot be sent to Agent for analysis");
       }
 
-      const response = await fetch(API_ROUTES.agent.respond, {
+      const response = await browserByokFetch(API_ROUTES.agent.respond, {
         method: "POST",
         headers: { "Content-Type": "application/json", ...buildProviderHeaders(selectedChatModel) },
         body: JSON.stringify({
@@ -3056,7 +3057,7 @@ export default function BoardPage({ boardId = DEFAULT_BOARD_ID }: BoardPageProps
         }
       }
 
-      const response = await fetch(API_ROUTES.board.promptText, {
+      const response = await browserByokFetch(API_ROUTES.board.promptText, {
         method: "POST",
         headers: { "Content-Type": "application/json", ...buildProviderHeaders(selectedChatModel) },
         body: JSON.stringify({
@@ -4126,7 +4127,7 @@ export default function BoardPage({ boardId = DEFAULT_BOARD_ID }: BoardPageProps
     setCancelingBoardItemIds(prev => [...prev, task.id]);
     try {
       if (canCancelRemote && operationName) {
-        const response = await fetch(API_ROUTES.media.cancel, {
+        const response = await browserByokFetch(API_ROUTES.media.cancel, {
           method: "POST",
           headers: { "Content-Type": "application/json", ...buildProviderHeaders(operationName) },
           body: JSON.stringify({ operationName }),

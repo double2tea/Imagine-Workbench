@@ -111,6 +111,7 @@ import {
   type MediaReferenceDimensions,
 } from "@/lib/media-references";
 import { API_ROUTES } from "@/lib/api/routes";
+import { browserByokFetch } from "@/lib/browser-byok-fetch";
 import {
   REFERENCE_IMAGE_REQUEST_BODY_MAX_BYTES,
   compressReferenceImageDataUrl,
@@ -966,7 +967,7 @@ export default function Home() {
         locallyCanceledItemIdsRef.current.add(task.id);
       }
       if (task.canCancelRemote && task.operationName) {
-        const res = await fetch(API_ROUTES.media.cancel, {
+        const res = await browserByokFetch(API_ROUTES.media.cancel, {
           method: "POST",
           headers: { "Content-Type": "application/json", ...buildProviderHeaders(task.operationName) },
           body: JSON.stringify({ operationName: task.operationName }),
@@ -1318,7 +1319,7 @@ export default function Home() {
     try {
       const headers = buildProviderHeaders(selectedChatModel);
 
-      const res = await fetch(API_ROUTES.prompts.optimize, {
+      const res = await browserByokFetch(API_ROUTES.prompts.optimize, {
         method: "POST",
         headers: { "Content-Type": "application/json", ...headers },
         body: JSON.stringify({ prompt: promptToOptimize, model: selectedChatModel }),

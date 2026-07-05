@@ -4,11 +4,11 @@ import { generateAudioOperation } from "../providers/audio";
 import { editImage, generateImage } from "../providers/image";
 import { parseProviderModel, ProviderModelParseError, type AiProvider } from "../providers/model-catalog";
 import type { ImageEditOperation, MimoAsrLanguage } from "../providers/types";
-import { resolveProviderConfigForRequest } from "../providers/team-config";
 import { optionalText, parseDataUri } from "../providers/utils";
 import { audioOperationApiError } from "./audio-errors";
 import { ApiError, apiErrorResponse, badRequest, requireApiText } from "./errors";
 import { assertOpenAiCompatibleGatewayAccess } from "./openai-auth";
+import { resolveOpenAiCompatibleProviderConfigForRequest } from "./openai-provider-config";
 import { assertPublicHttpUrl } from "./url-safety";
 import { REFERENCE_IMAGE_MAX_BYTES, REFERENCE_IMAGE_REQUEST_BODY_MAX_BYTES, dataUriByteSize } from "../reference-images";
 
@@ -49,10 +49,7 @@ export async function postOpenAiImageGenerations(req: Request): Promise<Response
 
     const parsed = parseProviderModel(body.model, "12ai");
     assertImmediateOpenAiImageTarget(parsed.provider, parsed.async, "/v1/images/generations");
-    const config = await resolveProviderConfigForRequest(req, parsed.provider, {
-      allowAnonymousProviderCredentials: true,
-      ignoredBearerToken: gatewayKey,
-    });
+    const config = resolveOpenAiCompatibleProviderConfigForRequest(req, parsed.provider, gatewayKey);
     const imageResolution = body.size ?? "1024x1024";
     const result = await generateImage(config, {
       prompt: body.prompt,
@@ -99,10 +96,7 @@ export async function postOpenAiImageEdits(req: Request): Promise<Response> {
 
     const parsed = parseProviderModel(modelValue, "12ai");
     assertImmediateOpenAiImageTarget(parsed.provider, parsed.async, "/v1/images/edits");
-    const config = await resolveProviderConfigForRequest(req, parsed.provider, {
-      allowAnonymousProviderCredentials: true,
-      ignoredBearerToken: gatewayKey,
-    });
+    const config = resolveOpenAiCompatibleProviderConfigForRequest(req, parsed.provider, gatewayKey);
     const images = await readRequiredImageEditDataUris(form);
     const mask = await readOptionalFileDataUri(form, "mask", "image/png", REFERENCE_IMAGE_MAX_BYTES);
     const imageResolution = readOptionalFormText(form, "size") ?? "1024x1024";
@@ -140,10 +134,7 @@ export async function postOpenAiAudioSpeech(req: Request): Promise<Response> {
       );
     }
 
-    const config = await resolveProviderConfigForRequest(req, parsed.provider, {
-      allowAnonymousProviderCredentials: true,
-      ignoredBearerToken: gatewayKey,
-    });
+    const config = resolveOpenAiCompatibleProviderConfigForRequest(req, parsed.provider, gatewayKey);
     const result = await generateAudioOperation(config, {
       mode: "tts",
       prompt: body.input,
@@ -188,10 +179,7 @@ export async function postOpenAiAudioTranscriptions(req: Request): Promise<Respo
       throw badRequest("/v1/audio/transcriptions supports response_format=json only", "unsupported_transcription_format");
     }
 
-    const config = await resolveProviderConfigForRequest(req, parsed.provider, {
-      allowAnonymousProviderCredentials: true,
-      ignoredBearerToken: gatewayKey,
-    });
+    const config = resolveOpenAiCompatibleProviderConfigForRequest(req, parsed.provider, gatewayKey);
     const audio = await readRequiredFileDataUri(form, "file", "audio/mpeg", REFERENCE_IMAGE_REQUEST_BODY_MAX_BYTES);
     const result = await generateAudioOperation(config, {
       mode: "asr",

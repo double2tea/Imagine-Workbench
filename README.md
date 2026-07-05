@@ -109,7 +109,7 @@ Manual deploy:
 pnpm run pages:deploy
 ```
 
-Cloudflare Pages builds hide Node runtime API routes before running the Pages adapter, then restore them locally after the build. The Pages deployment is browser-first; Node-only provider/team APIs are not included in the Pages output.
+Cloudflare Pages builds enable browser BYOK mode (`NEXT_PUBLIC_IMAGINE_BROWSER_BYOK=1`) and hide classified Node runtime API routes before running the Pages adapter, then restore them locally after the build. In Pages mode, generation calls go from the browser to the selected provider using the user's local provider credentials. Team-mode saved provider secrets stay self-hosted/Node-only.
 Run `pnpm run pages:build` before enabling or manually running Pages deployment.
 
 For opt-in LAN/self-hosted team workspaces backed by PostgreSQL and a server media volume, use `docker-compose.team.yml` and see [Local team deployment](docs/deployment/team-local.md). Browser IndexedDB remains the default storage mode.

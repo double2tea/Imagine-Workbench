@@ -4,8 +4,8 @@ import type { AiProvider, ModelKind, ModelOption } from "../providers/model-cata
 import { getModelCapability, parseProviderModel, ProviderModelParseError } from "../providers/model-catalog";
 import { isProviderKey, PROVIDER_KEYS } from "../providers/registry";
 import { listProviderModels, listStaticProviderModels, type ModelKindFilter } from "../providers/models";
-import { resolveProviderConfigForRequest } from "../providers/team-config";
 import { assertOpenAiCompatibleGatewayAccess } from "./openai-auth";
+import { resolveOpenAiCompatibleProviderConfigForRequest } from "./openai-provider-config";
 
 interface OpenAiModel {
   id: string;
@@ -16,9 +16,9 @@ interface OpenAiModel {
 
 export async function GET(req: Request) {
   try {
+    const gatewayKey = assertOpenAiCompatibleGatewayAccess(req);
     const provider = readProvider(req);
     const kind = readKind(req);
-    const gatewayKey = assertOpenAiCompatibleGatewayAccess(req);
     const models = provider === "all"
       ? listAllKnownProviderModels(kind)
       : await listSingleProviderModels(req, provider, kind, gatewayKey);
@@ -67,10 +67,7 @@ async function listSingleProviderModels(
   kind: ModelKindFilter,
   gatewayKey: string | undefined,
 ) {
-  const config = await resolveProviderConfigForRequest(req, provider, {
-    allowAnonymousProviderCredentials: true,
-    ignoredBearerToken: gatewayKey,
-  });
+  const config = resolveOpenAiCompatibleProviderConfigForRequest(req, provider, gatewayKey);
   return listProviderModels(config, kind);
 }
 

@@ -65,6 +65,19 @@ test("OpenAI-compatible model list validates provider keys", async () => {
   assert.match(await response.text(), /provider must be all or a valid provider key/);
 });
 
+test("OpenAI-compatible model list checks gateway auth before query validation", async () => {
+  const originalGatewayKey = process.env.OPENAI_COMPAT_API_KEY;
+  process.env.OPENAI_COMPAT_API_KEY = "gateway_key";
+
+  try {
+    const response = await listOpenAiModels(new Request("http://local.test/v1/models?provider=bad provider"));
+    assert.equal(response.status, 401);
+    assert.match(await response.text(), /gateway API key/);
+  } finally {
+    restoreEnv("OPENAI_COMPAT_API_KEY", originalGatewayKey);
+  }
+});
+
 test("OpenAI-compatible model list separates gateway auth from provider auth", async () => {
   const originalGatewayKey = process.env.OPENAI_COMPAT_API_KEY;
   process.env.OPENAI_COMPAT_API_KEY = "gateway_key";

@@ -66,13 +66,13 @@ Use [Local team deployment](deployment/team-local.md) for Docker Compose setup, 
 
 For Cloudflare Pages, Vercel, Netlify, or other hosted deployments:
 
-- serverless routes can call providers and return media results;
+- browser BYOK mode can call providers directly when the provider allows browser CORS;
 - user workspaces remain in the browser by default;
 - the server does not provide per-user asset browsing or sync;
 - `/v1/*` should be protected with `OPENAI_COMPAT_API_KEY` if exposed to others;
 - provider keys should be treated as secrets and should not be committed or exposed in client-visible code.
 
-Cloudflare Pages builds hide Node runtime API routes before generating the Pages output. Browser-first Pages deployments can update successfully, but Node-only provider/team APIs are not included there.
+Cloudflare Pages builds enable browser BYOK mode (`NEXT_PUBLIC_IMAGINE_BROWSER_BYOK=1`) and hide classified Node runtime API routes before generating the Pages output. Browser-first Pages deployments can update successfully and call providers directly with the user's local provider credentials when the provider allows browser CORS. Team-mode saved provider secrets are not available there.
 
 ## Current Limitations
 

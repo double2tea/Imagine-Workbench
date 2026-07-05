@@ -86,6 +86,7 @@ export async function postJson<T>(url: string, config: ProviderConfig, body: unk
       ...authHeaders(config),
     },
     body: JSON.stringify(body),
+    signal: config.signal,
   });
   return parseJsonResponse<T>(res);
 }
@@ -99,6 +100,7 @@ export function openAiCompatibleUrl(baseUrl: string, path: `/v1/${string}`): str
 export async function getJson<T>(url: string, config: ProviderConfig): Promise<T> {
   const res = await fetch(url, {
     headers: authHeaders(config),
+    signal: config.signal,
   });
   return parseJsonResponse<T>(res);
 }
@@ -107,6 +109,7 @@ export async function deleteJson<T>(url: string, config: ProviderConfig): Promis
   const res = await fetch(url, {
     method: "DELETE",
     headers: authHeaders(config),
+    signal: config.signal,
   });
   return parseJsonResponse<T>(res);
 }
@@ -116,6 +119,7 @@ export async function postForm<T>(url: string, config: ProviderConfig, form: For
     method: "POST",
     headers: authHeaders(config),
     body: form,
+    signal: config.signal,
   });
   return parseJsonResponse<T>(res);
 }

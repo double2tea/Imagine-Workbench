@@ -4,6 +4,7 @@ import type { Dispatch, MutableRefObject, SetStateAction } from "react";
 import type { ReferenceImageRef } from "@/components/reference/ReferenceImagePicker";
 import { isRunningHubWorkflowAudioTarget } from "@/lib/audio-generation-routing";
 import { API_ROUTES } from "@/lib/api/routes";
+import { browserByokFetch } from "@/lib/browser-byok-fetch";
 import { resolveAssetOriginalUrl } from "@/lib/assets/resolve-url";
 import { readFetchError, toErrorMessage } from "@/lib/client-fetch-error";
 import { readImageGenerationPayload } from "@/lib/client-image-response";
@@ -556,7 +557,7 @@ export function useGenerationActions({
     try {
       const headers = buildProviderHeaders(overrides.model ?? selectedModel);
 
-      const res = await fetch(API_ROUTES.media.generateImage, {
+      const res = await browserByokFetch(API_ROUTES.media.generateImage, {
         method: "POST",
         headers: { "Content-Type": "application/json", ...headers },
         signal: controller.signal,
@@ -752,7 +753,7 @@ export function useGenerationActions({
 
     try {
       const headers = buildProviderHeaders(requestModel);
-      const res = await fetch(API_ROUTES.media.generateVideo, {
+      const res = await browserByokFetch(API_ROUTES.media.generateVideo, {
         method: "POST",
         headers: { "Content-Type": "application/json", ...headers },
         signal: controller.signal,
@@ -962,7 +963,7 @@ export function useGenerationActions({
 
       try {
         const headers = buildProviderHeaders(requestModel);
-        const res = await fetch(audioGenerationEndpoint(requestModel, generationRequest.runningHubNodeInfoList), {
+        const res = await browserByokFetch(audioGenerationEndpoint(requestModel, generationRequest.runningHubNodeInfoList), {
           method: "POST",
           headers: { "Content-Type": "application/json", ...headers },
           signal: controller.signal,

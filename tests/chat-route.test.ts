@@ -1,6 +1,7 @@
 import assert from "node:assert/strict";
 import test from "node:test";
-import { POST } from "../lib/api/chat-completions";
+import { POST as postAppChatCompletions } from "../lib/api/chat-completions";
+import { POST as postOpenAiChatCompletions } from "../app/v1/chat/completions/route";
 
 test("chat completions proxies MiMo chat requests through provider-neutral route", async () => {
   const mock = withFetchMock(async (url, init) => {
@@ -16,7 +17,7 @@ test("chat completions proxies MiMo chat requests through provider-neutral route
   });
 
   try {
-    const response = await POST(jsonRequest({
+    const response = await postAppChatCompletions(jsonRequest({
       model: "mimo:mimo-v2.5",
       messages: [{ role: "user", content: "hello" }],
       stream: false,
@@ -43,7 +44,7 @@ test("chat completions proxies RunningHub chat requests through LLM host", async
   });
 
   try {
-    const response = await POST(jsonRequest({
+    const response = await postAppChatCompletions(jsonRequest({
       model: "runninghub:qwen/qwen3.7-max",
       messages: [{ role: "user", content: "hello" }],
     }, { "x-ai-api-key": "runninghub_key" }));
@@ -70,7 +71,7 @@ test("v1 chat completions treats Authorization as gateway auth when configured",
   });
 
   try {
-    const response = await POST(jsonRequest({
+    const response = await postOpenAiChatCompletions(jsonRequest({
       model: "newapi:chat-model",
       messages: [{ role: "user", content: "hello" }],
     }, {
@@ -88,6 +89,34 @@ test("v1 chat completions treats Authorization as gateway auth when configured",
   }
 });
 
+test("v1 chat completions rejects request base URL without request provider key", async () => {
+  const originalGatewayKey = process.env.OPENAI_COMPAT_API_KEY;
+  const originalTwelveAiKey = process.env.TWELVE_AI_API_KEY;
+  process.env.OPENAI_COMPAT_API_KEY = "gateway_key";
+  process.env.TWELVE_AI_API_KEY = "env_secret_key";
+  const mock = withFetchMock(async () => {
+    throw new Error("Request base URL must be rejected before provider fetch");
+  });
+
+  try {
+    const response = await postOpenAiChatCompletions(jsonRequest({
+      model: "12ai:chat-model",
+      messages: [{ role: "user", content: "hello" }],
+    }, {
+      Authorization: "Bearer gateway_key",
+      "x-ai-base-url": "https://attacker.example.test/v1",
+    }, "/v1/chat/completions"));
+
+    assert.equal(response.status, 400);
+    assert.match(await response.text(), /x-ai-base-url requires x-ai-api-key/);
+    assert.equal(mock.calls.count, 0);
+  } finally {
+    restoreEnv("OPENAI_COMPAT_API_KEY", originalGatewayKey);
+    restoreEnv("TWELVE_AI_API_KEY", originalTwelveAiKey);
+    mock.restore();
+  }
+});
+
 test("v1 chat completions rejects missing gateway auth when configured", async () => {
   const originalGatewayKey = process.env.OPENAI_COMPAT_API_KEY;
   process.env.OPENAI_COMPAT_API_KEY = "gateway_key";
@@ -96,7 +125,7 @@ test("v1 chat completions rejects missing gateway auth when configured", async (
   });
 
   try {
-    const response = await POST(jsonRequest({
+    const response = await postOpenAiChatCompletions(jsonRequest({
       model: "newapi:chat-model",
       messages: [{ role: "user", content: "hello" }],
     }, {
@@ -118,7 +147,7 @@ test("v1 chat completions checks gateway auth before parsing JSON", async () => 
   process.env.OPENAI_COMPAT_API_KEY = "gateway_key";
 
   try {
-    const response = await POST(new Request("http://local.test/v1/chat/completions", {
+    const response = await postOpenAiChatCompletions(new Request("http://local.test/v1/chat/completions", {
       method: "POST",
       headers: { "Content-Type": "application/json" },
       body: "{",
@@ -141,7 +170,7 @@ test("provider-neutral app chat route does not require v1 gateway auth", async (
   });
 
   try {
-    const response = await POST(jsonRequest({
+    const response = await postAppChatCompletions(jsonRequest({
       model: "newapi:chat-model",
       messages: [{ role: "user", content: "hello" }],
     }, {
@@ -158,7 +187,7 @@ test("provider-neutral app chat route does not require v1 gateway auth", async (
 });
 
 test("chat completions rejects invalid request bodies", async () => {
-  const response = await POST(jsonRequest({ model: "mimo:mimo-v2.5", messages: [] }));
+  const response = await postAppChatCompletions(jsonRequest({ model: "mimo:mimo-v2.5", messages: [] }));
   assert.equal(response.status, 400);
   assert.match(await response.text(), /messages/);
 });

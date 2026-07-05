@@ -3,6 +3,28 @@ import { access, readdir, readFile, rename, rm } from "node:fs/promises";
 import path from "node:path";
 
 const nodeRuntimeRoutePattern = /export\s+const\s+runtime\s*=\s*["']nodejs["']/;
+const cloudflareByokHiddenRoutePatterns = [
+  /^app\/api\/storage\/team\//,
+  /^app\/api\/resolve\//,
+];
+const cloudflareByokHiddenRouteFiles = new Set([
+  "app/api/agent/respond/route.ts",
+  "app/api/board/prompt-text/route.ts",
+  "app/api/chat/completions/route.ts",
+  "app/api/image/edit/route.ts",
+  "app/api/media/audio-download/route.ts",
+  "app/api/media/cancel/route.ts",
+  "app/api/media/generate-audio-workflow/route.ts",
+  "app/api/media/generate-audio/route.ts",
+  "app/api/media/generate-image/route.ts",
+  "app/api/media/generate-video/route.ts",
+  "app/api/media/image-download/route.ts",
+  "app/api/media/status/route.ts",
+  "app/api/media/video-download/route.ts",
+  "app/api/models/route.ts",
+  "app/api/prompts/optimize/route.ts",
+  "app/api/runninghub/ai-app-schema/route.ts",
+]);
 const staleDisabledRouteFiles = await findDisabledRouteFiles("app");
 if (staleDisabledRouteFiles.length > 0) {
   console.log(`Restoring ${staleDisabledRouteFiles.length} previously disabled Cloudflare route files...`);
@@ -15,7 +37,8 @@ if (staleDisabledRouteFiles.length > 0) {
   }
 }
 const nodeRuntimeRouteFiles = await findNodeRuntimeRouteFiles("app");
-const localOnlyRouteFiles = nodeRuntimeRouteFiles;
+const localOnlyRouteFiles = nodeRuntimeRouteFiles.filter(isCloudflareByokHiddenRouteFile);
+const unsupportedNodeRuntimeRouteFiles = nodeRuntimeRouteFiles.filter(routeFilePath => !isCloudflareByokHiddenRouteFile(routeFilePath));
 const movedRoutes = [];
 let restoring = false;
 
@@ -57,6 +80,16 @@ async function findDisabledRouteFiles(dirPath) {
   return routeFiles;
 }
 
+function normalizedSourcePath(filePath) {
+  return filePath.split(path.sep).join("/");
+}
+
+function isCloudflareByokHiddenRouteFile(routeFilePath) {
+  const normalizedPath = normalizedSourcePath(routeFilePath);
+  return cloudflareByokHiddenRouteFiles.has(normalizedPath) ||
+    cloudflareByokHiddenRoutePatterns.some(pattern => pattern.test(normalizedPath));
+}
+
 async function pathExists(filePath) {
   try {
     await access(filePath);
@@ -75,7 +108,16 @@ function run(command, args, env) {
 }
 
 async function moveRoutesOut() {
-  console.log(`Preparing Cloudflare Pages build routes (${localOnlyRouteFiles.length} Node runtime routes hidden)...`);
+  if (unsupportedNodeRuntimeRouteFiles.length > 0) {
+    throw new Error(
+      [
+        "Cloudflare Pages BYOK build blocked: unclassified Node runtime routes would be missing after deployment.",
+        "Classify these routes as browser-BYOK-hidden routes or make them Edge-compatible:",
+        ...unsupportedNodeRuntimeRouteFiles.map(routeFilePath => `- ${routeFilePath}`),
+      ].join("\n"),
+    );
+  }
+  console.log(`Preparing Cloudflare Pages BYOK build routes (${localOnlyRouteFiles.length} Node runtime routes hidden; browser BYOK enabled)...`);
   for (const routeFilePath of localOnlyRouteFiles) {
     await rename(routeFilePath, disabledRoutePath(routeFilePath));
     movedRoutes.push(routeFilePath);
@@ -114,7 +156,9 @@ try {
   console.log("Running @cloudflare/next-on-pages...");
   const exitCode = await run("pnpm", ["dlx", "@cloudflare/next-on-pages@1"], {
     ...process.env,
-    ENABLE_EXPERIMENTAL_COREPACK: "1",
+    IMAGINE_CLOUDFLARE_PAGES_BUILD: "1",
+    IMAGINE_BROWSER_BYOK: "1",
+    NEXT_PUBLIC_IMAGINE_BROWSER_BYOK: "1",
     VERCEL: "0",
   });
   process.exitCode = exitCode;

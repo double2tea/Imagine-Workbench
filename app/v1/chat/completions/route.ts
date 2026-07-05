@@ -1,2 +1,2 @@
-export const runtime = "nodejs";
-export { POST } from "@/lib/api/chat-completions";
+export const runtime = "edge";
+export { POST } from "@/lib/api/openai-chat-completions";

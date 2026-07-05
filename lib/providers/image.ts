@@ -238,7 +238,7 @@ export async function downloadImage(config: ProviderConfig, taskId: string, outp
   const url = readStatusUrlAt(status, outputIndex);
   if (!url) throw new Error(`Image task is complete but did not expose image #${outputIndex + 1}`);
 
-  const res = await fetch(url);
+  const res = await fetch(url, { signal: config.signal });
   if (!res.ok) throw new Error(`Failed to download image: HTTP ${res.status}`);
 
   return new Response(res.body, {
@@ -337,7 +337,7 @@ export async function downloadRunningHubMedia(
   const url = readStatusUrlAt(status, outputIndex);
   if (!url) throw new Error(`RunningHub ${mediaType} task is complete but did not expose result #${outputIndex + 1}`);
 
-  const res = await fetch(url);
+  const res = await fetch(url, { signal: config.signal });
   if (!res.ok) throw new Error(`Failed to download RunningHub ${mediaType}: HTTP ${res.status}`);
 
   return new Response(res.body, {
@@ -472,6 +472,7 @@ async function generateModelScopeImage(config: ProviderConfig, input: GenerateIm
       "X-ModelScope-Async-Mode": "true",
     },
     body: JSON.stringify(buildModelScopeImageBody(input)),
+    signal: config.signal,
   });
   const json = parseProviderResponseBody(await response.text()) as ModelScopeImageCreateResponse;
   if (!response.ok) {
@@ -497,6 +498,7 @@ async function getModelScopeImageStatus(config: ProviderConfig, taskId: string):
       "Authorization": `Bearer ${config.apiKey}`,
       "X-ModelScope-Task-Type": "image_generation",
     },
+    signal: config.signal,
   });
   const json = parseProviderResponseBody(await response.text()) as ModelScopeImageStatusResponse;
   if (!response.ok) {
@@ -1156,6 +1158,7 @@ async function generate12AiGeminiImage(config: ProviderConfig, input: GenerateIm
         contents: [{ role: "user", parts }],
         generationConfig,
       }),
+      signal: config.signal,
     },
   );
 

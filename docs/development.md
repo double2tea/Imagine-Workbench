@@ -43,7 +43,7 @@ pnpm run pages:deploy
 
 The GitHub Actions workflow deploys `main` to Cloudflare Pages only when `ENABLE_CLOUDFLARE_PAGES_DEPLOY=true`, `CLOUDFLARE_ACCOUNT_ID`, and `CLOUDFLARE_API_TOKEN` are configured.
 
-Cloudflare Pages builds only browser-first routes. The build hides Node runtime API route files before running the Pages adapter, then restores them locally after the build. Node-only provider/team APIs are not included in the Pages output.
+Cloudflare Pages builds the browser BYOK surface. The build sets `NEXT_PUBLIC_IMAGINE_BROWSER_BYOK=1`, hides classified Node runtime API route files before running the Pages adapter, then restores sources locally after the build. In Pages mode, generation calls go from the browser to the selected provider using local provider credentials; team-mode saved secrets stay self-hosted/Node-only.
 Run `pnpm run pages:build` before enabling the workflow or running a manual Pages deploy.
 
 ## Dependency Notes

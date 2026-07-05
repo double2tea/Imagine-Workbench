@@ -1,6 +1,7 @@
 import { t } from "@/lib/i18n";
 import { useEffect, useRef, type Dispatch, type MutableRefObject, type SetStateAction } from "react";
 import { API_ROUTES } from "@/lib/api/routes";
+import { browserByokFetch } from "@/lib/browser-byok-fetch";
 import { readFetchError, toErrorMessage } from "@/lib/client-fetch-error";
 import { buildStorageItem, type GenerationRequestSnapshot, type StorageItem } from "@/lib/db";
 import type { GenerationTask, GenerationTaskStorage, GenerationTaskUpdate } from "@/lib/generation-tasks";
@@ -220,7 +221,7 @@ export function useMediaPolling({
           try {
             const headers = buildProviderHeaders(task.operationName);
 
-            const res = await fetch(API_ROUTES.media.status, {
+            const res = await browserByokFetch(API_ROUTES.media.status, {
               method: "POST",
               headers: { "Content-Type": "application/json", ...headers },
               body: JSON.stringify({ operationName: task.operationName, model: task.model }),
@@ -273,7 +274,7 @@ export function useMediaPolling({
                 const completedItemsToSave: StorageItem[] = [];
                 let wasCanceled = false;
                 for (let outputIndex = 0; outputIndex < statusOutputCount(statusData); outputIndex += 1) {
-                  const dlRes = await fetch(downloadEndpoint, {
+                  const dlRes = await browserByokFetch(downloadEndpoint, {
                     method: "POST",
                     headers: { "Content-Type": "application/json", ...headers },
                     body: JSON.stringify({ operationName: task.operationName, model: task.model, outputIndex }),

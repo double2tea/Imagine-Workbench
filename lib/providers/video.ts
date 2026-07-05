@@ -193,6 +193,7 @@ export async function downloadVideo(config: ProviderConfig, taskId: string, mode
 async function downloadVideoUrl(config: ProviderConfig, baseUrl: string, videoUrl: string): Promise<Response> {
   const res = await fetch(videoUrl, {
     headers: videoUrl.startsWith(baseUrl) ? authHeaders(config) : {},
+    signal: config.signal,
   });
   if (!res.ok) throw new Error(`Failed to download video: HTTP ${res.status}`);
 

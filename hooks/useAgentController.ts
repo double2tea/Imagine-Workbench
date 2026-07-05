@@ -2,6 +2,7 @@ import { t, type Locale } from "@/lib/i18n";
 import { useEffect, useRef, useState, type Dispatch, type SetStateAction } from "react";
 import { getExecutableAction, getPendingAgentAction, type ChatMessage } from "@/components/agent/AgentDock";
 import { API_ROUTES } from "@/lib/api/routes";
+import { browserByokFetch } from "@/lib/browser-byok-fetch";
 import type { AgentGenerationParams, AgentToolAction } from "@/lib/agent-actions";
 import {
   isCustomImageResolutionValue,
@@ -14,6 +15,7 @@ import type { ReferenceImageRef } from "@/components/reference/ReferenceImagePic
 import type { StorageItem } from "@/lib/db";
 import { resolveAssetOriginalUrl } from "@/lib/assets/resolve-url";
 import { getSendableAgentMediaReferences } from "@/lib/agent-chat-model";
+import { readFetchError } from "@/lib/client-fetch-error";
 import type { AudioOperationMode } from "@/lib/providers/model-catalog";
 
 interface UseAgentControllerParams {
@@ -462,7 +464,7 @@ export function useAgentController({
           content: message.content,
         }));
 
-      const response = await fetch(API_ROUTES.agent.respond, {
+      const response = await browserByokFetch(API_ROUTES.agent.respond, {
         method: "POST",
         headers: { "Content-Type": "application/json", ...headers },
         body: JSON.stringify({
@@ -481,35 +483,37 @@ export function useAgentController({
         }),
       });
 
-      if (response.ok) {
-        const agentResponse = await response.json() as AgentResponsePayload;
-        const assistantMsgId = makeClientId("asst");
-        const recommendedAction = agentResponse.recommendedAction || { type: "none" as const };
-        const boardAction = agentResponse.boardAction || { type: "none" as const };
-        const executableAction = boardAction.type !== "none" ? boardAction : recommendedAction;
-        const actionDraft = executableAction.type !== "none"
-          ? prepareAgentActionDraft(executableAction)
-          : undefined;
+      if (!response.ok) {
+        throw new Error(await readFetchError(response, t("common.notices.agentRequestOverloaded")));
+      }
 
-        const assistantMessage: ChatMessage = {
-          id: assistantMsgId,
-          role: "assistant",
-          content: agentResponse.text || t("common.notices.agentReceivedInstruction"),
-          thought: agentResponse.thought || t("common.notices.agentAnalysisThought"),
-          recommendedAction,
-          boardAction,
-          actionDraft,
-          suggestedFollowUps: agentResponse.suggestedFollowUps || [],
-          interactiveState: "idle",
-          activeSkills: agentResponse.activeSkills || [],
-          toolCalls: agentResponse.toolCalls || [],
-        };
+      const agentResponse = await response.json() as AgentResponsePayload;
+      const assistantMsgId = makeClientId("asst");
+      const recommendedAction = agentResponse.recommendedAction || { type: "none" as const };
+      const boardAction = agentResponse.boardAction || { type: "none" as const };
+      const executableAction = boardAction.type !== "none" ? boardAction : recommendedAction;
+      const actionDraft = executableAction.type !== "none"
+        ? prepareAgentActionDraft(executableAction)
+        : undefined;
 
-        setAgentMessages(prev => [...prev, assistantMessage]);
+      const assistantMessage: ChatMessage = {
+        id: assistantMsgId,
+        role: "assistant",
+        content: agentResponse.text || t("common.notices.agentReceivedInstruction"),
+        thought: agentResponse.thought || t("common.notices.agentAnalysisThought"),
+        recommendedAction,
+        boardAction,
+        actionDraft,
+        suggestedFollowUps: agentResponse.suggestedFollowUps || [],
+        interactiveState: "idle",
+        activeSkills: agentResponse.activeSkills || [],
+        toolCalls: agentResponse.toolCalls || [],
+      };
 
-        if (autoExecute && actionDraft && canAutoExecuteAgentAction(actionDraft)) {
-          startAutoCountdown(assistantMsgId, actionDraft);
-        }
+      setAgentMessages(prev => [...prev, assistantMessage]);
+
+      if (autoExecute && actionDraft && canAutoExecuteAgentAction(actionDraft)) {
+        startAutoCountdown(assistantMsgId, actionDraft);
       }
     } catch (error) {
       console.error(error);

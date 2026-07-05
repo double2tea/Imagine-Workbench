@@ -22,6 +22,7 @@ import { dynamicProviderModelOption, isSelectableModelOptionForKind } from "@/li
 import { getProviderMeta, isKnownProvider, isProviderKey, PROVIDER_KEYS, type CustomProviderDefinition } from "@/lib/providers/registry";
 import type { ProviderCredentials } from "@/lib/providers/types";
 import { API_ROUTES } from "@/lib/api/routes";
+import { browserByokFetch } from "@/lib/browser-byok-fetch";
 import { readFetchError, toErrorMessage } from "@/lib/client-fetch-error";
 import {
   deleteTeamSecret,
@@ -620,7 +621,7 @@ export function useProviderSettings({
     setModelListMessage("");
     try {
       const headers = buildProviderHeaders(selectedProvider);
-      const res = await fetch(`/api/models?provider=${selectedProvider}&kind=all`, { headers });
+      const res = await browserByokFetch(`/api/models?provider=${selectedProvider}&kind=all`, { headers });
       if (!res.ok) {
         throw new Error(await readFetchError(res, t("common.notices.modelListFetchFailed")));
       }
@@ -661,7 +662,7 @@ export function useProviderSettings({
   const testProviderConnection = async (provider: AiProvider) => {
     setProviderTest({ provider, status: "testing", message: t("common.notices.testingConnection") });
     try {
-      const res = await fetch(`/api/models?provider=${provider}`, {
+      const res = await browserByokFetch(`/api/models?provider=${provider}`, {
         headers: buildProviderHeaders(provider),
       });
       if (!res.ok) {

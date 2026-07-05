@@ -66,13 +66,13 @@ Docker Compose 启动、环境变量、migrations、首个 owner 引导、备份
 
 对于 Cloudflare Pages、Vercel、Netlify 或其他托管部署：
 
-- serverless 路由可以调用供应商并返回媒体结果；
+- 浏览器 BYOK 模式可在 provider 允许浏览器 CORS 时直接调用 provider；
 - 用户工作区默认仍留在浏览器；
 - 服务端不提供按用户的素材浏览或同步；
 - 如果对外开放 `/v1/*`，应使用 `OPENAI_COMPAT_API_KEY` 保护；
 - 供应商 key 应视为密钥，不应提交到仓库或暴露在客户端可见代码中。
 
-Cloudflare Pages 构建会先隐藏 Node runtime API 路由再生成 Pages 输出。browser-first 的 Pages 部署可以正常更新，但 Node-only 的 provider/team API 不会包含在 Pages 输出中。
+Cloudflare Pages 构建会启用浏览器 BYOK 模式（`NEXT_PUBLIC_IMAGINE_BROWSER_BYOK=1`），并隐藏已分类的 Node runtime API route 后再生成 Pages 输出。browser-first 的 Pages 部署可以正常更新，并在 provider 允许浏览器 CORS 时用用户本地 provider 凭据直连 provider；team mode 保存的 provider 密钥不会在 Pages 中可用。
 
 ## 当前限制
 

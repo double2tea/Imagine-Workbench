@@ -3,10 +3,17 @@ import path from 'node:path';
 import packageJson from './package.json';
 
 const projectRoot = path.resolve(process.cwd());
+const isCloudflarePagesBuild = process.env.IMAGINE_CLOUDFLARE_PAGES_BUILD === '1';
 
 const nextConfig: NextConfig = {
   env: {
     NEXT_PUBLIC_APP_VERSION: packageJson.version,
+    NEXT_PUBLIC_IMAGINE_BROWSER_BYOK:
+      process.env.NEXT_PUBLIC_IMAGINE_BROWSER_BYOK === "1" ||
+      process.env.IMAGINE_BROWSER_BYOK === "1" ||
+      process.env.IMAGINE_CLOUDFLARE_PAGES_BUILD === "1"
+        ? "1"
+        : "",
   },
   reactStrictMode: true,
   devIndicators: false,
@@ -18,6 +25,7 @@ const nextConfig: NextConfig = {
   },
   experimental: {
     serverMinification: false,
+    ...(isCloudflarePagesBuild ? { cpus: 1 } : {}),
   },
   // Allow access to remote image placeholder.
   images: {

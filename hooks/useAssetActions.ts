@@ -3,6 +3,7 @@ import type { Dispatch, MutableRefObject, SetStateAction } from "react";
 import { useConfirm } from "@/components/confirm/ConfirmProvider";
 import type { CompareViewType } from "@/components/assets/ComparePanel";
 import { API_ROUTES } from "@/lib/api/routes";
+import { browserByokFetch } from "@/lib/browser-byok-fetch";
 import { downloadStorageItemsZip, storageItemDownloadFileName, storageItemDownloadMimeType } from "@/lib/assets/download-zip";
 import { readFetchError, toErrorMessage } from "@/lib/client-fetch-error";
 import { readImageGenerationPayload } from "@/lib/client-image-response";
@@ -276,7 +277,7 @@ export function useAssetActions({
       }
 
       if (canCancelRemote) {
-        const res = await fetch(API_ROUTES.media.cancel, {
+        const res = await browserByokFetch(API_ROUTES.media.cancel, {
           method: "POST",
           headers: { "Content-Type": "application/json", ...buildProviderHeaders(operationName) },
           body: JSON.stringify({ operationName }),
@@ -378,7 +379,7 @@ export function useAssetActions({
 
       const headers = buildProviderHeaders(retryRequestBody.model);
       const endpoint = item.type === "image" ? API_ROUTES.media.generateImage : API_ROUTES.media.generateVideo;
-      const res = await fetch(endpoint, {
+      const res = await browserByokFetch(endpoint, {
         method: "POST",
         headers: { "Content-Type": "application/json", ...headers },
         body: JSON.stringify(retryRequestBody),

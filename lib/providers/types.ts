@@ -12,6 +12,7 @@ export interface ProviderConfig {
   apiKey: string;
   baseUrl: string;
   videoBaseUrl: string;
+  signal?: AbortSignal;
 }
 
 export interface ReferenceImage {
