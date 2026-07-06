@@ -182,7 +182,7 @@ export default function VideoGenerationPanel({
   };
 
   return (
-    <div className="flex flex-col gap-3.5 animate-fade-in">
+    <div className="flex flex-col gap-3 animate-fade-in">
       <PromptComposerSurface
         acceptedMediaTypes={capabilities.referenceMediaTypes}
         actions={
@@ -212,9 +212,9 @@ export default function VideoGenerationPanel({
         references={referenceImages}
       />
 
-      <div className="grid grid-cols-1 gap-3">
-        <div>
-          <label className="imagine-section-label mb-1.5 block">{t("videoGeneration.modelLabel")}</label>
+      <div className="imagine-parameter-grid grid grid-cols-1 gap-3 sm:grid-cols-2">
+        <div className="imagine-parameter-field">
+          <label className="imagine-parameter-label-row imagine-section-label">{t("videoGeneration.modelLabel")}</label>
           <ModelSelectCombobox
             accent="violet"
             ariaLabel={t("videoGeneration.modelLabel")}
@@ -224,8 +224,8 @@ export default function VideoGenerationPanel({
           />
         </div>
 
-        <div>
-          <label className="imagine-section-label mb-1.5 block">{t("videoGeneration.aspectRatioLabel")}</label>
+        <div className="imagine-parameter-field">
+          <label className="imagine-parameter-label-row imagine-section-label">{t("videoGeneration.aspectRatioLabel")}</label>
           <select
             value={selectedSize}
             onChange={(event) => onSelectSize(event.target.value)}
@@ -240,8 +240,8 @@ export default function VideoGenerationPanel({
       </div>
 
       {referenceModeOptions.length > 1 && (
-        <div>
-          <label className="imagine-section-label mb-1.5 block">{t("videoGeneration.referenceModeLabel")}</label>
+        <div className="imagine-parameter-field">
+          <label className="imagine-parameter-label-row imagine-section-label">{t("videoGeneration.referenceModeLabel")}</label>
           <select
             value={selectedReferenceMode}
             onChange={(event) => onSelectReferenceMode(event.target.value as VideoReferenceMode)}
@@ -257,12 +257,13 @@ export default function VideoGenerationPanel({
       <CinematicProfileControls
         accent="violet"
         mediaType="video"
+        variant="compact"
         value={cinematicProfile}
         onChange={onCinematicProfileChange}
       />
 
       {(resolutionOptions.length > 0 || durationOptions.length > 0 || presetOptions.length > 0) && (
-        <div className={`grid grid-cols-1 gap-3 border-t border-[var(--iw-border)] pt-3 ${controlGridClass}`}>
+        <div className={`grid grid-cols-1 gap-3 ${controlGridClass}`}>
           {resolutionOptions.length > 0 && (
             <div>
               <label className="mb-1.5 block imagine-section-label">{t("videoGeneration.resolutionLabel")}</label>

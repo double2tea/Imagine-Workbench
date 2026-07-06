@@ -125,7 +125,7 @@ export default function BoardSidePanel({
       <button
         type="button"
         onClick={() => setMobileOpen(true)}
-        className="imagine-board-mobile-panel-btn fixed bottom-36 right-4 z-40 flex h-11 items-center gap-2 rounded-full border border-[var(--iw-border)] bg-[var(--iw-panel)] px-4 text-xs font-semibold text-[var(--iw-text)] shadow-lg lg:hidden"
+        className="imagine-board-mobile-panel-btn fixed bottom-28 right-4 z-40 flex h-10 items-center gap-2 rounded-full border border-[var(--iw-border)] bg-[var(--iw-panel)] px-3.5 text-[11px] font-semibold text-[var(--iw-text)] shadow-lg lg:hidden"
       >
         <PanelRight className="h-4 w-4" />
         {t('inspector.title')}

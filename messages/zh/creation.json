@@ -1,5 +1,6 @@
 {
   "tabs": {
+    "ariaLabel": "创作模式",
     "image": "智能绘图",
     "video": "视频合成",
     "audio": "音频创作"
@@ -183,7 +184,14 @@
       "video": "生成视频",
       "audio": "生成音频"
     },
-    "submittingLabel": "提交中 ({count})，可继续排队"
+    "submittingLabel": "提交中 ({count})，可继续排队",
+    "disabledHint": {
+      "prompt": "请先输入提示词",
+      "audioText": "请先填写文本内容",
+      "audioStyle": "请先填写风格描述",
+      "audioReference": "请添加所需参考音频或选择克隆音色",
+      "voiceCloneConsent": "请先确认语音克隆授权"
+    }
   },
   "imageGeneration": {
     "optimizeLabel": "优化",

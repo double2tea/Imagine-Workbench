@@ -315,22 +315,22 @@ export default function AssetCard({
     },
   ];
   const assetTypeBadge = item.type === "image" ? (
-    <span className="imagine-asset-type-badge flex shrink-0 items-center gap-1.5 px-2 py-1 text-[9px] font-bold tracking-wider uppercase rounded bg-blue-500/80 backdrop-blur-md text-white border border-blue-400/25">
+    <span className="imagine-asset-type-badge flex shrink-0 items-center gap-1.5 px-2 py-1 text-[9px] font-bold tracking-wider uppercase rounded border border-[var(--iw-tone-accent-border)] bg-[color-mix(in_srgb,var(--iw-tone-accent-bg)_80%,transparent)] text-[var(--iw-tone-accent-text)] backdrop-blur-md">
       <ImageIcon className="h-3 w-3" />
       IMAGE
     </span>
   ) : item.type === "video" ? (
-    <span className="imagine-asset-type-badge flex shrink-0 items-center gap-1.5 px-2 py-1 text-[9px] font-bold tracking-wider uppercase rounded bg-purple-500/80 backdrop-blur-md text-white border border-purple-400/25">
+    <span className="imagine-asset-type-badge flex shrink-0 items-center gap-1.5 px-2 py-1 text-[9px] font-bold tracking-wider uppercase rounded border border-[var(--iw-tone-violet-border)] bg-[color-mix(in_srgb,var(--iw-tone-violet-bg)_80%,transparent)] text-[var(--iw-tone-violet-text)] backdrop-blur-md">
       <span className="h-1.5 w-1.5 rounded-full bg-red-400 animate-ping" />
       VIDEO
     </span>
   ) : item.type === "audio" ? (
-    <span className="imagine-asset-type-badge imagine-audio-type-badge flex shrink-0 items-center gap-1.5 px-2 py-1 text-[9px] font-bold tracking-wider uppercase rounded border border-white/12 bg-slate-950/46 text-slate-100 backdrop-blur-md">
+    <span className="imagine-asset-type-badge imagine-audio-type-badge flex shrink-0 items-center gap-1.5 px-2 py-1 text-[9px] font-bold tracking-wider uppercase rounded backdrop-blur-md">
       <Music className="h-3 w-3" />
       AUDIO
     </span>
   ) : (
-    <span className="imagine-asset-type-badge flex shrink-0 items-center gap-1.5 px-2 py-1 text-[9px] font-bold tracking-wider uppercase rounded border border-cyan-400/20 bg-cyan-500/18 text-cyan-100 backdrop-blur-md">
+    <span className="imagine-asset-type-badge flex shrink-0 items-center gap-1.5 px-2 py-1 text-[9px] font-bold tracking-wider uppercase rounded border border-[var(--iw-tone-teal-border)] bg-[color-mix(in_srgb,var(--iw-tone-teal-bg)_80%,transparent)] text-[var(--iw-tone-teal-text)] backdrop-blur-md">
       <FileText className="h-3 w-3" />
       TEXT
     </span>
@@ -382,8 +382,8 @@ export default function AssetCard({
       onPointerLeave={clearLongPressTimer}
       onPointerMove={handleCardPointerMove}
       onPointerUp={clearLongPressTimer}
-      className={`imagine-asset-card relative flex h-full flex-col overflow-hidden rounded-xl group border bg-slate-900 shadow-xl transition-all duration-300 ${
-        selected ? "border-blue-500 ring-2 ring-blue-500/20" : "border-slate-850 hover:border-slate-750"
+      className={`imagine-asset-card relative flex h-full flex-col overflow-hidden rounded-xl border bg-[var(--iw-panel-solid)] transition-colors duration-200 ${
+        selected ? "border-[var(--iw-accent)] ring-2 ring-[var(--iw-accent-soft)]" : "border-[var(--iw-border)]"
       }`}
     >
       {item.status === "complete" && (
@@ -453,7 +453,7 @@ export default function AssetCard({
         </div>
       )}
 
-      <div className="imagine-asset-media relative aspect-[4/3] w-full bg-slate-950 overflow-hidden flex items-center justify-center border-b border-white/5">
+      <div className="imagine-asset-media relative aspect-[4/3] w-full overflow-hidden flex items-center justify-center border-b border-[var(--iw-border)] bg-[var(--iw-bg)]">
         {item.status === "processing" || item.status === "pending" ? (
           <div className="imagine-generation-stage overflow-hidden">
             <span className="imagine-generation-stage-glow" aria-hidden />
@@ -508,7 +508,7 @@ export default function AssetCard({
             </div>
           </div>
         ) : (
-          <div className="relative flex h-full w-full items-center justify-center bg-slate-950">
+          <div className="relative flex h-full w-full items-center justify-center bg-[var(--iw-bg)]">
             {item.type === "image" ? (
               <PreviewImage
                 src={item.url}
@@ -537,7 +537,7 @@ export default function AssetCard({
                 className="flex h-full w-full cursor-pointer flex-col items-start justify-start gap-3 p-4 text-left"
               >
                 <FileText className="h-5 w-5 shrink-0 text-[var(--iw-tone-info-text)]" />
-                <p className="line-clamp-6 whitespace-pre-wrap text-xs leading-5 text-slate-200">
+                <p className="line-clamp-6 whitespace-pre-wrap text-xs leading-5 text-[var(--iw-text)]">
                   {transcriptText || t("assetCard.noTranscriptText")}
                 </p>
               </button>
@@ -569,7 +569,7 @@ export default function AssetCard({
 
                 <div className="grid grid-cols-2 gap-1.5 p-2">
                   <button type="button" onClick={() => runMobileAction(() => onToggleSelect(item.id))}>
-                    {selected ? <CheckSquare className="imagine-tone-icon h-3.5 w-3.5" data-tone="accent" /> : <Square className="h-3.5 w-3.5 text-slate-300" />}
+                    {selected ? <CheckSquare className="imagine-tone-icon h-3.5 w-3.5" data-tone="accent" /> : <Square className="h-3.5 w-3.5 text-[var(--iw-muted)]" />}
                     {selected ? t("assetCard.cancelSelect") : t("assetCard.select")}
                   </button>
                   {item.type === "image" && (
@@ -621,7 +621,7 @@ export default function AssetCard({
                     </button>
                   )}
                   <button type="button" onClick={() => runMobileAction(() => onOpenFullscreen(item))}>
-                    <WorkbenchOperationIcon operation="fullscreen" className="h-3.5 w-3.5 text-slate-300" />
+                    <WorkbenchOperationIcon operation="fullscreen" className="h-3.5 w-3.5 text-[var(--iw-muted)]" />
                     {t("assetCard.fullscreen")}
                   </button>
                   <button type="button" onClick={() => runMobileAction(() => onDelete(item))}>
@@ -636,9 +636,9 @@ export default function AssetCard({
         )}
       </div>
 
-      <div className="imagine-asset-meta flex min-h-[88px] flex-col gap-1 bg-[var(--iw-panel-solid)] p-2">
+      <div className="imagine-asset-meta flex flex-col gap-1.5 bg-[var(--iw-panel-solid)] p-2">
         <div className="flex items-center gap-2">
-          <p className="min-w-0 flex-1 truncate font-sans text-[11px] font-medium text-[var(--iw-text)] opacity-90" title={item.prompt}>
+          <p className="min-w-0 flex-1 truncate font-sans text-[11px] font-medium leading-tight text-[var(--iw-text)]" title={item.prompt}>
             {item.prompt}
           </p>
           {referenceMedia.length > 0 && (
@@ -652,7 +652,7 @@ export default function AssetCard({
                       type="button"
                       key={`${item.id}_reference_${index}`}
                       onClick={() => onOpenReferencePreview(item, index)}
-                      className="relative h-7 w-7 overflow-hidden rounded-md border border-white/10 bg-slate-950 transition hover:border-cyan-300/70 focus:outline-none focus:ring-2 focus:ring-cyan-400/40"
+                      className="relative h-7 w-7 overflow-hidden rounded-md border border-[var(--iw-border)] bg-[var(--iw-panel-soft)] transition hover:border-[color-mix(in_srgb,var(--iw-accent)_40%,var(--iw-border))] focus:outline-none focus:ring-2 focus:ring-[color-mix(in_srgb,var(--iw-accent)_35%,transparent)]"
                       title={t("assetCard.referencePreviewTooltip", { type: mediaReferenceLabel(mediaType), index: index + 1 })}
                     >
                       {mediaType === "image" ? (
@@ -660,7 +660,7 @@ export default function AssetCard({
                       ) : mediaType === "video" ? (
                         <video src={reference.url} muted preload="metadata" className="h-full w-full object-cover" />
                       ) : (
-                        <Music className="m-auto h-full w-3.5 text-slate-400" />
+                        <Music className="m-auto h-full w-3.5 text-[var(--iw-faint)]" />
                       )}
                     </button>
                   );
@@ -670,28 +670,23 @@ export default function AssetCard({
           )}
         </div>
 
-        <div className="flex min-h-0 flex-1 flex-col justify-end border-t border-[var(--iw-border)] pt-1.5">
-          <div className="flex max-h-10 flex-wrap items-center gap-1 overflow-hidden font-mono text-[10px] text-[var(--iw-faint)]">
-            <span className="imagine-meta-chip rounded bg-white/5 px-1.5 py-0.5">
-              {providerLabel}
+        <div className="imagine-asset-meta-chips flex flex-wrap items-center gap-1 border-t border-[var(--iw-border)] pt-1.5 font-mono text-[10px] text-[var(--iw-faint)]">
+          <span className="imagine-meta-chip">{providerLabel}</span>
+          <span className="imagine-meta-chip max-w-[140px] truncate" title={item.model}>
+            {formatModelName(item.model)}
+          </span>
+          <span className="imagine-meta-chip">{formatDisplayedAspectRatio(item)}</span>
+          <span className="imagine-meta-chip imagine-status-chip" data-status={item.status}>
+            {item.status}
+          </span>
+          {item.errorMessage && (
+            <span className="imagine-tone-chip max-w-[160px] truncate text-[10px]" data-tone="danger" title={item.errorMessage}>
+              last error: {item.errorMessage}
             </span>
-            <span className="imagine-meta-chip max-w-[150px] truncate rounded bg-white/5 px-1.5 py-0.5" title={item.model}>
-              🤖 {formatModelName(item.model)}
-            </span>
-            <span className="imagine-meta-chip rounded bg-white/5 px-1.5 py-0.5">📐 {formatDisplayedAspectRatio(item)}</span>
-            <span className="imagine-meta-chip imagine-status-chip rounded bg-white/5 px-1.5 py-0.5">{item.status}</span>
-            {item.errorMessage && (
-              <span className="imagine-tone-chip max-w-[160px] truncate rounded px-2 py-0.5 text-[10px]" data-tone="danger" title={item.errorMessage}>
-                last error: {item.errorMessage}
-              </span>
-            )}
-          </div>
-
-          <div className="mt-1.5 flex items-center justify-between gap-2">
-            <span className="font-mono text-[10px] text-[var(--iw-faint)]">
-              {formatCreatedAt(item.createdAt)}
-            </span>
-          </div>
+          )}
+          <span className="imagine-meta-chip imagine-meta-chip-time ml-auto shrink-0 tabular-nums">
+            {formatCreatedAt(item.createdAt)}
+          </span>
         </div>
       </div>
     </div>

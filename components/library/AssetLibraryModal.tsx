@@ -345,14 +345,14 @@ export default function AssetLibraryModal({
         role="dialog"
         aria-modal="true"
         aria-labelledby="asset-library-fullscreen-title"
-        className="fixed inset-0 z-[90] flex flex-col bg-slate-950/95 p-3 text-white backdrop-blur-md sm:p-5"
+        className="fixed inset-0 z-[90] flex flex-col bg-[color-mix(in_srgb,var(--iw-bg)_95%,transparent)] p-3 text-[var(--iw-text)] backdrop-blur-md sm:p-5"
       >
         <div className="flex shrink-0 items-center justify-between gap-3 border-b border-white/10 pb-3">
           <div className="min-w-0">
             <h3 id="asset-library-fullscreen-title" className="truncate text-sm font-semibold">
               {fullscreenEntry.record.title}
             </h3>
-            <p className="mt-1 font-mono text-[10px] text-white/45">
+            <p className="mt-1 font-mono text-[10px] text-[var(--iw-faint)]">
               {LIBRARY_ASSET_MEDIA_TYPE_LABELS[fullscreenEntry.record.mediaType]} ·{" "}
               {LIBRARY_ASSET_CATEGORY_LABELS[fullscreenEntry.record.category]} · {formatDate(fullscreenEntry.record.updatedAt)}
             </p>
@@ -361,7 +361,7 @@ export default function AssetLibraryModal({
             ref={fullscreenCloseRef}
             type="button"
             onClick={() => setFullscreenEntry(null)}
-            className="imagine-secondary-action flex h-9 w-9 shrink-0 items-center justify-center rounded-lg border border-white/15 bg-white/10 text-white"
+            className="imagine-secondary-action flex h-9 w-9 shrink-0 items-center justify-center rounded-lg border border-[var(--iw-border)]"
             aria-label={t("library.fullscreenPreviewLabel")}
           >
             <X className="h-4 w-4" />

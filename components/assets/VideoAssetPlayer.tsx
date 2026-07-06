@@ -113,11 +113,11 @@ export default function VideoAssetPlayer({
   };
 
   if (!videoUrl) {
-    return <div ref={containerRef} className="relative flex h-full w-full items-center justify-center bg-slate-950" />;
+    return <div ref={containerRef} className="relative flex h-full w-full items-center justify-center bg-[var(--iw-bg)]" />;
   }
 
   return (
-    <div ref={containerRef} className="group/video relative flex h-full w-full items-center justify-center bg-slate-950">
+    <div ref={containerRef} className="group/video relative flex h-full w-full items-center justify-center bg-[var(--iw-bg)]">
       <video
         ref={videoRef}
         src={videoUrl}

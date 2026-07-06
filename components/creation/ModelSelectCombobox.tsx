@@ -18,9 +18,9 @@ interface ModelSelectComboboxProps {
 }
 
 const focusClassByAccent: Record<ModelSelectComboboxProps["accent"], string> = {
-  blue: "focus-within:border-blue-400/45",
-  cyan: "focus-within:border-cyan-400/45",
-  violet: "focus-within:border-violet-400/45",
+  blue: "focus-within:border-[color-mix(in_srgb,var(--iw-accent)_45%,transparent)]",
+  cyan: "focus-within:border-[color-mix(in_srgb,var(--iw-tone-teal-border)_70%,transparent)]",
+  violet: "focus-within:border-[color-mix(in_srgb,var(--iw-tone-violet-border)_70%,transparent)]",
 };
 
 export default function ModelSelectCombobox({

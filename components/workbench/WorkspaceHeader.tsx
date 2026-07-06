@@ -47,116 +47,126 @@ export default function WorkspaceHeader({
     <WorkspaceTopBar
       sticky
       start={
-        <WorkspaceTopBarBrand subtitle={t('workspaceHeader.brandSubtitle')} />
+        <WorkspaceTopBarBrand
+          compact
+          showBadge={false}
+          subtitle={t('workspaceHeader.brandSubtitle')}
+        />
       }
       end={
-        <div className="z-10 flex shrink-0 items-center gap-1.5 sm:gap-2">
-          {storageTarget === "postgres" ? (
-            <WorkspaceStorageModeBadge
-              label={storageModeLabel}
-              target={storageTarget}
-              title={t("workspaceHeader.storageModeTitle", { mode: storageModeLabel })}
-            />
-          ) : null}
+        <div className="z-10 flex shrink-0 items-center gap-1 sm:gap-1.5">
+          <div className="flex items-center gap-1 sm:gap-1.5">
+            {storageTarget === "postgres" ? (
+              <WorkspaceStorageModeBadge
+                label={storageModeLabel}
+                target={storageTarget}
+                title={t("workspaceHeader.storageModeTitle", { mode: storageModeLabel })}
+              />
+            ) : null}
 
-          <Link href="/board" className={workspaceTopBarButtonClass} title={t('workspaceHeader.boardLink')} aria-label={t('workspaceHeader.boardLink')}>
-            <Grid2X2 className="h-3.5 w-3.5" />
-            <span className="hidden sm:inline">{t('workspaceHeader.boardLink')}</span>
-          </Link>
+            <Link href="/board" className={workspaceTopBarButtonClass} title={t('workspaceHeader.boardLink')} aria-label={t('workspaceHeader.boardLink')}>
+              <Grid2X2 className="h-3.5 w-3.5" />
+              <span className="hidden md:inline">{t('workspaceHeader.boardLink')}</span>
+            </Link>
 
-          <button
-            type="button"
-            onClick={onOpenAssetLibrary}
-            className={`${workspaceTopBarButtonClass} cursor-pointer`}
-            title={t('workspaceHeader.assetLibraryLink')}
-            aria-label={t('workspaceHeader.assetLibraryLink')}
-          >
-            <FolderHeart className="h-3.5 w-3.5" />
-            <span className="hidden sm:inline">{t('workspaceHeader.assetLibraryLink')}</span>
-          </button>
-
-          {showResolveCheck ? (
             <button
               type="button"
-              onClick={onRunResolveCheck}
-              disabled={resolveCheckStatus === "running"}
-              className={`${workspaceTopBarButtonClass} cursor-pointer disabled:cursor-not-allowed disabled:opacity-60`}
-              title={t('workspaceHeader.resolveCheckTitle')}
-              aria-label={t('workspaceHeader.resolveCheckTitle')}
+              onClick={onOpenAssetLibrary}
+              className={`${workspaceTopBarButtonClass} cursor-pointer`}
+              title={t('workspaceHeader.assetLibraryLink')}
+              aria-label={t('workspaceHeader.assetLibraryLink')}
             >
-              <Plug className="h-3.5 w-3.5" />
-              <span className="hidden sm:inline">{resolveCheckStatus === "running" ? t('workspaceHeader.resolveRunning') : t('workspaceHeader.resolveIdle')}</span>
+              <FolderHeart className="h-3.5 w-3.5" />
+              <span className="hidden md:inline">{t('workspaceHeader.assetLibraryLink')}</span>
             </button>
-          ) : null}
 
-          <button
-            type="button"
-            onClick={onOpenSettings}
-            className={`${workspaceTopBarButtonClass} cursor-pointer`}
-            title={t('workspaceHeader.settingsLink')}
-            aria-label={t('workspaceHeader.settingsLink')}
-          >
-            <Settings className="h-3.5 w-3.5" />
-            <span className="hidden sm:inline">{t('workspaceHeader.settingsLink')}</span>
-          </button>
+            {showResolveCheck ? (
+              <button
+                type="button"
+                onClick={onRunResolveCheck}
+                disabled={resolveCheckStatus === "running"}
+                className={`${workspaceTopBarButtonClass} hidden md:flex cursor-pointer disabled:cursor-not-allowed disabled:opacity-60`}
+                title={t('workspaceHeader.resolveCheckTitle')}
+                aria-label={t('workspaceHeader.resolveCheckTitle')}
+              >
+                <Plug className="h-3.5 w-3.5" />
+                <span className="hidden md:inline">{resolveCheckStatus === "running" ? t('workspaceHeader.resolveRunning') : t('workspaceHeader.resolveIdle')}</span>
+              </button>
+            ) : null}
 
-          <a
-            href="https://github.com/double2tea/Imagine-Workbench"
-            target="_blank"
-            rel="noreferrer"
-            className={`${workspaceTopBarIconButtonClass} cursor-pointer`}
-            title="GitHub: Imagine Workbench"
-            aria-label={t('workspaceHeader.githubLinkAriaLabel')}
-          >
-            <Github className="h-3.5 w-3.5" />
-          </a>
-
-          <a
-            href="mailto:double_tea@foxmail.com"
-            className={`${workspaceTopBarIconButtonClass} cursor-pointer`}
-            title={t('workspaceHeader.contactEmailTitle')}
-            aria-label={t('workspaceHeader.contactEmailAriaLabel')}
-          >
-            <Mail className="h-3.5 w-3.5" />
-          </a>
-
-          <button
-            type="button"
-            onClick={toggleThemeMode}
-            aria-pressed={themeMode === "dark"}
-            className={`${workspaceTopBarIconButtonClass} cursor-pointer`}
-            title={themeMode === "light" ? t('workspaceHeader.toggleDarkModeTitle') : t('workspaceHeader.toggleLightModeTitle')}
-            aria-label={themeMode === "light" ? t('workspaceHeader.toggleDarkModeTitle') : t('workspaceHeader.toggleLightModeTitle')}
-          >
-            {themeMode === "light" ? <Moon className="h-3.5 w-3.5" /> : <Sun className="h-3.5 w-3.5" />}
-          </button>
-
-          <button
-            type="button"
-            onClick={() => setLocale(nextLocale)}
-            className={`${workspaceTopBarIconButtonClass} relative shrink-0 overflow-visible cursor-pointer`}
-            title={languageToggleLabel}
-            aria-label={languageToggleLabel}
-          >
-            <Globe className="h-3.5 w-3.5" />
-            <span
-              className="pointer-events-none absolute -right-1 -top-1 flex h-4 min-w-4 items-center justify-center rounded-[5px] border border-[var(--iw-border)] bg-[var(--iw-panel)] px-1 text-[8px] font-bold leading-none text-[var(--iw-text)] shadow-sm"
-              aria-hidden="true"
+            <button
+              type="button"
+              onClick={onOpenSettings}
+              className={`${workspaceTopBarButtonClass} cursor-pointer`}
+              title={t('workspaceHeader.settingsLink')}
+              aria-label={t('workspaceHeader.settingsLink')}
             >
-              {languageToggleShort}
-            </span>
-          </button>
+              <Settings className="h-3.5 w-3.5" />
+              <span className="hidden md:inline">{t('workspaceHeader.settingsLink')}</span>
+            </button>
+          </div>
 
-          <button
-            type="button"
-            onClick={onClearProject}
-            className={`${workspaceTopBarIconButtonClass} cursor-pointer`}
-            data-action="danger"
-            title={t('workspaceHeader.clearAssetsTitle')}
-            aria-label={t('workspaceHeader.clearAssetsAriaLabel')}
-          >
-            <Trash2 className="h-3.5 w-3.5" />
-          </button>
+          <span className="imagine-toolbar-chip-divider hidden sm:block" aria-hidden="true" />
+
+          <div className="flex items-center gap-1">
+            <a
+              href="https://github.com/double2tea/Imagine-Workbench"
+              target="_blank"
+              rel="noreferrer"
+              className={`${workspaceTopBarIconButtonClass} hidden md:flex cursor-pointer`}
+              title={t('workspaceHeader.githubLinkTitle')}
+              aria-label={t('workspaceHeader.githubLinkAriaLabel')}
+            >
+              <Github className="h-3.5 w-3.5" />
+            </a>
+
+            <a
+              href="mailto:double_tea@foxmail.com"
+              className={`${workspaceTopBarIconButtonClass} cursor-pointer hidden sm:flex`}
+              title={t('workspaceHeader.contactEmailTitle')}
+              aria-label={t('workspaceHeader.contactEmailAriaLabel')}
+            >
+              <Mail className="h-3.5 w-3.5" />
+            </a>
+
+            <button
+              type="button"
+              onClick={toggleThemeMode}
+              aria-pressed={themeMode === "dark"}
+              className={`${workspaceTopBarIconButtonClass} cursor-pointer`}
+              title={themeMode === "light" ? t('workspaceHeader.toggleDarkModeTitle') : t('workspaceHeader.toggleLightModeTitle')}
+              aria-label={themeMode === "light" ? t('workspaceHeader.toggleDarkModeTitle') : t('workspaceHeader.toggleLightModeTitle')}
+            >
+              {themeMode === "light" ? <Moon className="h-3.5 w-3.5" /> : <Sun className="h-3.5 w-3.5" />}
+            </button>
+
+            <button
+              type="button"
+              onClick={() => setLocale(nextLocale)}
+              className={`${workspaceTopBarIconButtonClass} relative shrink-0 overflow-visible cursor-pointer`}
+              title={languageToggleLabel}
+              aria-label={languageToggleLabel}
+            >
+              <Globe className="h-3.5 w-3.5" />
+              <span
+                className="pointer-events-none absolute -right-1 -top-1 flex h-4 min-w-4 items-center justify-center rounded-[5px] border border-[var(--iw-border)] bg-[var(--iw-panel)] px-1 text-[8px] font-bold leading-none text-[var(--iw-text)]"
+                aria-hidden="true"
+              >
+                {languageToggleShort}
+              </span>
+            </button>
+
+            <button
+              type="button"
+              onClick={onClearProject}
+              className={`${workspaceTopBarIconButtonClass} hidden sm:flex cursor-pointer`}
+              data-action="danger"
+              title={t('workspaceHeader.clearAssetsTitle')}
+              aria-label={t('workspaceHeader.clearAssetsAriaLabel')}
+            >
+              <Trash2 className="h-3.5 w-3.5" />
+            </button>
+          </div>
         </div>
       }
     />

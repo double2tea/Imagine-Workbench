@@ -88,7 +88,7 @@ function createReferenceChip(part: Extract<PromptEditorPart, { kind: "reference"
   const chip = document.createElement("span");
   chip.contentEditable = "false";
   chip.dataset.promptReferenceToken = part.token;
-  chip.className = "relative mx-1 inline-flex h-8 w-8 translate-y-1 items-center justify-center overflow-hidden rounded-md border border-white/15 bg-slate-950 align-baseline shadow-sm";
+  chip.className = "relative mx-1 inline-flex h-8 w-8 translate-y-1 items-center justify-center overflow-hidden rounded-md border border-[var(--iw-border)] bg-[var(--iw-bg)] align-baseline";
   chip.title = `${part.token} · ${mediaReferenceLabel(type)} · ${part.reference.id}`;
 
   if (type === "image" || (type === "video" && part.reference.url.startsWith("data:image/"))) {

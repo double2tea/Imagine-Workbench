@@ -1,4 +1,4 @@
-import { ChevronDown, ChevronLeft, ChevronRight, Image as ImageIcon, Music, X } from "lucide-react";
+import { ChevronLeft, ChevronRight, Image as ImageIcon, Music, X } from "lucide-react";
 import { useEffect, useMemo, useState } from "react";
 import { useTranslations } from "@/lib/i18n";
 import AssetCard from "@/components/assets/AssetCard";
@@ -138,7 +138,6 @@ export default function AssetGalleryWorkspace({
 }: AssetGalleryWorkspaceProps) {
   const { t } = useTranslations("common");
   const [referencePreview, setReferencePreview] = useState<{ itemId: string; index: number } | null>(null);
-  const [collapsedDateKeys, setCollapsedDateKeys] = useState<Set<string>>(() => new Set());
   const [visibleItemState, setVisibleItemState] = useState<{ filterKey: string; limit: number }>({
     filterKey: "",
     limit: initialVisibleItems,
@@ -213,18 +212,6 @@ export default function AssetGalleryWorkspace({
     });
     return () => window.cancelAnimationFrame(frameId);
   }, [assetStatusFilter, filteredItems.length]);
-
-  const toggleDateGroup = (dateKey: string) => {
-    setCollapsedDateKeys(current => {
-      const next = new Set(current);
-      if (next.has(dateKey)) {
-        next.delete(dateKey);
-      } else {
-        next.add(dateKey);
-      }
-      return next;
-    });
-  };
 
   return (
     <section className="imagine-gallery-panel flex min-w-0 flex-col gap-3">
@@ -305,59 +292,46 @@ export default function AssetGalleryWorkspace({
           </div>
         ) : (
           <div className="flex flex-col gap-4">
-            {groupedItems.map(group => {
-              const isCollapsed = collapsedDateKeys.has(group.dateKey);
-              return (
-                <section key={group.dateKey} className="imagine-gallery-date-group rounded-lg border">
-                  <button
-                    type="button"
-                    onClick={() => toggleDateGroup(group.dateKey)}
-                    className="imagine-gallery-date-header flex w-full items-center justify-between gap-3 border-b border-[var(--iw-border)] px-3 py-2.5 text-left"
-                    aria-expanded={!isCollapsed}
-                  >
-                    <span className="flex items-center gap-2">
-                      <ChevronDown className={`h-4 w-4 text-[var(--iw-faint)] transition ${isCollapsed ? "-rotate-90" : ""}`} />
-                      <span className="text-xs font-semibold text-[var(--iw-text)]">{group.label}</span>
-                    </span>
-                    <span className="imagine-meta-chip rounded-md px-2 py-1 font-mono text-[10px]">{t("gallery.itemCount", { count: group.items.length })}</span>
-                  </button>
+            {groupedItems.map(group => (
+                <section key={group.dateKey} className="imagine-gallery-date-group">
+                  <div className="imagine-gallery-date-divider">
+                    <span>{group.label}</span>
+                    <span className="imagine-meta-chip font-mono text-[10px]">{t("gallery.itemCount", { count: group.items.length })}</span>
+                  </div>
 
-                  {!isCollapsed && (
-                    <div className="imagine-gallery-grid grid grid-cols-1 items-stretch gap-3 p-3 sm:grid-cols-2 xl:grid-cols-3">
-                      {group.items.map((item) => (
-                        <AssetCard
-                          key={item.id}
-                          canceling={cancelingItemIdSet.has(item.id)}
-                          inCompare={compareItemIdSet.has(item.id)}
-                          item={item}
-                          priority={priorityItemIdSet.has(item.id)}
-                          selected={selectedItemIdSet.has(item.id)}
-                          selectedProvider={selectedProvider}
-                          providerLabelsByKey={providerLabelsByKey}
-                          onApplyVideoReference={onApplyVideoReference}
-                          onCancel={onCancelItem}
-                          onCaptureVideoFrame={onCaptureVideoFrame}
-                          onDelete={onDeleteItem}
-                          onDownload={onDownloadItem}
-                          onImageQuickEdit={onImageQuickEdit}
-                          onAddToLibrary={onAddToLibrary}
-                          onOpenFullscreen={onOpenFullscreen}
-                          onOpenPanorama={onOpenPanorama}
-                          onPromoteOriginal={onPromoteOriginal}
-                          onOpenReferencePreview={(previewItem, index) => setReferencePreview({ itemId: previewItem.id, index })}
-                          onRetry={onRetryItem}
-                          onReuseTask={onReuseTask}
-                          onSaveVoiceProfile={onSaveVoiceProfile}
-                          onToggleCompare={onToggleCompare}
-                          onToggleSelect={onToggleSelect}
-                          onUseAgentReference={onUseAgentReference}
-                        />
-                      ))}
-                    </div>
-                  )}
+                  <div className="imagine-gallery-grid grid grid-cols-1 items-stretch gap-3 sm:grid-cols-2 xl:grid-cols-3">
+                    {group.items.map((item) => (
+                      <AssetCard
+                        key={item.id}
+                        canceling={cancelingItemIdSet.has(item.id)}
+                        inCompare={compareItemIdSet.has(item.id)}
+                        item={item}
+                        priority={priorityItemIdSet.has(item.id)}
+                        selected={selectedItemIdSet.has(item.id)}
+                        selectedProvider={selectedProvider}
+                        providerLabelsByKey={providerLabelsByKey}
+                        onApplyVideoReference={onApplyVideoReference}
+                        onCancel={onCancelItem}
+                        onCaptureVideoFrame={onCaptureVideoFrame}
+                        onDelete={onDeleteItem}
+                        onDownload={onDownloadItem}
+                        onImageQuickEdit={onImageQuickEdit}
+                        onAddToLibrary={onAddToLibrary}
+                        onOpenFullscreen={onOpenFullscreen}
+                        onOpenPanorama={onOpenPanorama}
+                        onPromoteOriginal={onPromoteOriginal}
+                        onOpenReferencePreview={(previewItem, index) => setReferencePreview({ itemId: previewItem.id, index })}
+                        onRetry={onRetryItem}
+                        onReuseTask={onReuseTask}
+                        onSaveVoiceProfile={onSaveVoiceProfile}
+                        onToggleCompare={onToggleCompare}
+                        onToggleSelect={onToggleSelect}
+                        onUseAgentReference={onUseAgentReference}
+                      />
+                    ))}
+                  </div>
                 </section>
-              );
-            })}
+            ))}
 
             {hasMoreItems && (
               <button
@@ -378,14 +352,14 @@ export default function AssetGalleryWorkspace({
       </div>
 
       {selectedReferencePreview && (
-        <div className="fixed inset-0 z-[95] flex items-center justify-center bg-slate-950/80 p-4 backdrop-blur-sm">
+        <div className="fixed inset-0 z-[95] flex items-center justify-center bg-[var(--iw-bg)]/80 p-4 backdrop-blur-sm">
           <button
             type="button"
             className="absolute inset-0 cursor-zoom-out"
             aria-label={t("gallery.closeReferencePreview")}
             onClick={() => setReferencePreview(null)}
           />
-          <div className="relative flex max-h-[92vh] w-[min(1200px,calc(100vw-32px))] flex-col overflow-hidden rounded-xl border border-white/10 bg-slate-950 shadow-2xl">
+          <div className="relative flex max-h-[92vh] w-[min(1200px,calc(100vw-32px))] flex-col overflow-hidden rounded-xl border border-white/10 bg-[var(--iw-panel)] shadow-2xl">
             <div className="flex h-12 items-center justify-between border-b border-white/10 px-4">
               <span className="font-mono text-[10px] text-[var(--iw-muted)]">
                 {referencePreviewIndex + 1} / {referencePreviewMedia.length}
@@ -393,7 +367,7 @@ export default function AssetGalleryWorkspace({
               <button
                 type="button"
                 onClick={() => setReferencePreview(null)}
-                className="rounded-lg border border-white/10 bg-slate-900/80 p-2 text-slate-200 transition hover:bg-slate-800"
+                className="rounded-lg border border-white/10 bg-[var(--iw-panel)]/80 p-2 text-[var(--iw-text)] transition hover:bg-[var(--iw-panel-soft)]"
                 aria-label={t("gallery.closeReferencePreview")}
               >
                 <X className="h-4 w-4" />
@@ -405,7 +379,7 @@ export default function AssetGalleryWorkspace({
                 <button
                   type="button"
                   onClick={showPreviousReference}
-                  className="absolute left-3 top-1/2 z-10 flex h-10 w-10 -translate-y-1/2 items-center justify-center rounded-full border border-white/15 bg-slate-950/75 text-slate-100 transition hover:bg-slate-900"
+                  className="absolute left-3 top-1/2 z-10 flex h-10 w-10 -translate-y-1/2 items-center justify-center rounded-full border border-white/15 bg-[var(--iw-bg)]/75 text-[var(--iw-text)] transition hover:bg-[var(--iw-panel)]"
                   aria-label={t("gallery.previousReference")}
                 >
                   <ChevronLeft className="h-5 w-5" />
@@ -420,7 +394,7 @@ export default function AssetGalleryWorkspace({
               ) : selectedReferencePreview.type === "video" ? (
                 <video src={selectedReferencePreview.url} controls className="max-h-[72vh] w-full object-contain" />
               ) : (
-                <div className="flex min-h-60 w-full flex-col items-center justify-center gap-3 text-slate-300">
+                <div className="flex min-h-60 w-full flex-col items-center justify-center gap-3 text-[var(--iw-tone-neutral-text)]">
                   <Music className="h-9 w-9" />
                   <audio src={selectedReferencePreview.url} controls className="w-full max-w-lg" />
                 </div>
@@ -429,7 +403,7 @@ export default function AssetGalleryWorkspace({
                 <button
                   type="button"
                   onClick={showNextReference}
-                  className="absolute right-3 top-1/2 z-10 flex h-10 w-10 -translate-y-1/2 items-center justify-center rounded-full border border-white/15 bg-slate-950/75 text-slate-100 transition hover:bg-slate-900"
+                  className="absolute right-3 top-1/2 z-10 flex h-10 w-10 -translate-y-1/2 items-center justify-center rounded-full border border-white/15 bg-[var(--iw-bg)]/75 text-[var(--iw-text)] transition hover:bg-[var(--iw-panel)]"
                   aria-label={t("gallery.nextReference")}
                 >
                   <ChevronRight className="h-5 w-5" />
@@ -437,13 +411,13 @@ export default function AssetGalleryWorkspace({
               )}
             </div>
 
-            <div className="no-scrollbar flex gap-2 overflow-x-auto border-t border-white/10 bg-slate-950 p-3">
+            <div className="no-scrollbar flex gap-2 overflow-x-auto border-t border-white/10 bg-[var(--iw-bg)] p-3">
               {referencePreviewMedia.map((reference, index) => (
                 <button
                   key={`${referencePreviewItem?.id ?? "reference"}_${index}`}
                   type="button"
                   onClick={() => setReferencePreview(current => current ? { ...current, index } : current)}
-                  className={`h-14 w-14 shrink-0 overflow-hidden rounded-lg border bg-slate-900 transition ${
+                  className={`h-14 w-14 shrink-0 overflow-hidden rounded-lg border bg-[var(--iw-panel-soft)] transition ${
                     index === referencePreviewIndex
                       ? "border-cyan-300 ring-2 ring-cyan-300/30"
                       : "border-white/10 opacity-65 hover:opacity-100"
@@ -455,7 +429,7 @@ export default function AssetGalleryWorkspace({
                   ) : reference.type === "video" ? (
                     <video src={reference.url} muted preload="metadata" className="h-full w-full object-cover" />
                   ) : (
-                    <Music className="m-auto h-full w-4 text-slate-400" />
+                    <Music className="m-auto h-full w-4 text-[var(--iw-muted)]" />
                   )}
                 </button>
               ))}

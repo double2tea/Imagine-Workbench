@@ -74,11 +74,11 @@ export default function SaveVoiceProfileDialog({ item, onClose, onSave }: SaveVo
   };
 
   return (
-    <div className="fixed inset-0 z-[80] flex items-center justify-center bg-slate-950/70 p-4 backdrop-blur-sm">
+    <div className="imagine-overlay-scrim fixed inset-0 z-[80] flex items-center justify-center p-4 backdrop-blur-sm">
       <div className="w-full max-w-lg rounded-lg border border-[var(--iw-border)] bg-[var(--iw-panel)] text-[var(--iw-text)] shadow-2xl">
         <div className="flex items-center justify-between border-b border-[var(--iw-border)] px-4 py-3">
           <div className="flex min-w-0 items-center gap-2">
-            <Mic2 className="h-4 w-4 text-amber-600" />
+            <Mic2 className="h-4 w-4 text-[var(--iw-tone-warning-text)]" />
             <h2 className="truncate text-sm font-semibold">{t("voiceProfile.dialogTitle")}</h2>
           </div>
           <button

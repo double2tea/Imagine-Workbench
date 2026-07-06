@@ -41,6 +41,7 @@
     "resolveRunning": "等待达芬奇", "resolveIdle": "达芬奇",
     "settingsLink": "设置",
     "githubLinkAriaLabel": "打开项目 GitHub",
+    "githubLinkTitle": "GitHub：Imagine Workbench",
     "contactEmailTitle": "联系作者: double_tea@foxmail.com",
     "contactEmailAriaLabel": "给作者发送邮件",
     "toggleDarkModeTitle": "切换深色模式", "toggleLightModeTitle": "切换浅色模式",

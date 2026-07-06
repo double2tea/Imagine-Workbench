@@ -756,6 +756,20 @@ export default function Home() {
       ? (audioTextInputRequired && !prompt.trim()) || (audioStylePromptRequired && !audioStylePrompt.trim()) || !hasRequiredAudioReferences || (needsManualVoiceCloneConsent && !voiceCloneConsentAccepted)
       : (traditionalSubTab === "image" ? imagePromptRequired : videoPromptRequired) && !prompt.trim();
   const isCreatorGenerateDisabled = isCreatorSubmitting || isCreatorInputDisabled;
+  const creatorGenerateDisabledHint = (() => {
+    if (isCreatorSubmitting || !isCreatorInputDisabled) return undefined;
+    if (traditionalSubTab === "audio") {
+      if (audioTextInputRequired && !prompt.trim()) return creationT("generateButton.disabledHint.audioText");
+      if (audioStylePromptRequired && !audioStylePrompt.trim()) return creationT("generateButton.disabledHint.audioStyle");
+      if (!hasRequiredAudioReferences) return creationT("generateButton.disabledHint.audioReference");
+      if (needsManualVoiceCloneConsent && !voiceCloneConsentAccepted) return creationT("generateButton.disabledHint.voiceCloneConsent");
+      return undefined;
+    }
+    if (!prompt.trim() && (traditionalSubTab === "image" ? imagePromptRequired : videoPromptRequired)) {
+      return creationT("generateButton.disabledHint.prompt");
+    }
+    return undefined;
+  })();
 
   const asyncImageModel = resolveAsyncImageModelValue(selectedModel, referenceImages.length);
   const canUseBackgroundImageGeneration = asyncImageModel !== null;
@@ -2133,13 +2147,12 @@ export default function Home() {
   return (
     <div
       ref={workbenchShellRef}
-      className="imagine-workbench-shell imagine-theme-dark min-h-screen flex flex-col bg-[var(--iw-bg)] text-[var(--iw-text)] font-sans selection:bg-blue-500/30 selection:text-[var(--iw-text)] relative overflow-hidden"
+      className="imagine-workbench-shell imagine-theme-dark min-h-screen flex flex-col bg-[var(--iw-bg)] text-[var(--iw-text)] font-sans selection:bg-[color-mix(in_srgb,var(--iw-accent)_28%,transparent)] selection:text-[var(--iw-text)] relative overflow-hidden"
     >
 
       {/* Workbench depth layer */}
       <div className="absolute inset-0 pointer-events-none overflow-hidden z-0">
-        <div className="absolute inset-0 bg-[linear-gradient(rgba(148,163,184,0.045)_1px,transparent_1px),linear-gradient(90deg,rgba(148,163,184,0.045)_1px,transparent_1px)] bg-[size:48px_48px] [mask-image:linear-gradient(to_bottom,black,transparent_78%)]" />
-        <div className="absolute inset-0 bg-[radial-gradient(ellipse_at_top,rgba(30,41,59,0.42),transparent_56%)]" />
+        <div className="imagine-workbench-ambient-grid absolute inset-0 pointer-events-none" />
       </div>
 
       <WorkspaceNotices notices={workspaceNotices} onDismiss={dismissWorkspaceNotice} />
@@ -2161,7 +2174,7 @@ export default function Home() {
       <main
         className={`imagine-main-grid ${
           isAgentDockOpen ? "imagine-main-grid-agent-open" : "imagine-main-grid-agent-closed"
-        } flex-1 w-full max-w-[1880px] mx-auto px-4 pt-5 sm:px-6 sm:pt-6 grid grid-cols-1 lg:grid-cols-[minmax(400px,480px)_minmax(0,1fr)] xl:grid-cols-[minmax(430px,520px)_minmax(0,1fr)] gap-5 xl:gap-6 items-start z-10`}
+        } flex-1 w-full max-w-[1920px] mx-auto px-4 pt-5 sm:px-6 sm:pt-6 grid grid-cols-1 lg:grid-cols-[minmax(440px,520px)_minmax(0,1fr)] xl:grid-cols-[minmax(480px,560px)_minmax(0,1fr)] gap-4 xl:gap-5 items-start z-10`}
       >
 
         <section className="imagine-creator-panel imagine-creation-sidebar flex flex-col gap-4 min-w-0">
@@ -2177,10 +2190,35 @@ export default function Home() {
               {mobileWorkbenchPanel === "create" ? (
                 <section className="imagine-mobile-composer imagine-control-surface flex flex-col gap-3 rounded-xl p-3">
                   <CreationModeTabs value={traditionalSubTab} onChange={setTraditionalSubTab} />
-                  {renderCreationPanel(true)}
+                  <div className="imagine-mobile-creator-scroll flex min-h-0 flex-1 flex-col gap-3">
+                    {renderCreationPanel(false)}
+                  </div>
+                  <div className="imagine-mobile-generate-footer shrink-0">
+                    <CreatorGenerateButton
+                      mode={traditionalSubTab}
+                      disabled={isCreatorGenerateDisabled}
+                      disabledHint={creatorGenerateDisabledHint}
+                      isSubmitting={isCreatorSubmitting}
+                      submitCount={traditionalSubTab === "image" ? imageSubmitCount : traditionalSubTab === "audio" ? audioSubmitCount : videoSubmitCount}
+                      priceProvider={traditionalSubTab === "image" ? selectedModel.split(":")[0] : traditionalSubTab === "audio" ? selectedAudioModel.split(":")[0] : selectedVideoModel.split(":")[0]}
+                      priceModelId={traditionalSubTab === "image" ? selectedModel : traditionalSubTab === "audio" ? selectedAudioModel : selectedVideoModel}
+                      priceOptions={creatorPriceOptions}
+                      onGenerate={() => {
+                        if (traditionalSubTab === "image") {
+                          generateManualImage();
+                          return;
+                        }
+                        if (traditionalSubTab === "audio") {
+                          generateActiveAudio();
+                          return;
+                        }
+                        generateManualVideo();
+                      }}
+                    />
+                  </div>
                 </section>
               ) : (
-                <section className="imagine-mobile-asset-stream">
+                <section className="imagine-mobile-asset-stream flex min-h-0 flex-1 flex-col">
                   {renderAssetGalleryWorkspace()}
                 </section>
               )}
@@ -2188,8 +2226,8 @@ export default function Home() {
           )}
 
           {/* Active Creative Panel switch */}
-          <div className="imagine-control-surface hidden rounded-xl dark-glass p-4 lg:flex flex-col gap-4 min-h-[500px] max-h-[calc(100vh-5.5rem)] overflow-hidden">
-            <div className="imagine-creator-scroll flex min-h-0 flex-1 flex-col gap-3.5">
+          <div className="imagine-control-surface hidden rounded-xl lg:flex flex-col gap-3 min-h-[500px] max-h-[calc(100vh-5.5rem)] overflow-hidden">
+            <div className="imagine-creator-scroll flex min-h-0 flex-1 flex-col gap-3">
                 <CreationModeTabs value={traditionalSubTab} onChange={setTraditionalSubTab} />
 
                 {renderCreationPanel(false)}
@@ -2200,6 +2238,7 @@ export default function Home() {
               <CreatorGenerateButton
                 mode={traditionalSubTab}
                 disabled={isCreatorGenerateDisabled}
+                disabledHint={creatorGenerateDisabledHint}
                 isSubmitting={isCreatorSubmitting}
                 submitCount={traditionalSubTab === "image" ? imageSubmitCount : traditionalSubTab === "audio" ? audioSubmitCount : videoSubmitCount}
                 priceProvider={traditionalSubTab === "image" ? selectedModel.split(":")[0] : traditionalSubTab === "audio" ? selectedAudioModel.split(":")[0] : selectedVideoModel.split(":")[0]}

@@ -3680,8 +3680,8 @@ export default function BoardWorkspace({
                 className="pointer-events-none z-40 max-w-[calc(100vw_-_24px)]"
                 style={{ contain: "layout paint style" }}
               >
-                <div className={`pointer-events-auto flex h-10 ${selectionToolbarWidthClass} shrink-0 items-center gap-2 rounded-xl border border-white/10 bg-slate-950/88 px-2.5 text-[11px] font-semibold text-slate-100 shadow-[0_10px_24px_rgba(2,6,23,0.28)] backdrop-blur-md ring-1 ring-white/5`}>
-                  <span className="min-w-0 flex-1 truncate px-1 text-slate-300">
+                <div className={`pointer-events-auto flex h-10 ${selectionToolbarWidthClass} shrink-0 items-center gap-2 rounded-xl border border-[var(--iw-border)] bg-[color-mix(in_srgb,var(--iw-surface-raised)_88%,transparent)] px-2.5 text-[11px] font-semibold text-[var(--iw-text)] shadow-[var(--iw-card-shadow)] backdrop-blur-md`}>
+                  <span className="min-w-0 flex-1 truncate px-1 text-[var(--iw-muted)]">
                     {tb("workspace.selectedCount", { count: selectedNodeIds.length })}
                     {selectedDownloadableCount > 0 ? ` · ${tb("workspace.downloadableCount", { count: selectedDownloadableCount })}` : ""}
                   </span>
@@ -3689,7 +3689,7 @@ export default function BoardWorkspace({
                     <button
                       type="button"
                       onClick={createGroupFromSelectionToolbar}
-                      className="flex h-7 w-[66px] shrink-0 items-center justify-center gap-1.5 rounded-lg border border-white/10 bg-white/10 text-[11px] font-semibold text-slate-100 transition hover:border-emerald-300/40 hover:bg-emerald-500/20 hover:text-white"
+                      className="imagine-secondary-action flex h-7 w-[66px] shrink-0 items-center justify-center gap-1.5 rounded-lg border border-[var(--iw-border)] text-[11px] font-semibold transition hover:border-[var(--iw-tone-success-border)] hover:bg-[color-mix(in_srgb,var(--iw-tone-success-bg)_24%,transparent)] hover:text-[var(--iw-tone-success-text)]"
                       title={tb("workspace.groupTooltip")}
                     >
                       <Layers className="h-3.5 w-3.5" />
@@ -3699,7 +3699,7 @@ export default function BoardWorkspace({
                     <button
                       type="button"
                       onClick={ungroupSelectedGroups}
-                      className="flex h-7 w-[82px] shrink-0 items-center justify-center gap-1.5 rounded-lg border border-white/10 bg-white/10 text-[11px] font-semibold text-slate-100 transition hover:border-amber-300/40 hover:bg-amber-500/20 hover:text-white"
+                      className="imagine-secondary-action flex h-7 w-[82px] shrink-0 items-center justify-center gap-1.5 rounded-lg border border-[var(--iw-border)] text-[11px] font-semibold transition hover:border-[var(--iw-tone-warning-border)] hover:bg-[color-mix(in_srgb,var(--iw-tone-warning-bg)_24%,transparent)] hover:text-[var(--iw-tone-warning-text)]"
                       title={tb("workspace.ungroupTooltip")}
                     >
                       <Ungroup className="h-3.5 w-3.5" />
@@ -3710,7 +3710,7 @@ export default function BoardWorkspace({
                     <button
                       type="button"
                       onClick={onDownloadSelectedAssets}
-                      className="flex h-7 w-[86px] shrink-0 items-center justify-center gap-1.5 rounded-lg border border-white/10 bg-white/10 text-[11px] font-semibold text-slate-100 transition hover:border-blue-300/40 hover:bg-blue-500/20 hover:text-white"
+                      className="imagine-secondary-action flex h-7 w-[86px] shrink-0 items-center justify-center gap-1.5 rounded-lg border border-[var(--iw-border)] text-[11px] font-semibold transition hover:border-[var(--iw-tone-accent-border)] hover:bg-[color-mix(in_srgb,var(--iw-tone-accent-bg)_24%,transparent)] hover:text-[var(--iw-tone-accent-text)]"
                       title={tb("workspace.downloadZipTooltip")}
                     >
                       <Download className="h-3.5 w-3.5" />

@@ -284,7 +284,7 @@ export function WorkbenchPopoverMenu({
 }) {
   const surfaceClassName = surface === "panel"
     ? "border-[var(--iw-border)] bg-[var(--iw-panel)] text-[var(--iw-text)]"
-    : "border-white/12 bg-slate-950/94 text-slate-100 backdrop-blur";
+    : "border-[var(--iw-border)] bg-[color-mix(in_srgb,var(--iw-surface-raised)_94%,transparent)] text-[var(--iw-text)] backdrop-blur";
   const placementClassName = placement === "below" ? "top-full mt-1" : "bottom-full mb-1";
 
   return (

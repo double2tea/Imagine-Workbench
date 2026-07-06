@@ -77,10 +77,10 @@ function nodeIcon(node: BoardNodeModel) {
 }
 
 function handleClass(kind: BoardPortKind): string {
-  if (kind === "prompt") return "!border-teal-200 !bg-teal-400";
-  if (kind === "agent") return "!border-purple-200 !bg-purple-400";
-  if (kind === "result") return "!border-emerald-200 !bg-emerald-400";
-  return "!border-blue-200 !bg-blue-400";
+  if (kind === "prompt") return "!border-[var(--iw-board-edge-prompt)] !bg-[var(--iw-board-edge-prompt)]";
+  if (kind === "agent") return "!border-[var(--iw-board-edge-agent-context)] !bg-[var(--iw-board-edge-agent-context)]";
+  if (kind === "result") return "!border-[var(--iw-board-edge-result)] !bg-[var(--iw-board-edge-result)]";
+  return "!border-[var(--iw-board-edge-reference)] !bg-[var(--iw-board-edge-reference)]";
 }
 
 function BoardHandle({ id, kind, label, position, top, type, zone = "edge", zoneHeight }: BoardHandleProps) {
@@ -144,7 +144,7 @@ function GenerateReferenceShelf({
     edgeUseCounts.set(reference.sourceEdgeId, (edgeUseCounts.get(reference.sourceEdgeId) ?? 0) + 1);
   }
   return (
-    <div className="nodrag nopan absolute -top-12 left-0 z-40 flex max-w-full gap-1 overflow-hidden rounded-lg border border-blue-400/20 bg-slate-950/88 p-1 shadow-xl backdrop-blur">
+    <div className="nodrag nopan absolute -top-12 left-0 z-40 flex max-w-full gap-1 overflow-hidden rounded-lg border border-[color-mix(in_srgb,var(--iw-board-edge-reference)_20%,transparent)] bg-[color-mix(in_srgb,var(--iw-surface-raised)_88%,transparent)] p-1 shadow-[var(--iw-card-shadow)] backdrop-blur">
       {visibleReferences.map((reference, index) => {
         const canManageEdge = typeof reference.sourceEdgeId === "string" && edgeUseCounts.get(reference.sourceEdgeId) === 1;
         const canReorder = canManageEdge;
@@ -185,7 +185,7 @@ function GenerateReferenceShelf({
             onDragEnd={(event) => {
               event.stopPropagation();
             }}
-            className={`group/reference relative h-9 w-9 shrink-0 overflow-hidden rounded-md border border-white/15 bg-slate-900 ${
+            className={`group/reference relative h-9 w-9 shrink-0 overflow-hidden rounded-md border border-[var(--iw-border)] bg-[var(--iw-panel-soft)] ${
               canReorder ? "cursor-grab active:cursor-grabbing" : ""
             }`}
             title={`${roleLabel} ${index + 1} · ${sourceLabel}`}
@@ -392,7 +392,7 @@ function BoardNode({ data, selected }: NodeProps<BoardFlowNode>) {
           <input
             autoFocus
             className={[
-              "nodrag pointer-events-auto min-w-0 rounded-md border border-blue-400 bg-[var(--iw-panel)] font-semibold text-[var(--iw-text)] outline-none ring-2 ring-blue-500/20",
+              "nodrag pointer-events-auto min-w-0 rounded-md border border-[var(--iw-accent)] bg-[var(--iw-panel)] font-semibold text-[var(--iw-text)] outline-none ring-2 ring-[color-mix(in_srgb,var(--iw-accent)_20%,transparent)]",
               isMediaNode ? "h-5 w-36 px-1.5 text-[10px]" : "h-7 w-full px-2 text-xs",
             ].join(" ")}
             value={draftTitle}

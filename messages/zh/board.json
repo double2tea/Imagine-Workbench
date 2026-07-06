@@ -556,7 +556,8 @@
     "quickInsert": "快速插入",
     "captureIdeas": "采集创意",
     "handlesHint": "提示：从节点输出拖动连线",
-    "gotIt": "明白了"
+    "gotIt": "明白了",
+    "dismiss": "关闭提示"
   },
   "tasks": {
     "title": "任务",

@@ -960,7 +960,7 @@ export default function CanvasMaskEditor({
                       }}
                     />
                     <div
-                      className="pointer-events-none absolute z-20 border border-blue-200/80 shadow-[0_0_0_9999px_rgba(59,130,246,0.10)]"
+                      className="pointer-events-none absolute z-20 border border-[color-mix(in_srgb,var(--iw-accent)_80%,#fff)] shadow-[0_0_0_9999px_color-mix(in_srgb,var(--iw-accent)_10%,transparent)]"
                       style={{
                         left: outpaintMargins.left,
                         top: outpaintMargins.top,
@@ -971,7 +971,7 @@ export default function CanvasMaskEditor({
                     {(["left", "right", "top", "bottom"] as const).map(side => (
                       <span
                         key={side}
-                        className="pointer-events-none absolute z-30 rounded-full border border-blue-200/80 bg-blue-500/80 shadow-lg shadow-blue-950/35"
+                        className="pointer-events-none absolute z-30 rounded-full border border-[color-mix(in_srgb,var(--iw-accent)_80%,#fff)] bg-[color-mix(in_srgb,var(--iw-accent)_80%,transparent)]"
                         style={{
                           height: side === "left" || side === "right" ? 44 : 10,
                           width: side === "left" || side === "right" ? 10 : 44,
@@ -1043,7 +1043,7 @@ export default function CanvasMaskEditor({
 
                 {cropRect && (
                   <div
-                    className="pointer-events-none absolute z-30 border border-blue-300 bg-blue-400/12 shadow-[0_0_0_9999px_rgba(2,6,23,0.45)]"
+                    className="pointer-events-none absolute z-30 border border-[color-mix(in_srgb,var(--iw-accent)_70%,transparent)] bg-[color-mix(in_srgb,var(--iw-accent)_12%,transparent)] shadow-[0_0_0_9999px_color-mix(in_srgb,var(--iw-bg)_45%,transparent)]"
                     style={{
                       left: cropRect.x,
                       top: cropRect.y,
@@ -1051,11 +1051,11 @@ export default function CanvasMaskEditor({
                       height: cropRect.height,
                     }}
                   >
-                    <span className="absolute left-1/3 top-0 h-full border-l border-blue-100/35" />
-                    <span className="absolute left-2/3 top-0 h-full border-l border-blue-100/35" />
-                    <span className="absolute left-0 top-1/3 w-full border-t border-blue-100/35" />
-                    <span className="absolute left-0 top-2/3 w-full border-t border-blue-100/35" />
-                    <span className="absolute left-2 top-2 rounded bg-[var(--iw-bg)]/75 px-1.5 py-0.5 font-mono text-[10px] font-semibold text-blue-100 shadow-sm">
+                    <span className="absolute left-1/3 top-0 h-full border-l border-[color-mix(in_srgb,var(--iw-accent)_35%,transparent)]" />
+                    <span className="absolute left-2/3 top-0 h-full border-l border-[color-mix(in_srgb,var(--iw-accent)_35%,transparent)]" />
+                    <span className="absolute left-0 top-1/3 w-full border-t border-[color-mix(in_srgb,var(--iw-accent)_35%,transparent)]" />
+                    <span className="absolute left-0 top-2/3 w-full border-t border-[color-mix(in_srgb,var(--iw-accent)_35%,transparent)]" />
+                    <span className="absolute left-2 top-2 rounded bg-[var(--iw-bg)]/75 px-1.5 py-0.5 font-mono text-[10px] font-semibold text-[var(--iw-tone-accent-text)]">
                       {cropSizeLabel}
                     </span>
                     {(["nw", "ne", "se", "sw", "n", "e", "s", "w"] as const).map(handle => {
@@ -1067,7 +1067,7 @@ export default function CanvasMaskEditor({
                       return (
                         <span
                           key={handle}
-                          className="absolute h-3 w-3 rounded-sm border border-blue-200 bg-[var(--iw-bg)] shadow-sm shadow-blue-950/40"
+                          className="absolute h-3 w-3 rounded-sm border border-[color-mix(in_srgb,var(--iw-accent)_50%,transparent)] bg-[var(--iw-bg)]"
                           style={{
                             left: isWest ? 0 : isEast ? "100%" : "50%",
                             top: isNorth ? 0 : isSouth ? "100%" : "50%",
@@ -1125,7 +1125,7 @@ export default function CanvasMaskEditor({
                       max="80"
                       value={brushSize}
                       onChange={(event) => setBrushSize(Number(event.target.value))}
-                      className="h-1 w-32 cursor-pointer accent-blue-500"
+                      className="h-1 w-32 cursor-pointer accent-[var(--iw-accent)]"
                       aria-label={t("canvasMaskEditor.brushSizeLabel")}
                     />
                   </div>
@@ -1155,7 +1155,7 @@ export default function CanvasMaskEditor({
                     type="text"
                     value={textValue}
                     onChange={(event) => setTextValue(event.target.value)}
-                    className="h-8 w-40 rounded-md border border-[var(--iw-border)] bg-[var(--iw-bg)]/70 px-3 text-xs text-[var(--iw-text)] outline-none transition focus:border-blue-400/45"
+                    className="h-8 w-40 rounded-md border border-[var(--iw-border)] bg-[var(--iw-bg)]/70 px-3 text-xs text-[var(--iw-text)] outline-none transition focus:border-[color-mix(in_srgb,var(--iw-accent)_45%,transparent)]"
                     aria-label={t("canvasMaskEditor.textContentLabel")}
                   />
                   <div className="flex items-center gap-2">
@@ -1166,7 +1166,7 @@ export default function CanvasMaskEditor({
                       max="72"
                       value={textSize}
                       onChange={(event) => setTextSize(Number(event.target.value))}
-                      className="h-1 w-24 cursor-pointer accent-blue-500"
+                      className="h-1 w-24 cursor-pointer accent-[var(--iw-accent)]"
                       aria-label={t("canvasMaskEditor.textSizeLabel")}
                     />
                   </div>
@@ -1177,7 +1177,7 @@ export default function CanvasMaskEditor({
                         type="button"
                         onClick={() => setTextColor(color)}
                         className={`h-5 w-5 rounded-full border transition ${
-                          textColor === color ? "border-blue-300 ring-2 ring-blue-400/30" : "border-white/20"
+                          textColor === color ? "border-[var(--iw-accent)] ring-2 ring-[color-mix(in_srgb,var(--iw-accent)_30%,transparent)]" : "border-[var(--iw-border)]"
                         }`}
                         style={{ backgroundColor: color }}
                         aria-label={`${t("canvasMaskEditor.selectTextColorLabel")} ${color}`}
@@ -1229,7 +1229,7 @@ export default function CanvasMaskEditor({
                     disabled={!canApplyCrop}
                     className={`imagine-secondary-action flex h-8 items-center gap-1.5 rounded-md px-3 text-xs font-semibold transition ${
                       canApplyCrop
-                        ? "border border-blue-400/30 bg-blue-500/16 text-blue-100 hover:bg-blue-500/24"
+                        ? "border border-[var(--iw-tone-accent-border)] bg-[color-mix(in_srgb,var(--iw-tone-accent-bg)_16%,transparent)] text-[var(--iw-tone-accent-text)] hover:bg-[color-mix(in_srgb,var(--iw-tone-accent-bg)_24%,transparent)]"
                         : "border border-[var(--iw-border)] bg-[var(--iw-bg)]/45 text-[var(--iw-muted)]"
                     }`}
                   >

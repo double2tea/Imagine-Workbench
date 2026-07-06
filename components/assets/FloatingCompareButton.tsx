@@ -14,7 +14,7 @@ export default function FloatingCompareButton({ selectedCount, show, onOpen }: F
     <div className="imagine-floating-compare fixed top-20 right-6 z-30">
       <button
         onClick={onOpen}
-        className="flex items-center gap-1.5 px-4 py-2.5 bg-amber-500 rounded-full text-slate-950 text-xs font-bold border border-amber-600 shadow-xl shadow-amber-500/10 cursor-pointer hover:bg-amber-450 motion-safe:animate-bounce"
+        className="flex cursor-pointer items-center gap-1.5 rounded-full border border-[var(--iw-tone-warning-border)] bg-[color-mix(in_srgb,var(--iw-tone-warning-bg)_88%,transparent)] px-4 py-2.5 text-xs font-semibold text-[var(--iw-tone-warning-text)] transition hover:brightness-105"
       >
         <span>{t("compare.selected", { count: selectedCount })}</span>
       </button>

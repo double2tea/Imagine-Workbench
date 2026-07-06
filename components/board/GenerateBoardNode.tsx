@@ -363,7 +363,7 @@ const GenerateBoardNode = memo(function GenerateBoardNode({
             {referencePreviews.slice(0, 4).map(reference => (
               <div
                 key={`${reference.id}:${reference.url}`}
-                className="h-6 w-6 overflow-hidden rounded border border-blue-400/30 bg-[var(--iw-panel-soft)]"
+                className="h-6 w-6 overflow-hidden rounded border border-[color-mix(in_srgb,var(--iw-board-edge-reference)_30%,transparent)] bg-[var(--iw-panel-soft)]"
                 title={reference.role ? t("node.generateNode.referenceRole", { role: reference.role }) : t("node.generateNode.referenceMedia")}
               >
                 <MediaReferenceThumbnail reference={reference} alt="" className="h-full w-full" />
@@ -409,7 +409,7 @@ const GenerateBoardNode = memo(function GenerateBoardNode({
                 disabled={isProcessing}
                 className={`w-7 text-[10px] font-semibold transition ${
                   node.variantCount === count
-                    ? "bg-blue-600 text-white"
+                    ? "bg-[var(--iw-accent-strong)] text-white"
                     : "text-[var(--iw-muted)] hover:bg-[var(--iw-panel)] hover:text-[var(--iw-text)]"
                 }`}
               >
@@ -435,7 +435,8 @@ const GenerateBoardNode = memo(function GenerateBoardNode({
             type="button"
             onClick={onExecute}
             disabled={isProcessing}
-            className="imagine-generate-run-action nodrag flex h-8 items-center justify-center gap-1.5 rounded-md bg-blue-600 px-3 text-xs font-semibold text-white transition hover:bg-blue-500 disabled:bg-[var(--iw-panel-soft)] disabled:text-[var(--iw-faint)]"
+            className="imagine-primary-action imagine-generate-run-action nodrag flex h-8 items-center justify-center gap-1.5 px-3 text-xs font-semibold transition disabled:bg-[var(--iw-panel-soft)] disabled:text-[var(--iw-faint)]"
+            data-size="compact"
             title={t("node.generateNode.run")}
             aria-label={t("node.generateNode.run")}
           >

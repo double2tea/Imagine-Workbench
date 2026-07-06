@@ -512,7 +512,8 @@ const PromptTemplatePicker = forwardRef<PromptTemplatePickerHandle, PromptTempla
                 type="button"
                 onClick={saveCustomTemplate}
                 disabled={!isDraftValid}
-                className="imagine-motion-interactive flex h-8 items-center gap-1.5 rounded-md bg-blue-600 px-3 text-[11px] font-semibold text-white hover:bg-blue-500 disabled:bg-[var(--iw-panel-soft)] disabled:text-[var(--iw-faint)]"
+                className="imagine-primary-action imagine-motion-interactive flex h-8 items-center gap-1.5 px-3 text-[11px] font-semibold disabled:bg-[var(--iw-panel-soft)] disabled:text-[var(--iw-faint)]"
+                data-size="compact"
               >
                 <WandSparkles className="h-3.5 w-3.5" />
                 {editorMode === "edit" ? t("promptTemplates.customUpdateButton") : t("promptTemplates.customSaveButton")}
@@ -533,7 +534,8 @@ const PromptTemplatePicker = forwardRef<PromptTemplatePickerHandle, PromptTempla
                 type="button"
                 onClick={() => applyTemplate("replace")}
                 disabled={!selectedTemplate}
-                className="imagine-motion-interactive flex h-8 items-center gap-1.5 rounded-md bg-blue-600 px-3 text-[11px] font-semibold text-white hover:bg-blue-500 disabled:bg-[var(--iw-panel-soft)] disabled:text-[var(--iw-faint)]"
+                className="imagine-primary-action imagine-motion-interactive flex h-8 items-center gap-1.5 px-3 text-[11px] font-semibold disabled:bg-[var(--iw-panel-soft)] disabled:text-[var(--iw-faint)]"
+                data-size="compact"
               >
                 <WandSparkles className="h-3.5 w-3.5" />
                 {t("promptTemplates.replaceButton")}

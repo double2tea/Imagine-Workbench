@@ -557,7 +557,7 @@ function AgentMessage({
                   initial={{ width: "100%" }}
                   animate={{ width: "0%" }}
                   transition={{ duration: countdownSeconds, ease: "linear" }}
-                  className="h-full bg-blue-500"
+                  className="h-full bg-[var(--iw-accent)]"
                 />
               </div>
               <div className="flex items-center justify-between text-[10px] mt-1.5 font-mono">

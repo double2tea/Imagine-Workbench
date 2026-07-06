@@ -176,7 +176,7 @@ export default function ImageGenerationPanel({
   };
 
   return (
-    <div className="flex flex-col gap-3.5 animate-fade-in">
+    <div className="flex flex-col gap-3 animate-fade-in">
       <PromptComposerSurface
         acceptedMediaTypes={capabilities.referenceMediaTypes}
         actions={
@@ -207,7 +207,7 @@ export default function ImageGenerationPanel({
         references={referenceImages}
       />
 
-      <div className="imagine-parameter-grid grid grid-cols-1 gap-3">
+      <div className="imagine-parameter-grid grid grid-cols-1 gap-3 sm:grid-cols-2">
         <div className="imagine-parameter-field">
           <div className="imagine-parameter-label-row">
             <label className="imagine-section-label">{t("imageGeneration.modelLabel")}</label>
@@ -218,7 +218,7 @@ export default function ImageGenerationPanel({
                   type="checkbox"
                   checked={imageBackgroundGeneration}
                   onChange={(event) => onImageBackgroundGenerationChange(event.target.checked)}
-                  className="h-3 w-3 cursor-pointer accent-blue-500"
+                  className="h-3 w-3 cursor-pointer accent-[var(--iw-accent)]"
                 />
                 <span>{t("imageGeneration.backgroundLabel")}</span>
               </label>
@@ -254,10 +254,11 @@ export default function ImageGenerationPanel({
         </div>
       </div>
 
-      <div className="flex flex-col gap-3 border-t border-[var(--iw-border)] pt-3">
+      <div className="flex flex-col gap-3">
         <CinematicProfileControls
           accent="blue"
           mediaType="image"
+          variant="compact"
           value={cinematicProfile}
           onChange={onCinematicProfileChange}
         />

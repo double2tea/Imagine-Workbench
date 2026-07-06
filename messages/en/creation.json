@@ -1,5 +1,6 @@
 {
   "tabs": {
+    "ariaLabel": "Creation mode",
     "image": "Image",
     "video": "Video",
     "audio": "Audio"
@@ -236,7 +237,14 @@
       "video": "Generate Video",
       "audio": "Generate Audio"
     },
-    "submittingLabel": "Submitting ({count}); you can keep queueing"
+    "submittingLabel": "Submitting ({count}); you can keep queueing",
+    "disabledHint": {
+      "prompt": "Enter a prompt first",
+      "audioText": "Enter the text content first",
+      "audioStyle": "Enter the style description first",
+      "audioReference": "Add the required reference audio or select a cloned voice",
+      "voiceCloneConsent": "Confirm voice-clone consent first"
+    }
   },
   "parameters": {
     "defaultTitle": "Advanced Model Parameters",

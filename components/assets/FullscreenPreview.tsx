@@ -254,11 +254,11 @@ export default function FullscreenPreview({ item, items = [], onCaptureVideoFram
           animate={{ opacity: 1 }}
           exit={{ opacity: 0 }}
           transition={WORKBENCH_OVERLAY_TRANSITION}
-          className="fixed inset-0 z-50 flex bg-slate-950/95 p-2 backdrop-blur-md sm:p-4"
+          className="fixed inset-0 z-50 flex bg-[color-mix(in_srgb,var(--iw-bg)_95%,transparent)] p-2 backdrop-blur-md sm:p-4"
         >
           <button
             onClick={onClose}
-            className="imagine-motion-interactive absolute right-4 top-4 z-10 rounded-lg border border-slate-800 bg-slate-900/90 p-2 text-slate-400 hover:text-white sm:right-6 sm:top-6"
+            className="imagine-secondary-action imagine-motion-interactive absolute right-4 top-4 z-10 rounded-lg border border-[var(--iw-border)] p-2 sm:right-6 sm:top-6"
             aria-label={t("fullscreen.closePreview")}
           >
             <X className="h-6 w-6" />
@@ -309,7 +309,7 @@ export default function FullscreenPreview({ item, items = [], onCaptureVideoFram
                   <div className="absolute bottom-[3.85rem] right-4 z-30 opacity-0 transition-opacity duration-[160ms] group-hover/fullscreen-video:opacity-100 sm:right-6">
                     <VideoFrameMenu
                       align="right"
-                      buttonClassName="flex h-9 items-center justify-center gap-1.5 rounded-md border border-white/15 bg-slate-950/86 px-2.5 text-cyan-100 shadow-lg backdrop-blur transition hover:bg-cyan-600 hover:text-white"
+                      buttonClassName="flex h-9 items-center justify-center gap-1.5 rounded-md border border-[var(--iw-tone-teal-border)] bg-[color-mix(in_srgb,var(--iw-bg)_86%,transparent)] px-2.5 text-[var(--iw-tone-teal-text)] shadow-lg backdrop-blur transition hover:bg-[color-mix(in_srgb,var(--iw-tone-teal-border)_35%,var(--iw-panel))] hover:text-[var(--iw-text)]"
                       isOpen={isFrameMenuOpen}
                       onSelect={captureVideoFrame}
                       onToggle={() => setIsFrameMenuOpen(prev => !prev)}
@@ -328,12 +328,12 @@ export default function FullscreenPreview({ item, items = [], onCaptureVideoFram
                 </div>
               ) : (
                 <div className="flex h-full w-full items-center justify-center px-4 sm:px-8">
-                  <div className="max-h-full w-full max-w-5xl overflow-auto rounded-2xl border border-slate-800 bg-slate-900/72 p-5 text-slate-100 shadow-2xl">
-                    <div className="mb-4 flex items-center gap-2 text-sm font-semibold text-cyan-100">
+                  <div className="max-h-full w-full max-w-5xl overflow-auto rounded-2xl border border-[var(--iw-border)] bg-[color-mix(in_srgb,var(--iw-panel)_72%,transparent)] p-5 text-[var(--iw-text)] shadow-2xl">
+                    <div className="mb-4 flex items-center gap-2 text-sm font-semibold text-[var(--iw-tone-teal-text)]">
                       <FileText className="h-4 w-4" />
                       {t("fullscreen.transcriptTitle")}
                     </div>
-                    <p className="whitespace-pre-wrap text-sm leading-7 text-slate-200">
+                    <p className="whitespace-pre-wrap text-sm leading-7 text-[var(--iw-text)]">
                       {transcriptFromDataUrl(item.url) || t("fullscreen.noTranscriptText")}
                     </p>
                   </div>
@@ -341,7 +341,7 @@ export default function FullscreenPreview({ item, items = [], onCaptureVideoFram
               )}
             </div>
             {showPreviewStrip && (
-              <div className="imagine-motion-surface-reveal no-scrollbar flex w-full max-w-6xl shrink-0 gap-2 overflow-x-auto rounded-lg border border-slate-800 bg-slate-950/78 px-3 py-2 shadow-xl backdrop-blur">
+              <div className="imagine-motion-surface-reveal no-scrollbar flex w-full max-w-6xl shrink-0 gap-2 overflow-x-auto rounded-lg border border-[var(--iw-border)] bg-[color-mix(in_srgb,var(--iw-bg)_78%,transparent)] px-3 py-2 shadow-xl backdrop-blur">
                 {previewItems.map(previewItem => {
                   const isActive = previewItem.id === item.id;
                   return (
@@ -349,24 +349,24 @@ export default function FullscreenPreview({ item, items = [], onCaptureVideoFram
                       key={previewItem.id}
                       type="button"
                       onClick={() => onSelectItem?.(previewItem)}
-                      className={`imagine-motion-interactive relative h-14 w-20 shrink-0 overflow-hidden rounded-md border bg-slate-900 ${
-                        isActive ? "border-cyan-300 ring-2 ring-cyan-400/35" : "border-slate-700 hover:border-slate-500"
+                      className={`imagine-motion-interactive relative h-14 w-20 shrink-0 overflow-hidden rounded-md border bg-[var(--iw-panel)] ${
+                        isActive ? "border-[var(--iw-tone-teal-text)] ring-2 ring-[color-mix(in_srgb,var(--iw-tone-teal-border)_35%,transparent)]" : "border-[var(--iw-border)] hover:border-[var(--iw-muted)]"
                       }`}
                       aria-label={t("fullscreen.switchTo", { label: previewItem.prompt || previewItem.id })}
                     >
                       {previewItem.type === "image" ? (
                         <PreviewImage src={previewItem.url} alt={previewItem.prompt} className="h-full w-full object-cover" />
                       ) : previewItem.type === "video" ? (
-                        <div className="flex h-full w-full items-center justify-center bg-slate-900">
-                          <Film className="h-5 w-5 text-slate-300" />
+                        <div className="flex h-full w-full items-center justify-center bg-[var(--iw-panel)]">
+                          <Film className="h-5 w-5 text-[var(--iw-muted)]" />
                         </div>
                       ) : previewItem.type === "audio" ? (
-                        <div className="flex h-full w-full items-center justify-center bg-slate-900">
-                          <Music className="h-5 w-5 text-slate-300" />
+                        <div className="flex h-full w-full items-center justify-center bg-[var(--iw-panel)]">
+                          <Music className="h-5 w-5 text-[var(--iw-muted)]" />
                         </div>
                       ) : (
-                        <div className="flex h-full w-full items-center justify-center bg-slate-900">
-                          <FileText className="h-5 w-5 text-slate-300" />
+                        <div className="flex h-full w-full items-center justify-center bg-[var(--iw-panel)]">
+                          <FileText className="h-5 w-5 text-[var(--iw-muted)]" />
                         </div>
                       )}
                     </button>
@@ -374,18 +374,18 @@ export default function FullscreenPreview({ item, items = [], onCaptureVideoFram
                 })}
               </div>
             )}
-            <div className="imagine-motion-surface-reveal flex w-full max-w-6xl shrink-0 flex-col gap-2 rounded-lg border border-slate-800 bg-slate-950/88 px-3 py-2 text-slate-300 shadow-xl backdrop-blur sm:flex-row sm:items-center sm:justify-between">
-              <p className="line-clamp-2 min-w-0 flex-1 text-xs italic leading-5 text-slate-200">
+            <div className="imagine-motion-surface-reveal flex w-full max-w-6xl shrink-0 flex-col gap-2 rounded-lg border border-[var(--iw-border)] bg-[color-mix(in_srgb,var(--iw-bg)_88%,transparent)] px-3 py-2 text-[var(--iw-muted)] shadow-xl backdrop-blur sm:flex-row sm:items-center sm:justify-between">
+              <p className="line-clamp-2 min-w-0 flex-1 text-xs italic leading-5 text-[var(--iw-text)]">
                 &ldquo;{item.prompt}&rdquo;
               </p>
-              <div className="flex shrink-0 flex-wrap items-center gap-x-3 gap-y-1 text-[10px] text-slate-500">
+              <div className="flex shrink-0 flex-wrap items-center gap-x-3 gap-y-1 text-[10px] text-[var(--iw-faint)]">
                 <span className="font-mono">{t("fullscreen.modelLabel")}: {item.model}</span>
                 <span className="font-mono">{t("fullscreen.aspectRatioLabel")}: {formatDisplayedAspectRatio(item)}</span>
                 {onDownload && (
                   <button
                     type="button"
                     onClick={() => onDownload(item)}
-                    className="imagine-motion-interactive inline-flex h-8 items-center gap-1.5 rounded-md border border-slate-700 bg-slate-900 px-2.5 text-xs font-medium text-slate-200 hover:border-slate-500 hover:text-white"
+                    className="imagine-secondary-action imagine-motion-interactive inline-flex h-8 items-center gap-1.5 rounded-md border border-[var(--iw-border)] px-2.5 text-xs font-medium"
                     title={t("fullscreen.download")}
                   >
                     <Download className="h-3.5 w-3.5" />
@@ -407,7 +407,8 @@ export default function FullscreenPreview({ item, items = [], onCaptureVideoFram
                   <button
                     type="button"
                     onClick={() => onSaveVoiceProfile(item)}
-                    className="imagine-motion-interactive inline-flex h-8 items-center gap-1.5 rounded-md border border-cyan-400/25 bg-cyan-500/10 px-2.5 text-xs font-medium text-cyan-100 hover:border-cyan-300/45 hover:bg-cyan-500/20 hover:text-white"
+                    className="imagine-tone-surface imagine-motion-interactive inline-flex h-8 items-center gap-1.5 rounded-md border px-2.5 text-xs font-medium hover:text-[var(--iw-text)]"
+                    data-tone="teal"
                     title={t("fullscreen.saveVoiceProfile")}
                   >
                     <Mic2 className="h-3.5 w-3.5" />
@@ -417,7 +418,7 @@ export default function FullscreenPreview({ item, items = [], onCaptureVideoFram
                 <button
                   type="button"
                   onClick={() => setIsDiagnosticsOpen(true)}
-                  className="imagine-motion-interactive inline-flex h-8 items-center gap-1.5 rounded-md border border-slate-700 bg-slate-900 px-2.5 text-xs font-medium text-slate-200 hover:border-slate-500 hover:text-white"
+                  className="imagine-secondary-action imagine-motion-interactive inline-flex h-8 items-center gap-1.5 rounded-md border border-[var(--iw-border)] px-2.5 text-xs font-medium"
                   title={t("fullscreen.diagnosticsTitle")}
                 >
                   <Info className="h-3.5 w-3.5" />
@@ -425,7 +426,7 @@ export default function FullscreenPreview({ item, items = [], onCaptureVideoFram
                 </button>
                 <button
                   onClick={() => copyPrompt(item.id, item.prompt)}
-                  className="imagine-motion-interactive inline-flex h-8 items-center gap-1.5 rounded-md border border-slate-700 bg-slate-900 px-2.5 text-xs font-medium text-slate-200 hover:border-slate-500 hover:text-white"
+                  className="imagine-secondary-action imagine-motion-interactive inline-flex h-8 items-center gap-1.5 rounded-md border border-[var(--iw-border)] px-2.5 text-xs font-medium"
                   title={t("fullscreen.copyPrompt")}
                 >
                   {copyStatus === "copied" ? <Check className="h-3.5 w-3.5" /> : <Copy className="h-3.5 w-3.5" />}

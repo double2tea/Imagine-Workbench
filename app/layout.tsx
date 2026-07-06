@@ -1,10 +1,11 @@
 import type { Metadata } from 'next';
-import { Inter, JetBrains_Mono } from 'next/font/google';
+import { IBM_Plex_Sans, JetBrains_Mono } from 'next/font/google';
 import WorkbenchProviders from '@/components/workbench/WorkbenchProviders';
 import './globals.css'; // Global styles
 
-const inter = Inter({
+const plexSans = IBM_Plex_Sans({
   subsets: ['latin'],
+  weight: ['400', '500', '600', '700'],
   variable: '--font-sans',
   display: 'swap',
 });
@@ -29,7 +30,7 @@ const localeBootstrapScript = `(function(){try{var l=localStorage.getItem("imagi
 
 export default function RootLayout({ children }: { children: React.ReactNode }) {
   return (
-    <html lang="zh" suppressHydrationWarning className={`${inter.variable} ${jetbrainsMono.variable}`}>
+    <html lang="zh" suppressHydrationWarning className={`${plexSans.variable} ${jetbrainsMono.variable}`}>
       <head>
         <script dangerouslySetInnerHTML={{ __html: themeBootstrapScript }} />
         <script dangerouslySetInnerHTML={{ __html: localeBootstrapScript }} />

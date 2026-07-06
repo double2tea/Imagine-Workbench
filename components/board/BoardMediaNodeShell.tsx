@@ -139,7 +139,7 @@ export default function BoardMediaNodeShell({
             type="button"
             aria-expanded={isStackExpanded}
             aria-label={isStackExpanded ? t('mediaNode.collapseVersions') : t('mediaNode.expandVersions')}
-            className="board-media-stack-badge imagine-motion-interactive nodrag pointer-events-auto absolute right-2 top-2 z-30 flex items-center gap-1 rounded-md bg-slate-950/45 px-2 py-1 text-xs font-semibold text-white/90 opacity-80 shadow-lg backdrop-blur transition-opacity duration-200 group-hover/board-video:opacity-100"
+            className="board-media-stack-badge imagine-motion-interactive nodrag pointer-events-auto absolute right-2 top-2 z-30 flex items-center gap-1 rounded-md border border-[var(--iw-border)] bg-[color-mix(in_srgb,var(--iw-surface-raised)_45%,transparent)] px-2 py-1 text-xs font-semibold text-[var(--iw-text)] opacity-80 backdrop-blur transition-opacity duration-200 group-hover/board-video:opacity-100"
             data-expanded={isStackExpanded ? "true" : "false"}
             title={isStackExpanded ? t('mediaNode.collapseVersions') : t('mediaNode.expandVersions')}
             onClick={(event) => {

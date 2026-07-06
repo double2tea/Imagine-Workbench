@@ -39,10 +39,10 @@ export default function BoardAssetCompareOverlay({ originalUrl, resultUrl, onClo
             style={{ clipPath: `polygon(0 0, ${sliderPos}% 0, ${sliderPos}% 100%, 0 100%)` }}
           />
           <div
-            className="pointer-events-none absolute bottom-0 top-0 w-0.5 bg-blue-500/80"
+            className="pointer-events-none absolute bottom-0 top-0 w-0.5 bg-[color-mix(in_srgb,var(--iw-accent)_80%,transparent)]"
             style={{ left: `${sliderPos}%` }}
           >
-            <div className="absolute top-1/2 flex h-8 w-8 -translate-x-1/2 -translate-y-1/2 items-center justify-center rounded-full border border-blue-400 bg-blue-600 shadow-md">
+            <div className="absolute top-1/2 flex h-8 w-8 -translate-x-1/2 -translate-y-1/2 items-center justify-center rounded-full border border-[var(--iw-accent)] bg-[var(--iw-accent-strong)] shadow-[var(--iw-card-shadow)]">
               <Sliders className="h-4 w-4 rotate-90 text-white" />
             </div>
           </div>

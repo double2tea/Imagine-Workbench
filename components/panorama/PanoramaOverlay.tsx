@@ -31,9 +31,9 @@ interface ExportablePanoramaRenderer {
   ): unknown;
 }
 
-const actionButtonClass = "flex h-9 items-center gap-1.5 rounded-md border border-white/12 bg-slate-950/86 px-2.5 text-xs font-semibold text-slate-100 shadow-lg backdrop-blur transition hover:bg-cyan-600 hover:text-white disabled:cursor-not-allowed disabled:opacity-45";
-const iconButtonClass = "flex h-9 w-9 items-center justify-center rounded-md border border-white/12 bg-slate-950/86 text-slate-200 shadow-lg backdrop-blur transition hover:bg-white/10 hover:text-white";
-const sizeSelectClass = "h-9 rounded-md border border-white/12 bg-slate-950/86 px-2.5 text-xs font-semibold text-slate-100 shadow-lg outline-none backdrop-blur transition hover:border-cyan-300/55 focus:border-cyan-300/70";
+const actionButtonClass = "imagine-secondary-action flex h-9 items-center gap-1.5 px-2.5 text-xs font-semibold backdrop-blur transition hover:border-[var(--iw-tone-teal-border)] hover:bg-[color-mix(in_srgb,var(--iw-tone-teal-bg)_40%,transparent)] hover:text-[var(--iw-tone-teal-text)] disabled:cursor-not-allowed disabled:opacity-45";
+const iconButtonClass = "imagine-secondary-action flex h-9 w-9 items-center justify-center backdrop-blur transition";
+const sizeSelectClass = "h-9 rounded-md border border-[var(--iw-border)] bg-[color-mix(in_srgb,var(--iw-panel)_86%,transparent)] px-2.5 text-xs font-semibold text-[var(--iw-text)] outline-none backdrop-blur transition hover:border-[color-mix(in_srgb,var(--iw-tone-teal-border)_55%,transparent)] focus:border-[color-mix(in_srgb,var(--iw-tone-teal-border)_70%,transparent)]";
 
 function degreesToRadians(value: number): number {
   return value * Math.PI / 180;
@@ -272,13 +272,13 @@ export default function PanoramaOverlay({ item, onClose, onSaveScreenshots }: Pa
   }, []);
 
   return (
-    <div className="fixed inset-0 z-[60] flex bg-slate-950/96 p-2 backdrop-blur-md sm:p-4">
-      <div className="relative flex h-full min-h-0 w-full overflow-hidden rounded-lg border border-white/10 bg-black shadow-2xl">
+    <div className="fixed inset-0 z-[60] flex bg-[color-mix(in_srgb,var(--iw-bg)_96%,transparent)] p-2 backdrop-blur-md sm:p-4">
+      <div className="relative flex h-full min-h-0 w-full overflow-hidden rounded-lg border border-[var(--iw-border)] bg-[var(--iw-bg)] shadow-[var(--iw-card-shadow)]">
         <div ref={containerRef} className="h-full min-h-0 w-full" />
 
         {!isReady && !errorMessage && (
-          <div className="absolute inset-0 flex items-center justify-center bg-slate-950/70 text-sm font-semibold text-slate-200">
-            <Loader2 className="mr-2 h-4 w-4 animate-spin text-cyan-200" />
+          <div className="absolute inset-0 flex items-center justify-center bg-[color-mix(in_srgb,var(--iw-bg)_70%,transparent)] text-sm font-semibold text-[var(--iw-text)]">
+            <Loader2 className="mr-2 h-4 w-4 animate-spin text-[var(--iw-tone-teal-text)]" />
             {t("panorama.loading")}
           </div>
         )}
@@ -323,7 +323,7 @@ export default function PanoramaOverlay({ item, onClose, onSaveScreenshots }: Pa
           <button type="button" onClick={resetView} disabled={!isReady} className={iconButtonClass} title={t("panorama.resetView")}>
             <RotateCcw className="h-4 w-4" />
           </button>
-          <label className="flex h-9 items-center gap-1.5 rounded-md border border-white/12 bg-slate-950/86 px-2 text-xs font-semibold text-slate-200 shadow-lg backdrop-blur">
+          <label className="flex h-9 items-center gap-1.5 rounded-md border border-[var(--iw-border)] bg-[color-mix(in_srgb,var(--iw-panel)_86%,transparent)] px-2 text-xs font-semibold text-[var(--iw-text)] backdrop-blur">
             <span>{t("panorama.sizeLabel")}</span>
             <select
               value={captureSizeId}

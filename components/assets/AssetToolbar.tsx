@@ -64,7 +64,7 @@ export default function AssetToolbar({
   assetDateStart,
   assetModelFilter,
   assetStatusFilter,
-  dateOptions,
+  dateOptions: _dateOptions,
   filterType,
   inFlightCount = 0,
   itemsCount,
@@ -125,8 +125,6 @@ export default function AssetToolbar({
 
   const showCustomDateRange =
     assetDatePreset === "custom" || assetDateStart.length > 0 || assetDateEnd.length > 0;
-  const showFilterRows = itemsCount > 0 || searchQuery.trim().length > 0;
-
   const handleDateStartChange = (value: string) => {
     setAssetDatePreset("custom");
     setAssetDateStart(value);
@@ -138,24 +136,23 @@ export default function AssetToolbar({
   };
 
   return (
-    <div className="imagine-toolbar-surface rounded-xl dark-glass p-4">
+    <div className="imagine-toolbar-surface rounded-xl">
       {showGalleryHeader && (
         <>
           <div className="imagine-toolbar-header hidden lg:flex">
             <div>
-              <h2 className="text-sm font-semibold tracking-tight text-[var(--iw-text)]">{t("gallery.title")}</h2>
-              <p className="imagine-workspace-subtitle mt-0.5">{t("gallery.subtitle")}</p>
+              <h2 className="iw-type-label font-semibold tracking-tight text-[var(--iw-text)]">{t("gallery.title")}</h2>
             </div>
             <div className="flex shrink-0 flex-col items-end gap-1">
               {inFlightCount > 0 && (
-                <span className="imagine-tone-icon font-mono text-[10px]" data-tone="info">{t("gallery.inFlightCount", { count: inFlightCount })}</span>
+                <span className="imagine-tone-icon iw-type-caption font-mono" data-tone="info">{t("gallery.inFlightCount", { count: inFlightCount })}</span>
               )}
-              <span className="imagine-meta-chip font-mono text-[10px]">{t("gallery.itemCount", { count: itemsCount })}</span>
+              <span className="imagine-meta-chip iw-type-caption font-mono">{t("gallery.itemCount", { count: itemsCount })}</span>
             </div>
           </div>
           <div className="mb-3 flex items-center justify-between gap-2 lg:hidden">
-            <span className="text-sm font-semibold text-[var(--iw-text)]">{t("gallery.mobileTitle")}</span>
-            <span className="imagine-meta-chip font-mono text-[10px]">
+            <span className="iw-type-label font-semibold text-[var(--iw-text)]">{t("gallery.mobileTitle")}</span>
+            <span className="imagine-meta-chip iw-type-caption font-mono">
               {inFlightCount > 0 ? `${t("gallery.inFlightCount", { count: inFlightCount })} · ` : ""}
               {t("gallery.itemCount", { count: itemsCount })}
             </span>
@@ -173,14 +170,14 @@ export default function AssetToolbar({
             onChange={(e) => setSearchQuery(e.target.value)}
             placeholder={t("gallery.searchPlaceholder")}
             aria-label={t("gallery.searchPlaceholder")}
-            className="imagine-toolbar-search h-9 rounded-lg border border-slate-800 bg-slate-950/55 pr-4 text-xs text-slate-200 placeholder-slate-600 transition-colors duration-150 focus:border-blue-400/35 focus:outline-none"
+            className="imagine-toolbar-search h-9 pr-4 text-xs"
           />
         </div>
         <select
           name="asset-model-filter"
           value={assetModelFilter}
           onChange={(e) => setAssetModelFilter(e.target.value)}
-          className="imagine-toolbar-select h-9 min-w-0 rounded-lg border border-slate-800 bg-slate-950/55 px-3 font-mono text-[10px] text-slate-300 transition-colors duration-150 focus:border-blue-400/35 focus:outline-none sm:min-w-[9rem]"
+          className="imagine-toolbar-select iw-type-caption h-9 min-w-0 px-3 font-mono sm:min-w-[9rem]"
           aria-label={t("gallery.filterByModel")}
         >
           <option value="all">{t("gallery.allModels")}</option>
@@ -191,24 +188,50 @@ export default function AssetToolbar({
         <button
           type="button"
           onClick={exportMetadataJson}
-          className="imagine-secondary-action h-9 shrink-0 rounded-lg border border-slate-800 bg-slate-950/55 px-3 text-[10px] font-semibold text-slate-300 transition-colors duration-150 hover:bg-slate-900"
+          className="imagine-secondary-action iw-type-caption h-9 shrink-0 px-3 font-semibold"
         >
           {t("gallery.export")}
         </button>
         <button
           type="button"
           onClick={() => deleteItemsByStatus(["failed", "pending"])}
-          className="imagine-danger-action h-9 shrink-0 rounded-lg px-3 text-[10px] font-semibold transition-colors duration-150"
+          className="imagine-danger-action iw-type-caption h-9 shrink-0 rounded-lg px-3 font-semibold transition-colors duration-150"
         >
           {t("gallery.clearFailed")}
         </button>
       </div>
 
-      {showFilterRows ? (
+      <div className="imagine-gallery-toolbar-mobile-actions mt-2 flex items-center gap-2 lg:hidden">
+        <select
+          name="asset-model-filter-mobile"
+          value={assetModelFilter}
+          onChange={(e) => setAssetModelFilter(e.target.value)}
+          className="imagine-toolbar-select iw-type-caption h-9 min-w-0 flex-1 px-3 font-mono"
+          aria-label={t("gallery.filterByModel")}
+        >
+          <option value="all">{t("gallery.allModels")}</option>
+          {modelOptions.map(model => (
+            <option key={model} value={model}>{formatModelLabel(model, selectedProvider)}</option>
+          ))}
+        </select>
+        <button
+          type="button"
+          onClick={exportMetadataJson}
+          className="imagine-secondary-action iw-type-caption h-9 shrink-0 px-2.5 font-semibold"
+        >
+          {t("gallery.export")}
+        </button>
+        <button
+          type="button"
+          onClick={() => deleteItemsByStatus(["failed", "pending"])}
+          className="imagine-danger-action iw-type-caption h-9 shrink-0 rounded-lg px-2.5 font-semibold transition-colors duration-150"
+        >
+          {t("gallery.clearFailed")}
+        </button>
+      </div>
+
       <div className="imagine-gallery-filters">
-        <div className="imagine-filter-row">
-          <span className="imagine-filter-row-label">{t("gallery.filterStatus")}</span>
-          <div className="imagine-filter-track" role="group" aria-label={t("gallery.filterStatus")}>
+        <div className="imagine-filter-track" role="group" aria-label={t("gallery.filterStatus")}>
             {STATUS_FILTER_OPTIONS.map(option => {
               const count = getStatusCount(option.value);
               return (
@@ -222,12 +245,11 @@ export default function AssetToolbar({
                 />
               );
             })}
-          </div>
         </div>
 
-        <div className="imagine-filter-row">
-          <span className="imagine-filter-row-label">{t("gallery.filterType")}</span>
-          <div className="imagine-filter-track" role="group" aria-label={t("gallery.filterType")}>
+        <span className="imagine-toolbar-chip-divider" aria-hidden="true" />
+
+        <div className="imagine-filter-track" role="group" aria-label={t("gallery.filterType")}>
             {TYPE_FILTER_OPTIONS.map(option => {
               const count = getTypeCount(option.value);
               return (
@@ -241,17 +263,11 @@ export default function AssetToolbar({
                 />
               );
             })}
-          </div>
         </div>
 
-        <div className="imagine-filter-row">
-          <span className="imagine-filter-row-label">
-            {t("gallery.filterTime")}
-            <span className="mt-1 block font-mono text-[9px] font-normal normal-case tracking-normal text-[var(--iw-faint)]">
-              {t("gallery.dayCount", { count: dateOptions.length })}
-            </span>
-          </span>
-          <div className="imagine-filter-track">
+        <span className="imagine-toolbar-chip-divider" aria-hidden="true" />
+
+        <div className="imagine-filter-track" role="group" aria-label={t("gallery.filterTime")}>
             {DATE_PRESET_OPTIONS.map(option => (
               <FilterChip
                 key={option.value}
@@ -285,7 +301,7 @@ export default function AssetToolbar({
                   className="imagine-filter-date-input"
                   aria-label={t("gallery.dateFrom")}
                 />
-                <span className="font-mono text-[10px] text-[var(--iw-faint)]">{t("gallery.dateRangeSeparator")}</span>
+                <span className="iw-type-caption font-mono text-[var(--iw-faint)]">{t("gallery.dateRangeSeparator")}</span>
                 <input
                   type="date"
                   name="asset-date-end"
@@ -296,14 +312,8 @@ export default function AssetToolbar({
                 />
               </div>
             )}
-          </div>
         </div>
       </div>
-      ) : (
-        <p className="mt-2 text-[11px] leading-5 text-[var(--iw-faint)]">
-          {t("gallery.emptyFilterHint")}
-        </p>
-      )}
     </div>
   );
 }

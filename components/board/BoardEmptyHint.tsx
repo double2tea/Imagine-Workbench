@@ -1,49 +1,51 @@
 "use client";
 
 import { useEffect, useState } from "react";
-import { Bot, FileText, ImagePlus, Layers3, MousePointerClick, Plus, Upload, type LucideIcon } from "lucide-react";
+import { ImagePlus, MousePointerClick, Plus, Upload, X, type LucideIcon } from "lucide-react";
 import { useTranslations } from "@/lib/i18n";
 
-const BOARD_HANDLES_HINT_KEY = "imagine_board_handles_hint_seen";
+const BOARD_EMPTY_HINT_DISMISSED_KEY = "imagine_board_empty_hint_dismissed";
 
 interface StartAction {
   descriptionKey: string;
   icon: LucideIcon;
   labelKey: string;
+  mobilePriority?: "low";
 }
 
 interface BoardEmptyHintProps {
   onQuickInsert?: () => void;
 }
 
-function readHandlesHintSeen(): boolean {
+function readEmptyHintDismissed(): boolean {
   if (typeof window === "undefined") return true;
-  return window.localStorage.getItem(BOARD_HANDLES_HINT_KEY) === "1";
+  return window.localStorage.getItem(BOARD_EMPTY_HINT_DISMISSED_KEY) === "1";
 }
 
 export default function BoardEmptyHint({ onQuickInsert }: BoardEmptyHintProps) {
   const { t } = useTranslations("board");
-  const [handlesHintSeen, setHandlesHintSeen] = useState(true);
+  const [dismissed, setDismissed] = useState(true);
 
   useEffect(() => {
     const restoreTimer = window.setTimeout(() => {
-      setHandlesHintSeen(readHandlesHintSeen());
+      setDismissed(readEmptyHintDismissed());
     }, 0);
     return () => window.clearTimeout(restoreTimer);
   }, []);
 
-  const dismissHandlesHint = () => {
-    window.localStorage.setItem(BOARD_HANDLES_HINT_KEY, "1");
-    setHandlesHintSeen(true);
+  const dismissEmptyHint = () => {
+    window.localStorage.setItem(BOARD_EMPTY_HINT_DISMISSED_KEY, "1");
+    setDismissed(true);
   };
+
+  if (dismissed) {
+    return null;
+  }
 
   const startActions: StartAction[] = [
     { icon: Upload, labelKey: "emptyHint.importMedia", descriptionKey: "emptyHint.topBarOrDrag" },
-    { icon: MousePointerClick, labelKey: "emptyHint.doubleClickBlank", descriptionKey: "emptyHint.quickInsert" },
-    { icon: ImagePlus, labelKey: "emptyHint.generateNode", descriptionKey: "emptyHint.imageVideoAudio" },
-    { icon: Layers3, labelKey: "emptyHint.referenceGroup", descriptionKey: "emptyHint.groupConnect" },
-    { icon: FileText, labelKey: "emptyHint.promptNote", descriptionKey: "emptyHint.captureIdeas" },
-    { icon: Bot, labelKey: "emptyHint.handToAgent", descriptionKey: "emptyHint.continueArrange" },
+    { icon: MousePointerClick, labelKey: "emptyHint.doubleClickBlank", descriptionKey: "emptyHint.quickInsert", mobilePriority: "low" },
+    { icon: ImagePlus, labelKey: "emptyHint.generateNode", descriptionKey: "emptyHint.imageVideoAudio", mobilePriority: "low" },
   ];
 
   return (
@@ -53,8 +55,18 @@ export default function BoardEmptyHint({ onQuickInsert }: BoardEmptyHintProps) {
         onClick={event => event.stopPropagation()}
         onPointerDown={event => event.stopPropagation()}
       >
-        <p className="text-sm font-semibold text-[var(--iw-text)]">{t('emptyHint.startWithAction')}</p>
-        <p className="mt-2 text-xs leading-5 text-[var(--iw-muted)]">
+        <div className="flex items-start justify-between gap-3">
+          <p className="text-sm font-semibold text-[var(--iw-text)]">{t('emptyHint.startWithAction')}</p>
+          <button
+            type="button"
+            onClick={dismissEmptyHint}
+            className="imagine-icon-button flex h-7 w-7 shrink-0 items-center justify-center rounded-md border border-[var(--iw-border)] text-[var(--iw-muted)] transition hover:bg-[var(--iw-panel-soft)] hover:text-[var(--iw-text)]"
+            aria-label={t('emptyHint.dismiss')}
+          >
+            <X className="h-3.5 w-3.5" />
+          </button>
+        </div>
+        <p className="board-empty-hint-description mt-2 text-xs leading-5 text-[var(--iw-muted)]">
           {t('emptyHint.description')}
         </p>
         {onQuickInsert ? (
@@ -67,15 +79,16 @@ export default function BoardEmptyHint({ onQuickInsert }: BoardEmptyHintProps) {
             {t('emptyHint.openInsertMenu')}
           </button>
         ) : null}
-        <div className="mt-4 grid grid-cols-2 gap-1.5 text-left">
-          {startActions.map(action => {
+        <div className="mt-3 grid grid-cols-1 gap-1.5 text-left sm:grid-cols-3">
+          {startActions.map((action) => {
             const Icon = action.icon;
             return (
               <span
                 key={action.labelKey}
-                className="board-empty-start-step rounded-md border border-[var(--iw-border)] bg-[var(--iw-panel-soft)] px-2 py-1.5 text-[11px] font-semibold text-[var(--iw-text)]"
+                data-mobile-priority={action.mobilePriority}
+                className="board-empty-start-step flex items-start gap-2 rounded-md border border-[var(--iw-border)] bg-[var(--iw-panel-soft)] px-2 py-1.5 text-[11px] font-semibold text-[var(--iw-text)]"
               >
-                <Icon className="h-3.5 w-3.5 text-[var(--iw-muted)]" />
+                <Icon className="mt-0.5 h-3.5 w-3.5 shrink-0 text-[var(--iw-muted)]" />
                 <span className="min-w-0">
                   <span className="block truncate">{t(action.labelKey)}</span>
                   <span className="block truncate text-[10px] font-medium text-[var(--iw-faint)]">{t(action.descriptionKey)}</span>
@@ -84,20 +97,14 @@ export default function BoardEmptyHint({ onQuickInsert }: BoardEmptyHintProps) {
             );
           })}
         </div>
-        {!handlesHintSeen && (
-          <p className="mt-3 rounded-lg border border-[var(--iw-border)] bg-[var(--iw-panel-soft)] px-3 py-2 text-[11px] leading-5 text-[var(--iw-muted)]">
-            {t('emptyHint.handlesHint')}
-          </p>
-        )}
-        {!handlesHintSeen && (
-          <button
-            type="button"
-            onClick={dismissHandlesHint}
-            className="imagine-secondary-action mt-3 h-8 w-full rounded-lg border border-[var(--iw-border)] text-[11px] font-semibold text-[var(--iw-text)] transition hover:bg-[var(--iw-panel-soft)]"
-          >
-            {t('emptyHint.gotIt')}
-          </button>
-        )}
+        <p className="mt-3 text-[10px] leading-4 text-[var(--iw-faint)]">{t('emptyHint.handlesHint')}</p>
+        <button
+          type="button"
+          onClick={dismissEmptyHint}
+          className="imagine-secondary-action mt-3 h-8 w-full rounded-lg border border-[var(--iw-border)] text-[11px] font-semibold text-[var(--iw-text)] transition hover:bg-[var(--iw-panel-soft)]"
+        >
+          {t('emptyHint.gotIt')}
+        </button>
       </div>
     </div>
   );

@@ -41,6 +41,7 @@
     "resolveRunning": "Waiting for Resolve", "resolveIdle": "DaVinci Resolve",
     "settingsLink": "Settings",
     "githubLinkAriaLabel": "Open project GitHub",
+    "githubLinkTitle": "GitHub: Imagine Workbench",
     "contactEmailTitle": "Contact: double_tea@foxmail.com",
     "contactEmailAriaLabel": "Send email to author",
     "toggleDarkModeTitle": "Switch to dark mode", "toggleLightModeTitle": "Switch to light mode",

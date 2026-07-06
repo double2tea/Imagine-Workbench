@@ -376,7 +376,7 @@ export default function AudioGenerationPanel({
   };
 
   return (
-    <div className="flex flex-col gap-3.5 animate-fade-in">
+    <div className="flex flex-col gap-3 animate-fade-in">
       <PromptComposerSurface
         acceptedMediaTypes={acceptedMediaTypes}
         actions={
@@ -406,17 +406,17 @@ export default function AudioGenerationPanel({
         references={referenceImages}
       />
 
-      <div className="grid grid-cols-1 gap-3">
-        <div>
-          <label className="imagine-section-label mb-1.5 block">{t("audio.providerLabel")}</label>
+      <div className="imagine-parameter-grid grid grid-cols-1 gap-3">
+        <div className="imagine-parameter-field">
+          <label className="imagine-parameter-label-row imagine-section-label">{t("audio.providerLabel")}</label>
           <select value={selectedProvider} onChange={(event) => handleProviderChange(event.target.value)} className="imagine-select py-2.5">
             {providerOptions.map(option => (
               <option key={option.value} value={option.value}>{option.label}</option>
             ))}
           </select>
         </div>
-        <div>
-          <label className="imagine-section-label mb-1.5 block">{t("audio.functionLabel")}</label>
+        <div className="imagine-parameter-field">
+          <label className="imagine-parameter-label-row imagine-section-label">{t("audio.functionLabel")}</label>
           <select value={functionOptions.some(option => option.value === selectedFunctionValue) ? selectedFunctionValue : ""} onChange={(event) => handleFunctionChange(event.target.value)} className="imagine-select py-2.5">
             {!functionOptions.some(option => option.value === selectedFunctionValue) && <option value="" disabled>{t("audio.functionUnavailable")}</option>}
             {functionOptions.map(option => (
@@ -425,8 +425,8 @@ export default function AudioGenerationPanel({
           </select>
         </div>
         {formatOptions.length > 0 && (
-          <div>
-            <label className="imagine-section-label mb-1.5 block">{t("audio.formatLabel")}</label>
+          <div className="imagine-parameter-field">
+            <label className="imagine-parameter-label-row imagine-section-label">{t("audio.formatLabel")}</label>
             <select value={selectedFormat} onChange={(event) => onSelectFormat(event.target.value)} className="imagine-select py-2.5">
               {formatOptions.map(option => (
                 <option key={option.value} value={option.value}>{option.label}</option>
@@ -439,7 +439,7 @@ export default function AudioGenerationPanel({
       <ReferenceImagePicker
         acceptedMediaTypes={acceptedMediaTypes}
         addLabel={t("audio.addReferenceLabel")}
-        browseClassName={referenceLimit > 0 ? "cursor-pointer font-semibold text-amber-700 underline-offset-2 hover:underline" : "text-[var(--iw-faint)]"}
+        browseClassName={referenceLimit > 0 ? "cursor-pointer font-semibold text-[var(--iw-tone-warning-text)] underline-offset-2 hover:underline" : "text-[var(--iw-faint)]"}
         clearLabel={t("audio.clearReferenceLabel")}
         emptyHelp={referenceLimit > 0 ? t("audio.emptyHelpWithLimit") : t("audio.emptyHelpNoLimit")}
         emptyLabel={referenceLimit > 0 ? t("audio.emptyLabelWithLimit") : t("audio.emptyLabelNoLimit")}
@@ -458,8 +458,8 @@ export default function AudioGenerationPanel({
       />
 
       {(mode === "voice_design" || mode === "voice_clone") && (
-        <div>
-          <label className="imagine-section-label mb-1.5 block">{stylePromptLabel}</label>
+        <div className="imagine-parameter-field">
+          <label className="imagine-parameter-label-row imagine-section-label">{stylePromptLabel}</label>
           <input
             value={audioStylePrompt}
             onChange={event => onAudioStylePromptChange(event.target.value)}
@@ -470,8 +470,8 @@ export default function AudioGenerationPanel({
       )}
 
       {mode === "asr" && (
-        <div>
-          <label className="imagine-section-label mb-1.5 block">{t("audio.transcribeLanguageLabel")}</label>
+        <div className="imagine-parameter-field">
+          <label className="imagine-parameter-label-row imagine-section-label">{t("audio.transcribeLanguageLabel")}</label>
           <select value={asrLanguage} onChange={event => onAsrLanguageChange(event.target.value as "auto" | "zh" | "en")} className="imagine-select py-2.5">
             {ASR_LANGUAGE_OPTIONS.map(option => (
               <option key={option.value} value={option.value}>{option.label}</option>

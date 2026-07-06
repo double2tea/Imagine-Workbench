@@ -556,7 +556,8 @@
     "quickInsert": "Quick insert",
     "captureIdeas": "Capture ideas",
     "handlesHint": "Tip: drag a wire from node outputs",
-    "gotIt": "Got it"
+    "gotIt": "Got it",
+    "dismiss": "Dismiss hint"
   },
   "tasks": {
     "title": "Tasks",

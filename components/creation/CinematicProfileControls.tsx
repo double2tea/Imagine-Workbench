@@ -260,7 +260,7 @@ function OptionGrid<T extends string>({
                 {icon}
               </span>
               {selected && (
-                <span className="absolute right-2 top-2 flex h-5 w-5 items-center justify-center rounded-full bg-white text-slate-950 shadow-sm">
+                <span className="absolute right-2 top-2 flex h-5 w-5 items-center justify-center rounded-full bg-white text-[var(--iw-bg)]">
                   <Check className="h-3 w-3" />
                 </span>
               )}

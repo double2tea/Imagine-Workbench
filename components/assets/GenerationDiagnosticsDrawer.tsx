@@ -92,25 +92,25 @@ export default function GenerationDiagnosticsDrawer({ item, onClose }: Generatio
   };
 
   return (
-    <div className="absolute inset-y-0 right-0 z-40 flex w-full max-w-[420px] flex-col border-l border-slate-800 bg-slate-950/96 text-slate-100 shadow-2xl backdrop-blur-xl">
+    <div className="absolute inset-y-0 right-0 z-40 flex w-full max-w-[420px] flex-col border-l border-[var(--iw-border)] bg-[color-mix(in_srgb,var(--iw-bg)_96%,transparent)] text-[var(--iw-text)] shadow-2xl backdrop-blur-xl">
       <div
         role="dialog"
         aria-modal="true"
         aria-labelledby="generation-diagnostics-title"
         className="flex min-h-0 flex-1 flex-col"
       >
-        <div className="flex shrink-0 items-center justify-between border-b border-slate-800 px-4 py-3">
+        <div className="flex shrink-0 items-center justify-between border-b border-[var(--iw-border)] px-4 py-3">
           <div>
-            <h2 id="generation-diagnostics-title" className="text-sm font-semibold text-slate-50">
+            <h2 id="generation-diagnostics-title" className="text-sm font-semibold text-[var(--iw-text)]">
               {t("diagnostics.title")}
             </h2>
-            <p className="mt-0.5 break-all text-[11px] text-slate-500">{item.id}</p>
+            <p className="mt-0.5 break-all text-[11px] text-[var(--iw-faint)]">{item.id}</p>
           </div>
           <button
             ref={closeButtonRef}
             type="button"
             onClick={onClose}
-            className="imagine-motion-interactive flex h-8 w-8 items-center justify-center rounded-md border border-slate-800 bg-slate-900 text-slate-400 hover:border-slate-600 hover:text-white"
+            className="imagine-secondary-action imagine-motion-interactive flex h-8 w-8 items-center justify-center rounded-md border border-[var(--iw-border)]"
             aria-label={t("diagnostics.close")}
           >
             <X className="h-4 w-4" />
@@ -119,29 +119,29 @@ export default function GenerationDiagnosticsDrawer({ item, onClose }: Generatio
 
         <div className="min-h-0 flex-1 overflow-y-auto px-4 py-4">
           <section className="space-y-2">
-            <h3 className="text-[11px] font-semibold uppercase tracking-[0.14em] text-slate-500">{t("diagnostics.requestSummary")}</h3>
-            <dl className="overflow-hidden rounded-lg border border-slate-800">
+            <h3 className="text-[11px] font-semibold uppercase tracking-[0.14em] text-[var(--iw-faint)]">{t("diagnostics.requestSummary")}</h3>
+            <dl className="overflow-hidden rounded-lg border border-[var(--iw-border)]">
               {rows.map(row => (
-                <div key={row.label} className="grid grid-cols-[88px_1fr] border-b border-slate-800/80 last:border-b-0">
-                  <dt className="bg-slate-900/80 px-3 py-2 text-[11px] text-slate-500">{row.label}</dt>
-                  <dd className="min-w-0 break-words px-3 py-2 text-xs text-slate-200">{row.value}</dd>
+                <div key={row.label} className="grid grid-cols-[88px_1fr] border-b border-[color-mix(in_srgb,var(--iw-border)_80%,transparent)] last:border-b-0">
+                  <dt className="bg-[color-mix(in_srgb,var(--iw-panel)_80%,transparent)] px-3 py-2 text-[11px] text-[var(--iw-faint)]">{row.label}</dt>
+                  <dd className="min-w-0 break-words px-3 py-2 text-xs text-[var(--iw-text)]">{row.value}</dd>
                 </div>
               ))}
             </dl>
           </section>
 
           <section className="mt-5 space-y-2">
-            <h3 className="text-[11px] font-semibold uppercase tracking-[0.14em] text-slate-500">{t("diagnostics.promptLabel")}</h3>
-            <p className="max-h-40 overflow-y-auto whitespace-pre-wrap rounded-lg border border-slate-800 bg-slate-900/52 p-3 text-xs leading-5 text-slate-200">
+            <h3 className="text-[11px] font-semibold uppercase tracking-[0.14em] text-[var(--iw-faint)]">{t("diagnostics.promptLabel")}</h3>
+            <p className="max-h-40 overflow-y-auto whitespace-pre-wrap rounded-lg border border-[var(--iw-border)] bg-[color-mix(in_srgb,var(--iw-panel)_52%,transparent)] p-3 text-xs leading-5 text-[var(--iw-text)]">
               {prompt || t("diagnostics.noPrompt")}
             </p>
           </section>
 
           <section className="mt-5 space-y-2">
-            <h3 className="text-[11px] font-semibold uppercase tracking-[0.14em] text-slate-500">{t("diagnostics.referenceMedia")}</h3>
-            <div className="rounded-lg border border-slate-800 bg-slate-900/52 p-3 text-xs leading-5 text-slate-200">
+            <h3 className="text-[11px] font-semibold uppercase tracking-[0.14em] text-[var(--iw-faint)]">{t("diagnostics.referenceMedia")}</h3>
+            <div className="rounded-lg border border-[var(--iw-border)] bg-[color-mix(in_srgb,var(--iw-panel)_52%,transparent)] p-3 text-xs leading-5 text-[var(--iw-text)]">
               {references.length === 0 ? (
-                <p className="text-slate-500">{t("diagnostics.noReference")}</p>
+                <p className="text-[var(--iw-faint)]">{t("diagnostics.noReference")}</p>
               ) : (
                 <pre className="whitespace-pre-wrap font-sans">{referenceSummary(item, t)}</pre>
               )}
@@ -150,19 +150,19 @@ export default function GenerationDiagnosticsDrawer({ item, onClose }: Generatio
 
           {item.errorMessage?.trim() ? (
             <section className="mt-5 space-y-2">
-              <h3 className="text-[11px] font-semibold uppercase tracking-[0.14em] text-rose-300">{t("diagnostics.failedInfo")}</h3>
-              <p className="rounded-lg border border-rose-400/25 bg-rose-500/10 p-3 text-xs leading-5 text-rose-100">
+              <h3 className="text-[11px] font-semibold uppercase tracking-[0.14em] text-[var(--iw-tone-danger-text)]">{t("diagnostics.failedInfo")}</h3>
+              <p className="imagine-tone-surface rounded-lg border p-3 text-xs leading-5" data-tone="danger">
                 {item.errorMessage.trim()}
               </p>
             </section>
           ) : null}
         </div>
 
-        <div className="shrink-0 border-t border-slate-800 px-4 py-3">
+        <div className="shrink-0 border-t border-[var(--iw-border)] px-4 py-3">
           <button
             type="button"
             onClick={copySummary}
-            className="imagine-motion-interactive inline-flex h-9 w-full items-center justify-center gap-2 rounded-md border border-slate-700 bg-slate-900 px-3 text-xs font-medium text-slate-100 hover:border-slate-500 hover:text-white"
+            className="imagine-secondary-action imagine-motion-interactive inline-flex h-9 w-full items-center justify-center gap-2 rounded-md border border-[var(--iw-border)] px-3 text-xs font-medium"
           >
             {copyState === "copied" ? <Check className="h-4 w-4" /> : <Clipboard className="h-4 w-4" />}
             {copyLabels[copyState]}

@@ -232,7 +232,7 @@ export default function ReferenceImagePicker({
                     {isStart ? `${globalT("media.videoFrameCapture.first")} ${token}` : isEnd ? `${globalT("media.videoFrameCapture.last")} ${token}` : `${mediaReferenceLabel(mediaType)} ${token}`}
                   </button>
                 ) : (
-                  <div className="absolute bottom-0 inset-x-0 bg-black/65 text-[9px] font-mono text-slate-300 truncate px-1 py-0.5 text-center">
+                  <div className="absolute bottom-0 inset-x-0 bg-black/65 text-[9px] font-mono text-[var(--iw-muted)] truncate px-1 py-0.5 text-center">
                     {token}
                   </div>
                 )}

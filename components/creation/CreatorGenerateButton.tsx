@@ -8,6 +8,7 @@ export type CreatorGenerateMode = "image" | "video" | "audio";
 interface CreatorGenerateButtonProps {
   mode: CreatorGenerateMode;
   disabled: boolean;
+  disabledHint?: string;
   isSubmitting: boolean;
   priceProvider?: string;
   priceModelId?: string;
@@ -20,6 +21,7 @@ interface CreatorGenerateButtonProps {
 export default function CreatorGenerateButton({
   mode,
   disabled,
+  disabledHint,
   isSubmitting,
   priceProvider,
   priceModelId,
@@ -35,14 +37,20 @@ export default function CreatorGenerateButton({
   const defaultLabel = isImage ? t("generateButton.defaultLabel.image") : isAudio ? t("generateButton.defaultLabel.audio") : t("generateButton.defaultLabel.video");
   const submittingLabel = t("generateButton.submittingLabel", { count: submitCount });
 
+  const showDisabledHint = disabled && !isSubmitting && disabledHint;
+
   return (
-    <button
+    <div className="flex flex-col gap-1.5">
+      {showDisabledHint ? (
+        <p className="iw-type-label text-center leading-4 text-[var(--iw-faint)]">{disabledHint}</p>
+      ) : null}
+      <button
       type="button"
       onClick={onGenerate}
       disabled={disabled}
       data-mode={mode}
       data-tone="accent"
-      className={`imagine-primary-action imagine-creator-generate-btn flex w-full items-center justify-center gap-2 rounded-lg py-3 text-xs font-bold text-white transition duration-200 ${
+      className={`imagine-primary-action imagine-creator-generate-btn flex w-full items-center justify-center gap-2 rounded-lg py-3 text-xs font-bold transition duration-200 ${
         disabled ? "cursor-not-allowed" : "cursor-pointer active:scale-[0.98]"
       }`}
     >
@@ -64,5 +72,6 @@ export default function CreatorGenerateButton({
         />
       )}
     </button>
+    </div>
   );
 }

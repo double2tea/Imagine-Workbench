@@ -61,7 +61,7 @@ export default function PromptComposerSurface({
   return (
     <div>
       {headerVariant === "toolbar" ? (
-        <div className="mb-2 flex min-h-10 items-center justify-between gap-2 rounded-lg border border-[var(--iw-border)] bg-[var(--iw-panel-soft)] px-2 py-1.5">
+        <div className="mb-2 flex min-h-9 items-center justify-between gap-2">
           <label htmlFor={textareaId} className="flex min-w-0 items-center gap-2">
             <span
               className="imagine-tone-surface flex h-7 w-7 shrink-0 items-center justify-center rounded-md border"
@@ -69,9 +69,9 @@ export default function PromptComposerSurface({
             >
               {icon}
             </span>
-            <span className="truncate text-xs font-semibold text-[var(--iw-text)]">{label}</span>
+            <span className="iw-type-label truncate font-semibold text-[var(--iw-text)]">{label}</span>
           </label>
-          <div className="flex shrink-0 items-center rounded-md border border-[var(--iw-border)] bg-[var(--iw-surface-raised)] p-0.5">
+          <div className="flex shrink-0 items-center gap-1">
             {actions}
           </div>
         </div>
@@ -125,7 +125,7 @@ export default function PromptComposerSurface({
             onKeyUp={(event) => emitSelection(event.currentTarget)}
             onSelect={(event) => emitSelection(event.currentTarget)}
             placeholder={placeholder}
-            className={`imagine-field-textarea relative z-10 h-24 text-sm leading-6 caret-[var(--iw-text)] transition-all duration-200 ${
+            className={`imagine-field-textarea iw-type-body relative z-10 h-36 caret-[var(--iw-text)] transition-all duration-200 ${
               isDragOver ? "scale-[1.01]" : ""
             } ${referenceThumbnails.length > 0 ? "!text-transparent" : ""}`}
           />
@@ -133,7 +133,7 @@ export default function PromptComposerSurface({
             acceptedMediaTypes={acceptedMediaTypes}
             prompt={prompt}
             references={references}
-            className="text-sm leading-6"
+            className="iw-type-body"
           />
         </div>
         <div className="imagine-field-shell-footer mt-2 flex items-center justify-between pt-2">
