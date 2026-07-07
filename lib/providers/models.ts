@@ -27,7 +27,7 @@ export async function listProviderModels(config: ProviderConfig, kind: ModelKind
   if (config.provider === "agnes") {
     return listStaticProviderModels(config.provider, kind);
   }
-  if (config.provider === "mimo") {
+  if (config.provider === "mimo" || config.provider === "seedaudio") {
     return listStaticProviderModels(config.provider, kind);
   }
 

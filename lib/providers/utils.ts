@@ -50,7 +50,7 @@ export function resolveProviderConfig(
   if (!isKnownProvider(provider) && !configuredBaseUrl) {
     throw new Error(`${providerLabel ?? provider} Base URL is required.`);
   }
-  if ((provider === "12ai" || provider === "agnes" || provider === "modelscope" || provider === "runninghub" || provider === "mimo") && !apiKey) {
+  if (isKnownProvider(provider) && !apiKey) {
     const meta = getProviderMeta(provider);
     throw new Error(`${meta.label} API key is required. Set ${meta.envApiKey} or provide a custom API key.`);
   }
@@ -75,6 +75,7 @@ export function readProviderRequestApiKey(req: Request, options: ResolveProvider
 export function authHeaders(config: ProviderConfig): HeadersInit {
   if (!config.apiKey) return {};
   if (config.provider === "mimo") return { "api-key": config.apiKey };
+  if (config.provider === "seedaudio") return { "X-Api-Key": config.apiKey };
   return { Authorization: `Bearer ${config.apiKey}` };
 }
 

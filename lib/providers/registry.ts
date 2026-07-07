@@ -121,6 +121,25 @@ export const PROVIDER_REGISTRY = [
     supportsAudio: true,
     supportsChat: true,
   },
+  {
+    key: "seedaudio",
+    label: "Seed Audio",
+    envApiKey: "VOLCENGINE_TTS_API_KEY",
+    envBaseUrl: "SEED_AUDIO_BASE_URL",
+    defaultBaseUrl: "https://openspeech.bytedance.com",
+    defaultVideoBaseUrl: "https://openspeech.bytedance.com",
+    apiKeyPlaceholder: "your_volcengine_tts_api_key",
+    credentialHint: "Uses Volcengine / BytePlus OpenSpeech tts/create X-Api-Key authentication.",
+    endpointInfo: [
+      "OpenSpeech: https://openspeech.bytedance.com/api/v3/tts/create",
+    ],
+    registerUrl: "https://console.volcengine.com/speech/service/10007",
+    hasEditableBaseUrl: true,
+    supportsImage: false,
+    supportsVideo: false,
+    supportsAudio: true,
+    supportsChat: false,
+  },
 ] as const;
 
 export type AiProvider = string;

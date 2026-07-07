@@ -2136,6 +2136,92 @@
       }
     },
     {
+      "value": "seedaudio:seed-audio-1.0",
+      "label": "Seed Audio 1.0",
+      "provider": "seedaudio",
+      "model": "seed-audio-1.0",
+      "kind": "audio",
+      "listed": true,
+      "supportsAsync": false,
+      "aspectRatios": [],
+      "sizes": [],
+      "thinkingLevels": [],
+      "qualityLevels": [],
+      "resolutions": [],
+      "durations": [],
+      "presets": [
+        {
+          "value": "wav",
+          "label": "WAV"
+        },
+        {
+          "value": "mp3",
+          "label": "MP3"
+        },
+        {
+          "value": "pcm",
+          "label": "PCM"
+        },
+        {
+          "value": "ogg_opus",
+          "label": "OGG Opus"
+        }
+      ],
+      "audioModes": [
+        "tts",
+        "sfx",
+        "music",
+        "voice_clone"
+      ],
+      "audioOutputKinds": [
+        "audio"
+      ],
+      "audioDefaultMode": "tts",
+      "videoReferenceMode": "none",
+      "videoReferenceModes": [],
+      "inputModalities": {
+        "text": {
+          "required": true,
+          "maxLength": 2048
+        },
+        "images": {
+          "minCount": 0,
+          "maxCount": 1,
+          "roles": [
+            "reference"
+          ],
+          "acceptedMimeTypes": [
+            "image/jpeg",
+            "image/png",
+            "image/webp"
+          ],
+          "delivery": "rawDataUri"
+        },
+        "audio": {
+          "minCount": 0,
+          "maxCount": 3,
+          "roles": [
+            "voice",
+            "audioGuide"
+          ],
+          "acceptedMimeTypes": [
+            "audio/wav",
+            "audio/mpeg",
+            "audio/ogg"
+          ],
+          "delivery": "rawDataUri"
+        },
+        "mixed": {
+          "maxTotalCount": 3
+        }
+      },
+      "parameterDescriptors": [],
+      "pricing": {
+        "status": "unpriced",
+        "reason": "unverified"
+      }
+    },
+    {
       "generated": {
         "source": "runninghub-standard"
       },
