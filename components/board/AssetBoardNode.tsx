@@ -262,7 +262,8 @@ const AssetBoardNode = memo(function AssetBoardNode({
         processingLabel={imageQuickEditProcessingTitleFromPrompt(item.prompt, creationT) ?? undefined}
         stackItems={stackItems}
         status={item.status}
-        statusLabel={item.errorMessage ?? (item.status === "failed" ? t("node.statusLabels.failed") : undefined)}
+        errorMessage={item.errorMessage}
+        statusLabel={item.status === "failed" ? t("node.statusLabels.failed") : undefined}
     >
       {node.asset.type === "image" && item.url.trim() ? (
         <PreviewImage

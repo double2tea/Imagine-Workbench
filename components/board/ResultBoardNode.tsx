@@ -220,7 +220,8 @@ const ResultBoardNode = memo(function ResultBoardNode({
         processingLabel={imageQuickEditProcessingTitleFromPrompt(item.prompt, creationT) ?? undefined}
         stackItems={stackItems}
         status={item.status}
-        statusLabel={item.errorMessage ?? (item.status === "failed" ? t("node.statusLabels.failed") : undefined)}
+        errorMessage={item.errorMessage}
+        statusLabel={item.status === "failed" ? t("node.statusLabels.failed") : undefined}
     >
       {item.type === "image" && item.url.trim() ? (
         <PreviewImage

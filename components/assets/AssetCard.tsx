@@ -386,6 +386,10 @@ export default function AssetCard({
         selected ? "border-[var(--iw-accent)] ring-2 ring-[var(--iw-accent-soft)]" : "border-[var(--iw-border)]"
       }`}
     >
+      {(item.status === "failed" || item.status === "pending" || item.status === "processing") && (
+        <div className="imagine-asset-controlbar imagine-asset-controlbar-spacer" aria-hidden="true" />
+      )}
+
       {item.status === "complete" && (
         <div className="imagine-asset-controlbar flex items-start gap-2">
           <div

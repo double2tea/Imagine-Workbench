@@ -377,14 +377,14 @@ const GenerateBoardNode = memo(function GenerateBoardNode({
           </div>
         </div>
       )}
-      <div className="grid grid-cols-[1fr_minmax(110px,0.9fr)_auto_auto] items-center gap-2">
+      <div className="grid grid-cols-[minmax(0,1fr)_minmax(110px,0.9fr)_auto_auto] items-center gap-2">
         <span
-          className={`imagine-status-chip truncate text-[10px] font-mono ${node.status === "failed" ? "imagine-tone-icon" : "text-[var(--iw-muted)]"}`}
+          className={`imagine-status-chip min-w-0 truncate text-[10px] font-mono ${node.status === "failed" ? "imagine-tone-icon" : "text-[var(--iw-muted)]"}`}
           data-status={node.status}
-          data-tone="danger"
-          title={node.errorMessage ?? statusLabel}
+          data-tone={node.status === "failed" ? "danger" : undefined}
+          title={node.status === "failed" && node.errorMessage ? node.errorMessage : statusLabel}
         >
-          {node.errorMessage ?? compactStatusLabel}
+          {compactStatusLabel}
         </span>
         {cinematicNode ? (
           <CinematicProfileControls

@@ -1597,6 +1597,7 @@ export default function BoardWorkspace({
     ? "w-[330px]"
     : "w-[240px]";
   const viewportRef = useRef<BoardViewport>(board.viewport);
+  const mobileViewportFittedBoardIdRef = useRef<string | null>(null);
   const setFlowHostRef = useCallback((element: HTMLElement | null): void => {
     flowHostRef.current = element;
   }, []);
@@ -1609,6 +1610,17 @@ export default function BoardWorkspace({
     if (!instance || !flowReady || sameBoardViewportModel(instance.getViewport(), board.viewport)) return;
     void instance.setViewport(board.viewport, { duration: 0 });
   }, [board.id, board.viewport, flowReady]);
+  useEffect(() => {
+    const instance = flowInstanceRef.current;
+    if (!instance || !flowReady || board.nodes.length === 0) return;
+    if (typeof window === "undefined" || window.innerWidth >= 1024) return;
+    if (mobileViewportFittedBoardIdRef.current === board.id) return;
+    mobileViewportFittedBoardIdRef.current = board.id;
+    const frameId = window.requestAnimationFrame(() => {
+      void instance.fitView({ padding: 0.2, duration: 0, maxZoom: 0.72 });
+    });
+    return () => window.cancelAnimationFrame(frameId);
+  }, [board.id, board.nodes.length, flowReady]);
   const boardGraphContentKey = useMemo(
     () => buildBoardGraphContentKey(board.nodes, board.edges),
     [board.nodes, board.edges],

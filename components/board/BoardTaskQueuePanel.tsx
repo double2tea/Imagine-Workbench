@@ -79,6 +79,7 @@ function TaskRow({
   const canFocusTaskResult = Boolean(resultAssetId && (resultItem || resultNode?.resultAssetIds.includes(resultAssetId)));
   const canCancel = task.status === "pending" || task.status === "processing";
   const canHandleFailure = task.status === "failed";
+  const showErrorSlot = task.status === "pending" || task.status === "processing" || task.status === "failed";
   const progress = task.status === "complete" || task.status === "canceled" ? 100 : task.progress;
   const title = taskTitle(task, sourceNode);
 
@@ -113,10 +114,18 @@ function TaskRow({
         <BoardTaskProgressBar progress={progress} status={task.status} />
       </div>
 
-      {task.errorMessage ? (
-        <p className="imagine-tone-surface mt-2 line-clamp-2 rounded-md border px-2 py-1 text-[10px] leading-4" data-tone="danger">
-          {task.errorMessage}
-        </p>
+      {showErrorSlot ? (
+        <div className="board-task-error-slot mt-2">
+          {task.errorMessage ? (
+            <p
+              className="board-task-error imagine-tone-surface truncate rounded-md border px-2 py-1 text-[10px] leading-4"
+              data-tone="danger"
+              title={task.errorMessage}
+            >
+              {task.errorMessage}
+            </p>
+          ) : null}
+        </div>
       ) : null}
 
       <div className="mt-2 flex flex-wrap gap-1.5">

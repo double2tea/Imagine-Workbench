@@ -19,6 +19,7 @@ interface BoardMediaNodeShellProps {
   processingLabel?: string;
   onSelectStackAsset?: (assetId: string) => void;
   stackItems: ReadonlyArray<BoardMediaStackItem>;
+  errorMessage?: string;
   status?: StorageItem["status"];
   statusLabel?: string;
 }
@@ -47,6 +48,7 @@ export default function BoardMediaNodeShell({
   processingLabel,
   onSelectStackAsset,
   stackItems,
+  errorMessage,
   status,
   statusLabel,
 }: BoardMediaNodeShellProps) {
@@ -63,11 +65,13 @@ export default function BoardMediaNodeShell({
   const isProcessing = status === "pending" || status === "processing";
   const isFailed = status === "failed";
   const visualStatus = isFailed ? "failed" : isProcessing ? "processing" : status === "complete" ? "complete" : "idle";
+  const failedStatusTitle = statusLabel ?? t("mediaNode.taskFailed");
   const statusTitle = isFailed
-    ? statusLabel ?? t('mediaNode.taskFailed')
+    ? failedStatusTitle
     : status === "pending"
       ? t('mediaNode.taskQueued')
       : processingLabel ?? t('mediaNode.processing');
+  const statusTooltip = isFailed && errorMessage ? errorMessage : statusTitle;
 
   useEffect(() => {
     if (!shouldShowStackControls || (!isSelected && !isHovered && !hasFocusWithin)) setIsStackExpanded(false);
@@ -167,7 +171,7 @@ export default function BoardMediaNodeShell({
             <div className="absolute inset-0 flex items-center justify-center p-3">
               <div className="board-media-processing-pill imagine-motion-panel-reveal flex max-w-[calc(100%-24px)] items-center gap-2 rounded-full border border-white/15 bg-black/32 px-3 py-1.5 text-[11px] font-semibold text-white/90 shadow-lg backdrop-blur-md">
                 {isProcessing ? <Loader2 className="h-3.5 w-3.5 shrink-0 animate-spin" /> : <X className="h-3.5 w-3.5 shrink-0 text-[var(--iw-tone-danger-text)]" />}
-                <span className="truncate">{statusTitle}</span>
+                <span className="truncate" title={statusTooltip}>{statusTitle}</span>
               </div>
             </div>
             {isProcessing && onCancelProcessing && shouldShowNodeControls ? (
