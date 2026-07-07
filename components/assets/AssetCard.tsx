@@ -41,6 +41,25 @@ import {
   workbenchCardActionClassName,
 } from "@/components/workbench/OperationControls";
 
+function AssetMetaErrorChip({ message }: { message: string }) {
+  const [expanded, setExpanded] = useState(false);
+  return (
+    <button
+      type="button"
+      className={`imagine-tone-chip max-w-[160px] text-[10px] ${expanded ? "" : "truncate"}`}
+      data-expanded={expanded ? "true" : "false"}
+      data-tone="danger"
+      title={expanded ? undefined : message}
+      onClick={event => {
+        event.stopPropagation();
+        setExpanded(current => !current);
+      }}
+    >
+      last error: {message}
+    </button>
+  );
+}
+
 type AssetSelectionEvent = { shiftKey?: boolean };
 
 interface AssetCardProps {
@@ -683,11 +702,7 @@ export default function AssetCard({
           <span className="imagine-meta-chip imagine-status-chip" data-status={item.status}>
             {item.status}
           </span>
-          {item.errorMessage && (
-            <span className="imagine-tone-chip max-w-[160px] truncate text-[10px]" data-tone="danger" title={item.errorMessage}>
-              last error: {item.errorMessage}
-            </span>
-          )}
+          {item.errorMessage ? <AssetMetaErrorChip message={item.errorMessage} /> : null}
           <span className="imagine-meta-chip imagine-meta-chip-time ml-auto shrink-0 tabular-nums">
             {formatCreatedAt(item.createdAt)}
           </span>

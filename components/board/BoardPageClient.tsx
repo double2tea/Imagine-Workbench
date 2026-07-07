@@ -30,6 +30,7 @@ import BoardTaskQueuePanel from "@/components/board/BoardTaskQueuePanel";
 import BoardWorkspace from "@/components/board/BoardWorkspace";
 import SettingsModal from "@/components/settings/SettingsModal";
 import WorkspaceNotices, { type WorkspaceNotice } from "@/components/workbench/WorkspaceNotices";
+import { useWorkbenchThemeShellSync } from "@/lib/theme-mode";
 import type { AgentBoardContext, AgentBoardContextSnapshot, AgentBoardNodeDetail, AgentBoardNodeParams, AgentBoardNodeSummary } from "@/lib/agent-context";
 import { getSendableAgentMediaReferences, isSendableAgentMediaReference, type AgentReferenceInputSupport } from "@/lib/agent-chat-model";
 
@@ -1700,6 +1701,7 @@ function boardSummaryFromDocument(board: BoardDocument): BoardSummary {
 }
 
 export default function BoardPage({ boardId = DEFAULT_BOARD_ID }: BoardPageProps) {
+  useWorkbenchThemeShellSync();
   const { t, locale } = useTranslations();
   const { t: creationT } = useTranslations("creation");
   const router = useRouter();

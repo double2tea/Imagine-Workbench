@@ -81,6 +81,13 @@ export function useThemeMode(): { themeMode: ThemeMode; toggleThemeMode: () => v
 }
 
 /** For React Flow colorMode and other surfaces that need React state on theme change. */
+/** Re-apply shell theme classes when a route mounts another `.imagine-workbench-shell`. */
+export function useWorkbenchThemeShellSync(): void {
+  useLayoutEffect(() => {
+    applyThemeClassesToDom(resolveThemeMode());
+  }, []);
+}
+
 export function useThemeModeSnapshot(): ThemeMode {
   const [themeMode, setThemeMode] = useState<ThemeMode>(DEFAULT_THEME);
 

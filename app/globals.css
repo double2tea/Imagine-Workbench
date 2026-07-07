@@ -2855,6 +2855,16 @@ html[data-imagine-theme="light"] .imagine-root-body {
 
 .board-task-error {
   max-height: 1.25rem;
+  cursor: pointer;
+}
+
+.board-task-error[data-expanded="true"],
+.imagine-tone-chip[data-expanded="true"] {
+  max-height: none;
+  max-width: none;
+  overflow: visible;
+  white-space: normal;
+  text-overflow: clip;
 }
 
 .board-media-top-actions {

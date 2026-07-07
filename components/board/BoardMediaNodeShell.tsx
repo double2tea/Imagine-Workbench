@@ -58,6 +58,7 @@ export default function BoardMediaNodeShell({
   const [isHovered, setIsHovered] = useState(false);
   const [hasFocusWithin, setHasFocusWithin] = useState(false);
   const [isStackExpanded, setIsStackExpanded] = useState(false);
+  const [failedErrorExpanded, setFailedErrorExpanded] = useState(false);
   const hasStackSwitcher = stackItems.length > 1;
   const shouldShowNodeControls = !isBatchSelectionActive;
   const shouldMountActionBar = shouldShowNodeControls && (isSelected || isHovered || hasFocusWithin);
@@ -71,11 +72,16 @@ export default function BoardMediaNodeShell({
     : status === "pending"
       ? t('mediaNode.taskQueued')
       : processingLabel ?? t('mediaNode.processing');
-  const statusTooltip = isFailed && errorMessage ? errorMessage : statusTitle;
+  const statusTooltip = isFailed && errorMessage && !failedErrorExpanded ? errorMessage : statusTitle;
+  const failedDisplayText = isFailed && failedErrorExpanded && errorMessage ? errorMessage : statusTitle;
 
   useEffect(() => {
     if (!shouldShowStackControls || (!isSelected && !isHovered && !hasFocusWithin)) setIsStackExpanded(false);
   }, [hasFocusWithin, isHovered, isSelected, shouldShowStackControls]);
+
+  useEffect(() => {
+    if (!isFailed) setFailedErrorExpanded(false);
+  }, [isFailed]);
 
   const handleSelectStackAsset = (assetId: string) => {
     onSelectStackAsset?.(assetId);
@@ -169,9 +175,26 @@ export default function BoardMediaNodeShell({
               </>
             )}
             <div className="absolute inset-0 flex items-center justify-center p-3">
-              <div className="board-media-processing-pill imagine-motion-panel-reveal flex max-w-[calc(100%-24px)] items-center gap-2 rounded-full border border-white/15 bg-black/32 px-3 py-1.5 text-[11px] font-semibold text-white/90 shadow-lg backdrop-blur-md">
+              <div
+                className={`board-media-processing-pill imagine-motion-panel-reveal flex max-w-[calc(100%-24px)] items-center gap-2 rounded-full border border-white/15 bg-black/32 px-3 py-1.5 text-[11px] font-semibold text-white/90 shadow-lg backdrop-blur-md ${isFailed && errorMessage ? "pointer-events-auto cursor-pointer" : ""}`}
+                data-expanded={failedErrorExpanded ? "true" : "false"}
+                role={isFailed && errorMessage ? "button" : undefined}
+                tabIndex={isFailed && errorMessage ? 0 : undefined}
+                title={statusTooltip}
+                onClick={isFailed && errorMessage ? (event) => {
+                  event.stopPropagation();
+                  setFailedErrorExpanded(current => !current);
+                } : undefined}
+                onKeyDown={isFailed && errorMessage ? (event) => {
+                  if (event.key === "Enter" || event.key === " ") {
+                    event.preventDefault();
+                    event.stopPropagation();
+                    setFailedErrorExpanded(current => !current);
+                  }
+                } : undefined}
+              >
                 {isProcessing ? <Loader2 className="h-3.5 w-3.5 shrink-0 animate-spin" /> : <X className="h-3.5 w-3.5 shrink-0 text-[var(--iw-tone-danger-text)]" />}
-                <span className="truncate" title={statusTooltip}>{statusTitle}</span>
+                <span className={`min-w-0 ${failedErrorExpanded ? "whitespace-normal" : "truncate"}`}>{failedDisplayText}</span>
               </div>
             </div>
             {isProcessing && onCancelProcessing && shouldShowNodeControls ? (

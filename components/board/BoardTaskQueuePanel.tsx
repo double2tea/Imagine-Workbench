@@ -6,6 +6,7 @@ import type { BoardEdge, BoardNode } from "@/lib/board";
 import { findConnectedResultNodeForSourceStack, isResultSourceNode } from "@/lib/board/utils";
 import type { StorageItem } from "@/lib/db";
 import type { GenerationTask } from "@/lib/generation-tasks";
+import TruncatableErrorText from "@/components/workbench/TruncatableErrorText";
 import { useTranslations } from "@/lib/i18n";
 
 interface BoardTaskQueuePanelProps {
@@ -117,13 +118,11 @@ function TaskRow({
       {showErrorSlot ? (
         <div className="board-task-error-slot mt-2">
           {task.errorMessage ? (
-            <p
+            <TruncatableErrorText
               className="board-task-error imagine-tone-surface truncate rounded-md border px-2 py-1 text-[10px] leading-4"
               data-tone="danger"
-              title={task.errorMessage}
-            >
-              {task.errorMessage}
-            </p>
+              message={task.errorMessage}
+            />
           ) : null}
         </div>
       ) : null}

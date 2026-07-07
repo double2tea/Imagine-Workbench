@@ -1,6 +1,7 @@
 'use client';
 
 import React, { useCallback, useMemo, useState, useEffect, useRef } from "react";
+import { useWorkbenchThemeShellSync } from "@/lib/theme-mode";
 import { createPortal } from "react-dom";
 import { useConfirm } from "@/components/confirm/ConfirmProvider";
 import AgentDock from "@/components/agent/AgentDock";
@@ -286,6 +287,7 @@ function modelProviderIsAvailable(
 }
 
 export default function Home() {
+  useWorkbenchThemeShellSync();
   const { t, locale } = useTranslations();
   const { t: creationT } = useTranslations("creation");
   const isDesktopLayout = useDesktopLayout();

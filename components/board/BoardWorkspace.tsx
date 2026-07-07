@@ -668,7 +668,6 @@ const BoardEdgeComponent = memo(function BoardEdgeComponent({
 });
 
 const edgeTypes = { smoothstep: BoardEdgeComponent };
-const reactFlowConnectionLineStyle = { stroke: "#60a5fa", strokeDasharray: "7 5", strokeWidth: 2 };
 const reactFlowDefaultEdgeOptions = { type: "smoothstep" };
 const reactFlowDeleteKeyCode = ["Backspace", "Delete"];
 const reactFlowPanOnDrag = [1, 2];
@@ -1597,7 +1596,19 @@ export default function BoardWorkspace({
     ? "w-[330px]"
     : "w-[240px]";
   const viewportRef = useRef<BoardViewport>(board.viewport);
-  const mobileViewportFittedBoardIdRef = useRef<string | null>(null);
+  const mobileViewportFittedGraphKeyRef = useRef<string | null>(null);
+  const boardGraphContentKey = useMemo(
+    () => buildBoardGraphContentKey(board.nodes, board.edges),
+    [board.nodes, board.edges],
+  );
+  const reactFlowConnectionLineStyle = useMemo(
+    () => ({
+      stroke: getBoardVar("--iw-board-edge-reference", "#60a5fa"),
+      strokeDasharray: "7 5",
+      strokeWidth: 2,
+    }),
+    [themeMode],
+  );
   const setFlowHostRef = useCallback((element: HTMLElement | null): void => {
     flowHostRef.current = element;
   }, []);
@@ -1614,17 +1625,14 @@ export default function BoardWorkspace({
     const instance = flowInstanceRef.current;
     if (!instance || !flowReady || board.nodes.length === 0) return;
     if (typeof window === "undefined" || window.innerWidth >= 1024) return;
-    if (mobileViewportFittedBoardIdRef.current === board.id) return;
-    mobileViewportFittedBoardIdRef.current = board.id;
+    const fitKey = `${board.id}:${boardGraphContentKey}`;
+    if (mobileViewportFittedGraphKeyRef.current === fitKey) return;
+    mobileViewportFittedGraphKeyRef.current = fitKey;
     const frameId = window.requestAnimationFrame(() => {
       void instance.fitView({ padding: 0.2, duration: 0, maxZoom: 0.72 });
     });
     return () => window.cancelAnimationFrame(frameId);
-  }, [board.id, board.nodes.length, flowReady]);
-  const boardGraphContentKey = useMemo(
-    () => buildBoardGraphContentKey(board.nodes, board.edges),
-    [board.nodes, board.edges],
-  );
+  }, [board.id, board.nodes.length, boardGraphContentKey, flowReady]);
   const boardPromptReferenceGraphIndex = useMemo(
     () => buildBoardPromptReferenceGraphIndex(board.nodes, board.edges),
     // graph key includes node content and edge order; positions do not affect reference resolution
@@ -3676,8 +3684,8 @@ export default function BoardWorkspace({
             {shouldRenderMiniMap && (
               <MiniMap
                 className="imagine-board-minimap"
-                nodeColor={getBoardVar("--iw-board-minimap-node", themeMode === "light" ? "#1e40af" : "#1d4ed8")}
-                maskColor={getBoardVar("--iw-board-minimap-mask", themeMode === "light" ? "rgba(241, 245, 249, 0.75)" : "rgba(2,6,23,0.66)")}
+                nodeColor={getBoardVar("--iw-board-minimap-node", "#1d4ed8")}
+                maskColor={getBoardVar("--iw-board-minimap-mask", "rgba(2,6,23,0.66)")}
                 pannable
                 zoomable
               />
