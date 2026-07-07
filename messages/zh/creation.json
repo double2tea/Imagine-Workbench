@@ -249,7 +249,20 @@
   "parameters": {
     "defaultTitle": "模型高级参数",
     "clearButton": "清空",
-    "uploadLabel": "上传"
+    "uploadLabel": "上传",
+    "seedAudio": {
+      "sampleRate": "采样率",
+      "speechRate": "语速",
+      "loudness": "响度",
+      "pitch": "音高",
+      "subtitle": "字幕",
+      "aigcWatermark": "AIGC 水印",
+      "aigcMetadata": "AIGC 元数据",
+      "contentProducer": "内容生产方",
+      "produceId": "生产 ID",
+      "contentPropagator": "内容传播方",
+      "propagateId": "传播 ID"
+    }
   },
   "promptTemplates": {
     "panelTitle": "提示词模板库",

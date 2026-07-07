@@ -38,6 +38,7 @@ interface ModelParameterDescriptorBase {
   key: string;
   kind: ModelParameterKind;
   label: string;
+  labelKey?: string;
   group: ModelParameterGroup;
   providerField?: string;
   required?: boolean;

@@ -2220,6 +2220,7 @@
           "key": "sample_rate",
           "kind": "enum",
           "label": "Sample rate",
+          "labelKey": "parameters.seedAudio.sampleRate",
           "group": "advanced",
           "providerField": "audio_config.sample_rate",
           "defaultValue": "24000",
@@ -2257,6 +2258,7 @@
           "key": "speech_rate",
           "kind": "number",
           "label": "Speech rate",
+          "labelKey": "parameters.seedAudio.speechRate",
           "group": "advanced",
           "providerField": "audio_config.speech_rate",
           "defaultValue": 0,
@@ -2268,6 +2270,7 @@
           "key": "loudness_rate",
           "kind": "number",
           "label": "Loudness",
+          "labelKey": "parameters.seedAudio.loudness",
           "group": "advanced",
           "providerField": "audio_config.loudness_rate",
           "defaultValue": 0,
@@ -2279,6 +2282,7 @@
           "key": "pitch_rate",
           "kind": "number",
           "label": "Pitch",
+          "labelKey": "parameters.seedAudio.pitch",
           "group": "advanced",
           "providerField": "audio_config.pitch_rate",
           "defaultValue": 0,
@@ -2290,6 +2294,7 @@
           "key": "enable_subtitle",
           "kind": "boolean",
           "label": "Subtitle",
+          "labelKey": "parameters.seedAudio.subtitle",
           "group": "advanced",
           "providerField": "audio_config.enable_subtitle",
           "defaultValue": false
@@ -2298,6 +2303,7 @@
           "key": "aigc_watermark",
           "kind": "boolean",
           "label": "AIGC watermark",
+          "labelKey": "parameters.seedAudio.aigcWatermark",
           "group": "provider",
           "providerField": "watermark.aigc_watermark",
           "defaultValue": false
@@ -2306,6 +2312,7 @@
           "key": "aigc_metadata_enable",
           "kind": "boolean",
           "label": "AIGC metadata",
+          "labelKey": "parameters.seedAudio.aigcMetadata",
           "group": "provider",
           "providerField": "watermark.aigc_metadata.enable",
           "defaultValue": false
@@ -2314,6 +2321,7 @@
           "key": "aigc_metadata_content_producer",
           "kind": "text",
           "label": "Content producer",
+          "labelKey": "parameters.seedAudio.contentProducer",
           "group": "provider",
           "providerField": "watermark.aigc_metadata.content_producer",
           "maxLength": 128
@@ -2322,6 +2330,7 @@
           "key": "aigc_metadata_produce_id",
           "kind": "text",
           "label": "Produce ID",
+          "labelKey": "parameters.seedAudio.produceId",
           "group": "provider",
           "providerField": "watermark.aigc_metadata.produce_id",
           "maxLength": 128
@@ -2330,6 +2339,7 @@
           "key": "aigc_metadata_content_propagator",
           "kind": "text",
           "label": "Content propagator",
+          "labelKey": "parameters.seedAudio.contentPropagator",
           "group": "provider",
           "providerField": "watermark.aigc_metadata.content_propagator",
           "maxLength": 128
@@ -2338,6 +2348,7 @@
           "key": "aigc_metadata_propagate_id",
           "kind": "text",
           "label": "Propagate ID",
+          "labelKey": "parameters.seedAudio.propagateId",
           "group": "provider",
           "providerField": "watermark.aigc_metadata.propagate_id",
           "maxLength": 128

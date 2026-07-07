@@ -249,7 +249,20 @@
   "parameters": {
     "defaultTitle": "Advanced Model Parameters",
     "clearButton": "Clear",
-    "uploadLabel": "Upload"
+    "uploadLabel": "Upload",
+    "seedAudio": {
+      "sampleRate": "Sample rate",
+      "speechRate": "Speech rate",
+      "loudness": "Loudness",
+      "pitch": "Pitch",
+      "subtitle": "Subtitle",
+      "aigcWatermark": "AIGC watermark",
+      "aigcMetadata": "AIGC metadata",
+      "contentProducer": "Content producer",
+      "produceId": "Produce ID",
+      "contentPropagator": "Content propagator",
+      "propagateId": "Propagate ID"
+    }
   },
   "promptTemplates": {
     "panelTitle": "Prompt Template Library",

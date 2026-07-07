@@ -2,7 +2,7 @@
 
 import type { ChangeEvent } from "react";
 import { ImagePlus, X } from "lucide-react";
-import { useTranslations } from "@/lib/i18n";
+import { useTranslations, type TFunction } from "@/lib/i18n";
 import {
   mediaReferenceTypeFromMime,
   type MediaReferenceType,
@@ -49,17 +49,20 @@ export default function CapabilityParameterControls({
         <span className={compact ? "imagine-capability-field-label" : "imagine-section-label"}>{resolvedTitle}</span>
         {booleanDescriptors.length > 0 && (
           <div className="flex flex-wrap items-center justify-end gap-2">
-            {booleanDescriptors.map(descriptor => (
-              <label key={descriptor.key} className={`imagine-inline-chip-toggle${compact ? " h-6 px-2 text-[9px]" : ""}`}>
-                <input
-                  type="checkbox"
-                  checked={readBooleanValue(value, descriptor)}
-                  onChange={event => patchValue(descriptor.key, event.target.checked)}
-                  className="imagine-capability-checkbox"
-                />
-                {descriptor.label}
-              </label>
-            ))}
+            {booleanDescriptors.map(descriptor => {
+              const label = parameterLabel(descriptor, t);
+              return (
+                <label key={descriptor.key} className={`imagine-inline-chip-toggle${compact ? " h-6 px-2 text-[9px]" : ""}`}>
+                  <input
+                    type="checkbox"
+                    checked={readBooleanValue(value, descriptor)}
+                    onChange={event => patchValue(descriptor.key, event.target.checked)}
+                    className="imagine-capability-checkbox"
+                  />
+                  {label}
+                </label>
+              );
+            })}
           </div>
         )}
       </div>
@@ -67,12 +70,14 @@ export default function CapabilityParameterControls({
       {fieldDescriptors.length > 0 && (
         <div className={compact ? "grid grid-cols-2 gap-2" : "grid gap-3 sm:grid-cols-2"}>
           {fieldDescriptors.map(descriptor => {
+            const label = parameterLabel(descriptor, t);
             if (descriptor.kind === "number") {
               return (
                 <NumberParameterControl
                   key={descriptor.key}
                   compact={compact}
                   descriptor={descriptor}
+                  label={label}
                   value={readNumberValue(value, descriptor)}
                   onChange={nextValue => patchValue(descriptor.key, nextValue)}
                 />
@@ -81,7 +86,7 @@ export default function CapabilityParameterControls({
             if (descriptor.kind === "enum") {
               return (
                 <label key={descriptor.key} className={`imagine-capability-slider${compact ? " imagine-capability-slider--compact" : ""}`}>
-                  <span className="imagine-capability-field-label">{descriptor.label}</span>
+                  <span className="imagine-capability-field-label">{label}</span>
                   <select
                     value={readStringValue(value, descriptor.key, descriptor.defaultValue ?? "")}
                     onChange={event => patchValue(descriptor.key, event.target.value)}
@@ -96,7 +101,7 @@ export default function CapabilityParameterControls({
             }
             return (
               <label key={descriptor.key} className={`imagine-capability-slider${compact ? " imagine-capability-slider--compact" : ""}`}>
-                <span className="imagine-capability-field-label">{descriptor.label}</span>
+                <span className="imagine-capability-field-label">{label}</span>
                 <input
                   type="text"
                   maxLength={descriptor.maxLength}
@@ -150,14 +155,20 @@ function readReferenceValue(
   return Array.isArray(current) ? current : [];
 }
 
+function parameterLabel(descriptor: Pick<ModelParameterDescriptor, "label" | "labelKey">, t: TFunction): string {
+  return descriptor.labelKey ? t(descriptor.labelKey) : descriptor.label;
+}
+
 function NumberParameterControl({
   compact,
   descriptor,
+  label,
   onChange,
   value,
 }: {
   compact: boolean;
   descriptor: Extract<ModelParameterDescriptor, { kind: "number" }>;
+  label: string;
   onChange: (value: number) => void;
   value: number;
 }) {
@@ -169,7 +180,7 @@ function NumberParameterControl({
   return (
     <label className={`imagine-capability-slider${compact ? " imagine-capability-slider--compact" : ""}`}>
       <span className={`flex items-center justify-between ${compact ? "gap-1" : "gap-2"}`}>
-        <span className="imagine-capability-field-label">{descriptor.label}</span>
+        <span className="imagine-capability-field-label">{label}</span>
         <input
           type="number"
           min={descriptor.min}
@@ -178,6 +189,7 @@ function NumberParameterControl({
           value={value}
           onChange={event => handleChange(event.target.value)}
           className={`imagine-capability-number${compact ? " imagine-capability-number--compact" : ""}`}
+          aria-label={label}
         />
       </span>
       <input
@@ -188,6 +200,7 @@ function NumberParameterControl({
         value={value}
         onChange={event => handleChange(event.target.value)}
         className="imagine-capability-range"
+        aria-label={label}
       />
     </label>
   );
@@ -206,6 +219,7 @@ function ReferenceParameterControl({
 }) {
   const { t } = useTranslations("creation");
   const reference = value[0];
+  const label = parameterLabel(descriptor, t);
   const accept = descriptor.mediaTypes.map(type => `${type}/*`).join(",");
 
   const handleUpload = (event: ChangeEvent<HTMLInputElement>): void => {
@@ -222,7 +236,7 @@ function ReferenceParameterControl({
   return (
     <div>
       <div className="mb-1.5 flex items-center justify-between gap-2">
-        <span className="imagine-capability-field-label">{descriptor.label}</span>
+        <span className="imagine-capability-field-label">{label}</span>
         {reference && (
           <button
             type="button"
@@ -247,7 +261,7 @@ function ReferenceParameterControl({
             type="button"
             onClick={() => onChange(undefined)}
             className="absolute right-1 top-1 z-10 rounded-md border border-[var(--iw-tone-danger-border)] bg-[var(--iw-tone-danger-bg)] p-1 text-[var(--iw-tone-danger-text)] transition hover:scale-105"
-            title={t("parameters.clearButton") + descriptor.label}
+            title={t("parameters.clearButton") + label}
           >
             <X className="h-3 w-3" />
           </button>
@@ -263,7 +277,7 @@ function ReferenceParameterControl({
             type="file"
             name={`capability-${descriptor.key}-upload`}
             accept={accept}
-            aria-label={t("parameters.uploadLabel") + descriptor.label}
+            aria-label={t("parameters.uploadLabel") + label}
             onChange={handleUpload}
             className="hidden"
           />

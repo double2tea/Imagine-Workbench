@@ -138,6 +138,7 @@ test("Volcengine providers expose scoped capabilities", () => {
   assert.equal(capability.parameterDescriptors.some(descriptor => descriptor.key === "sample_rate"), true);
   assert.equal(capability.parameterDescriptors.some(descriptor => descriptor.key === "enable_subtitle"), true);
   assert.equal(capability.parameterDescriptors.some(descriptor => descriptor.key === "aigc_watermark"), true);
+  assert.equal(capability.parameterDescriptors.every(descriptor => descriptor.labelKey?.startsWith("parameters.seedAudio.")), true);
 });
 
 test("model capability catalog fails fast on invalid provider keys", () => {
