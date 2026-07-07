@@ -627,7 +627,7 @@ export default function Home() {
     : audioFormatOptions[0]?.value ?? "";
   useEffect(() => {
     setAudioParameterValues(current => pruneCapabilityParameterValues(audioCapabilities.parameterDescriptors, current));
-  }, [audioCapabilities.parameterDescriptors, selectedAudioModel]);
+  }, [selectedAudioModel]);
   const activeImageResolution = isCustomImageSize ? customImageSize.trim() : imageResolution;
   const activeImageQuality = imageCapabilities.qualities.some(option => option.value === imageQuality) ? imageQuality : undefined;
   const activeVideoSize = videoCapabilities.sizes.some(option => option.value === aspectRatio) ? aspectRatio : "auto";

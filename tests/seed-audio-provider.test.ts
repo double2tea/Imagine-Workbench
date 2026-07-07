@@ -194,6 +194,32 @@ test("Seed Audio rejects mixed image and audio references before fetch", async (
   }
 });
 
+test("Seed Audio rejects voice clone without audio reference or speaker before fetch", async () => {
+  const originalFetch = globalThis.fetch;
+  let fetchCount = 0;
+  globalThis.fetch = async (): Promise<Response> => {
+    fetchCount += 1;
+    throw new Error("Missing clone audio must be rejected before fetch");
+  };
+
+  try {
+    await assert.rejects(
+      () => generateSeedAudio(seedAudioConfig, {
+        mode: "voice_clone",
+        prompt: "Clone this voice.",
+        model: "seed-audio-1.0",
+        referenceMedia: [{ dataUri: "data:image/png;base64,scene_image", type: "image" }],
+        format: "wav",
+        voiceCloneConsentAccepted: true,
+      }),
+      /voice clone requires an audio reference or speaker ID/,
+    );
+    assert.equal(fetchCount, 0);
+  } finally {
+    globalThis.fetch = originalFetch;
+  }
+});
+
 test("Seed Audio rejects reference payloads larger than 10MB before fetch", async () => {
   const originalFetch = globalThis.fetch;
   let fetchCount = 0;

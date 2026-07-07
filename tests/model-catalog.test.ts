@@ -31,6 +31,7 @@ import { DEFAULT_CINEMATIC_PROFILE } from "../lib/cinematic-controls";
 import {
   defaultCapabilityParameterValues,
   inputModalitiesReferenceCountRange,
+  pruneCapabilityParameterValues,
   validateCapabilityParameterValues,
   validateInputModalityReferences,
 } from "../lib/providers/model-capabilities";
@@ -965,6 +966,23 @@ test("runninghub youchuan descriptors expose version-specific fields", () => {
   assert.throws(
     () => validateCapabilityParameterValues(v81.parameterDescriptors, { "runninghub.youchuan.weird": 1 }),
     /not supported/,
+  );
+});
+
+test("pruneCapabilityParameterValues preserves unchanged object identity", () => {
+  const v7 = getImageModelCapabilities("runninghub:api:/openapi/v2/youchuan/text-to-image-v7");
+  const values = {
+    "runninghub.youchuan.chaos": 8,
+    "runninghub.youchuan.raw": true,
+  };
+
+  assert.equal(pruneCapabilityParameterValues(v7.parameterDescriptors, values), values);
+  assert.deepEqual(
+    pruneCapabilityParameterValues(v7.parameterDescriptors, {
+      ...values,
+      unsupported: "drop",
+    }),
+    values,
   );
 });
 

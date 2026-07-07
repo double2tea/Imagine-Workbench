@@ -282,10 +282,15 @@ export function pruneCapabilityParameterValues(
 ): ModelParameterValues {
   const allowedKeys = new Set(descriptors.map(descriptor => descriptor.key));
   const next: ModelParameterValues = {};
+  let changed = false;
   for (const [key, value] of Object.entries(values)) {
-    if (allowedKeys.has(key) && value !== undefined) next[key] = value;
+    if (allowedKeys.has(key) && value !== undefined) {
+      next[key] = value;
+    } else {
+      changed = true;
+    }
   }
-  return next;
+  return changed ? next : values;
 }
 
 export function validateCapabilityParameterValues(

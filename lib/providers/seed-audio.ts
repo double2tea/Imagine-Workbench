@@ -104,6 +104,9 @@ function seedAudioReferences(input: GenerateAudioOperationInput): SeedAudioRefer
   if (imageReferences.length > 1) {
     throw new Error("Seed Audio supports at most one image reference");
   }
+  if (input.mode === "voice_clone" && audioReferences.length === 0 && !speaker) {
+    throw new Error("Seed Audio voice clone requires an audio reference or speaker ID");
+  }
   if (imageReferences.length === 1) {
     return [{ image_data: referenceBase64(imageReferences[0]) }];
   }
@@ -115,9 +118,6 @@ function seedAudioReferences(input: GenerateAudioOperationInput): SeedAudioRefer
   }
   if (references.length > 3) {
     throw new Error("Seed Audio supports at most three audio references including speaker IDs");
-  }
-  if (input.mode === "voice_clone" && references.length === 0) {
-    throw new Error("Seed Audio voice clone requires an audio reference or speaker ID");
   }
   return references;
 }
