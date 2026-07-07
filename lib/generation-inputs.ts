@@ -12,6 +12,7 @@ import type {
   ModelKind,
   VideoReferenceMode,
 } from "./providers/model-catalog";
+import type { ModelParameterValues } from "./providers/model-capabilities";
 import {
   getModelCapability,
   MODEL_CAPABILITY_CATALOG_VERSION,
@@ -76,6 +77,7 @@ export interface GenerationInputModelControls {
   videoResolution?: string;
   audioFormat?: string;
   audioMode?: GenerationRequestSnapshot["audioMode"];
+  parameterValues?: ModelParameterValues;
   audioStylePrompt?: string;
   asrLanguage?: GenerationRequestSnapshot["asrLanguage"];
   optimizeTextPreview?: boolean;
@@ -189,6 +191,7 @@ export function generationInputModelControlsFromRequest(
     videoResolution: request.videoResolution,
     audioFormat: request.audioFormat,
     audioMode: request.audioMode,
+    parameterValues: request.parameterValues,
     audioStylePrompt: request.audioStylePrompt,
     asrLanguage: request.asrLanguage,
     optimizeTextPreview: request.optimizeTextPreview,

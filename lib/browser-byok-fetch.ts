@@ -21,7 +21,7 @@ import {
   getMediaReferenceType,
   type MediaReferenceType,
 } from "@/lib/media-references";
-import { validateInputModalityReferences, ModelCapabilityValidationError } from "@/lib/providers/model-capabilities";
+import { validateCapabilityParameterValues, validateInputModalityReferences, ModelCapabilityValidationError } from "@/lib/providers/model-capabilities";
 import {
   DEFAULT_CHAT_MODEL,
   DEFAULT_IMAGE_MODEL,
@@ -40,6 +40,7 @@ import { editImage, downloadImage, generateImage, getAsyncImageStatus } from "@/
 import { generateVideo, getVideoStatus, downloadVideo, cancelVideo } from "@/lib/providers/video";
 import { generateAudio, generateAudioOperation, getAudioStatus, downloadAudio } from "@/lib/providers/audio";
 import { listProviderModels, type ModelKindFilter } from "@/lib/providers/models";
+import { readModelParameterValues } from "@/lib/providers/parameter-values";
 import { fetchRunningHubAiAppSchema } from "@/lib/providers/runninghub-app";
 import { getRunningHubYouchuanCatalog } from "@/lib/providers/runninghub";
 import {
@@ -83,6 +84,7 @@ const audioGenerateBodySchema = z.object({
   voiceProfileId: z.string().trim().min(1).optional(),
   voiceCloneConsentAccepted: z.boolean().optional(),
   optimizeTextPreview: z.boolean().optional(),
+  parameterValues: z.unknown().optional(),
   referenceMedia: z.unknown().optional(),
   runningHubAccessPassword: z.unknown().optional(),
   runningHubNodeInfoList: z.unknown().optional(),
@@ -497,6 +499,7 @@ async function generateAudioOperationForBrowser(headers: Headers, body: unknown,
   const formatError = getReferenceMediaFormatError(referenceMedia);
   if (formatError) throw badRequest(formatError, "invalid_reference_media");
   validateInputModalityReferences(capability.inputModalities, referenceMedia);
+  const parameterValues = readAudioParameterValues(parsedBody.parameterValues, capability.parameterDescriptors);
   const payloadError = getReferenceMediaPayloadError(referenceMedia.map(reference => reference.dataUri));
   if (payloadError) throw payloadTooLarge(payloadError);
 
@@ -507,6 +510,7 @@ async function generateAudioOperationForBrowser(headers: Headers, body: unknown,
     referenceMedia,
     asrLanguage: parsedBody.asrLanguage,
     format: parsedBody.format,
+    parameterValues,
     stylePrompt: parsedBody.stylePrompt,
     voice: parsedBody.voice,
     voiceCloneConsentAccepted: parsedBody.voiceCloneConsentAccepted,
@@ -909,6 +913,20 @@ function getReferenceMediaFormatError(referenceMedia: ReferenceMedia[]): string 
     if (!actualType) return "Reference media must be data:image/*, data:video/* or data:audio/* base64 data URIs";
   }
   return null;
+}
+
+function readAudioParameterValues(
+  value: unknown,
+  descriptors: Parameters<typeof validateCapabilityParameterValues>[0],
+): ReturnType<typeof validateCapabilityParameterValues> {
+  try {
+    return validateCapabilityParameterValues(descriptors, readModelParameterValues(value));
+  } catch (error) {
+    if (error instanceof ModelCapabilityValidationError) {
+      throw badRequest(error.message, "invalid_audio_parameter");
+    }
+    throw error;
+  }
 }
 
 function readReferenceMode(value: unknown): "reference" | "firstLast" | undefined {

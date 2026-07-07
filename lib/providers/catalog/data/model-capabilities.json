@@ -2215,7 +2215,134 @@
           "maxTotalCount": 3
         }
       },
-      "parameterDescriptors": [],
+      "parameterDescriptors": [
+        {
+          "key": "sample_rate",
+          "kind": "enum",
+          "label": "Sample rate",
+          "group": "advanced",
+          "providerField": "audio_config.sample_rate",
+          "defaultValue": "24000",
+          "options": [
+            {
+              "value": "8000",
+              "label": "8 kHz"
+            },
+            {
+              "value": "16000",
+              "label": "16 kHz"
+            },
+            {
+              "value": "24000",
+              "label": "24 kHz"
+            },
+            {
+              "value": "32000",
+              "label": "32 kHz"
+            },
+            {
+              "value": "44100",
+              "label": "44.1 kHz"
+            },
+            {
+              "value": "48000",
+              "label": "48 kHz"
+            }
+          ],
+          "ui": {
+            "control": "select"
+          }
+        },
+        {
+          "key": "speech_rate",
+          "kind": "number",
+          "label": "Speech rate",
+          "group": "advanced",
+          "providerField": "audio_config.speech_rate",
+          "defaultValue": 0,
+          "min": -50,
+          "max": 100,
+          "step": 1
+        },
+        {
+          "key": "loudness_rate",
+          "kind": "number",
+          "label": "Loudness",
+          "group": "advanced",
+          "providerField": "audio_config.loudness_rate",
+          "defaultValue": 0,
+          "min": -50,
+          "max": 100,
+          "step": 1
+        },
+        {
+          "key": "pitch_rate",
+          "kind": "number",
+          "label": "Pitch",
+          "group": "advanced",
+          "providerField": "audio_config.pitch_rate",
+          "defaultValue": 0,
+          "min": -12,
+          "max": 12,
+          "step": 1
+        },
+        {
+          "key": "enable_subtitle",
+          "kind": "boolean",
+          "label": "Subtitle",
+          "group": "advanced",
+          "providerField": "audio_config.enable_subtitle",
+          "defaultValue": false
+        },
+        {
+          "key": "aigc_watermark",
+          "kind": "boolean",
+          "label": "AIGC watermark",
+          "group": "provider",
+          "providerField": "watermark.aigc_watermark",
+          "defaultValue": false
+        },
+        {
+          "key": "aigc_metadata_enable",
+          "kind": "boolean",
+          "label": "AIGC metadata",
+          "group": "provider",
+          "providerField": "watermark.aigc_metadata.enable",
+          "defaultValue": false
+        },
+        {
+          "key": "aigc_metadata_content_producer",
+          "kind": "text",
+          "label": "Content producer",
+          "group": "provider",
+          "providerField": "watermark.aigc_metadata.content_producer",
+          "maxLength": 128
+        },
+        {
+          "key": "aigc_metadata_produce_id",
+          "kind": "text",
+          "label": "Produce ID",
+          "group": "provider",
+          "providerField": "watermark.aigc_metadata.produce_id",
+          "maxLength": 128
+        },
+        {
+          "key": "aigc_metadata_content_propagator",
+          "kind": "text",
+          "label": "Content propagator",
+          "group": "provider",
+          "providerField": "watermark.aigc_metadata.content_propagator",
+          "maxLength": 128
+        },
+        {
+          "key": "aigc_metadata_propagate_id",
+          "kind": "text",
+          "label": "Propagate ID",
+          "group": "provider",
+          "providerField": "watermark.aigc_metadata.propagate_id",
+          "maxLength": 128
+        }
+      ],
       "pricing": {
         "status": "unpriced",
         "reason": "unverified"

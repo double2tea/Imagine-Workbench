@@ -72,6 +72,17 @@ test("Seed Audio prompt generation sends OpenSpeech create request", async () =>
       model: "seed-audio-1.0",
       referenceMedia: [],
       format: "mp3",
+      parameterValues: {
+        sample_rate: "44100",
+        speech_rate: 12,
+        loudness_rate: -4,
+        pitch_rate: 2,
+        enable_subtitle: true,
+        aigc_watermark: true,
+        aigc_metadata_enable: true,
+        aigc_metadata_content_producer: "Imagine Workbench",
+        aigc_metadata_produce_id: "asset-1",
+      },
       voice: "S_test_speaker",
     });
 
@@ -91,7 +102,22 @@ test("Seed Audio prompt generation sends OpenSpeech create request", async () =>
       model: "seed-audio-1.0",
       text_prompt: "生成一个清脆的金币音效。",
       references: [{ speaker: "S_test_speaker" }],
-      audio_config: { format: "mp3" },
+      audio_config: {
+        format: "mp3",
+        sample_rate: 44100,
+        speech_rate: 12,
+        loudness_rate: -4,
+        pitch_rate: 2,
+        enable_subtitle: true,
+      },
+      watermark: {
+        aigc_watermark: true,
+        aigc_metadata: {
+          enable: true,
+          content_producer: "Imagine Workbench",
+          produce_id: "asset-1",
+        },
+      },
     });
   } finally {
     globalThis.fetch = originalFetch;
@@ -161,6 +187,33 @@ test("Seed Audio rejects mixed image and audio references before fetch", async (
         format: "wav",
       }),
       /cannot be mixed/,
+    );
+    assert.equal(fetchCount, 0);
+  } finally {
+    globalThis.fetch = originalFetch;
+  }
+});
+
+test("Seed Audio rejects reference payloads larger than 10MB before fetch", async () => {
+  const originalFetch = globalThis.fetch;
+  let fetchCount = 0;
+  globalThis.fetch = async (): Promise<Response> => {
+    fetchCount += 1;
+    throw new Error("Oversized references must be rejected before fetch");
+  };
+
+  try {
+    const oversizedBase64 = "a".repeat(Math.ceil(((10 * 1024 * 1024) + 1) * 4 / 3));
+    await assert.rejects(
+      () => generateSeedAudio(seedAudioConfig, {
+        mode: "voice_clone",
+        prompt: "Say hello.",
+        model: "seed-audio-1.0",
+        referenceMedia: [{ dataUri: `data:audio/wav;base64,${oversizedBase64}`, type: "audio" }],
+        format: "wav",
+        voiceCloneConsentAccepted: true,
+      }),
+      /at most 10MB/,
     );
     assert.equal(fetchCount, 0);
   } finally {

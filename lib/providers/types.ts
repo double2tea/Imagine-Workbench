@@ -1,4 +1,5 @@
 import type { AiProvider, AudioOperationMode, AudioOutputKind, VideoReferenceMode } from "./model-catalog";
+import type { ModelParameterValues } from "./model-capabilities";
 import type { MediaReferenceType } from "@/lib/media-references";
 
 export interface ProviderCredentials {
@@ -126,6 +127,7 @@ export interface GenerateAudioOperationInput extends GenerateAudioInput {
   asrLanguage?: MimoAsrLanguage;
   mode: AudioOperationMode;
   format?: string;
+  parameterValues?: ModelParameterValues;
   stylePrompt?: string;
   voice?: string;
   voiceProfileId?: string;

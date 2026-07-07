@@ -3,6 +3,7 @@ import { AudioLines, Pencil, Trash2 } from "lucide-react";
 import { useTranslations } from "@/lib/i18n";
 import VoiceProfilePreviewPlayer from "@/components/audio/VoiceProfilePreviewPlayer";
 import { useConfirm } from "@/components/confirm/ConfirmProvider";
+import CapabilityParameterControls from "@/components/creation/CapabilityParameterControls";
 import CreatorGenerateButton from "@/components/creation/CreatorGenerateButton";
 import PromptComposerSurface, { type PromptComposerSelectionRange } from "@/components/creation/PromptComposerSurface";
 import PromptComposerToolbarActions from "@/components/creation/PromptComposerToolbarActions";
@@ -31,6 +32,7 @@ import {
 import { getMediaReferenceType } from "@/lib/media-references";
 import { getAssetMetasByIds, hydrateAssets } from "@/lib/db";
 import { getAudioModelCapabilities, parseProviderModel, type AudioModelCapabilities, type AudioOperationMode } from "@/lib/providers/model-catalog";
+import type { ModelParameterValues } from "@/lib/providers/model-capabilities";
 import {
   VOICE_PROFILES_CHANGED_EVENT,
   VOICE_PROFILE_TAG_GROUPS,
@@ -53,6 +55,7 @@ interface AudioGenerationPanelProps {
   isSubmitting: boolean;
   mode: AudioOperationMode;
   modelGroups: ModelOptionGroup[];
+  parameterValues: ModelParameterValues;
   prompt: string;
   referenceImages: ReferenceImageRef[];
   selectedFormat: string;
@@ -65,6 +68,7 @@ interface AudioGenerationPanelProps {
   onClearReferences: () => void;
   onGenerate: () => void;
   onOptimizePrompt: () => void;
+  onParameterValuesChange: (value: ModelParameterValues) => void;
   onPromptChange: (value: string) => void;
   onPromptDropAsset: (event: DragEvent<HTMLTextAreaElement>) => void;
   onReferenceDropAsset: (asset: DraggedReferenceAsset) => void;
@@ -90,6 +94,7 @@ export default function AudioGenerationPanel({
   isSubmitting,
   mode,
   modelGroups,
+  parameterValues,
   prompt,
   referenceImages,
   selectedFormat,
@@ -102,6 +107,7 @@ export default function AudioGenerationPanel({
   onClearReferences,
   onGenerate,
   onOptimizePrompt,
+  onParameterValuesChange,
   onPromptChange,
   onPromptDropAsset,
   onReferenceDropAsset,
@@ -435,6 +441,12 @@ export default function AudioGenerationPanel({
           </div>
         )}
       </div>
+
+      <CapabilityParameterControls
+        descriptors={capabilities.parameterDescriptors}
+        value={parameterValues}
+        onChange={onParameterValuesChange}
+      />
 
       <ReferenceImagePicker
         acceptedMediaTypes={acceptedMediaTypes}

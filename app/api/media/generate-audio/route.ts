@@ -5,9 +5,10 @@ import { apiErrorResponse, badRequest, requireApiText } from "@/lib/api/errors";
 import { isRunningHubWorkflowAudioTarget } from "@/lib/audio-generation-routing";
 import { readOptionalAudioFormat } from "@/lib/audio-operation-rules";
 import { mediaReferenceTypeFromBase64DataUri } from "@/lib/media-references";
-import { ModelCapabilityValidationError, validateInputModalityReferences } from "@/lib/providers/model-capabilities";
+import { ModelCapabilityValidationError, validateCapabilityParameterValues, validateInputModalityReferences } from "@/lib/providers/model-capabilities";
 import { generateAudioOperation } from "@/lib/providers/audio";
 import { getOptionalModelCapability, parseProviderModel, ProviderModelParseError } from "@/lib/providers/model-catalog";
+import { readModelParameterValues } from "@/lib/providers/parameter-values";
 import { readRunningHubNodeInfoList } from "@/lib/providers/runninghub-node-info";
 import type { ReferenceMedia } from "@/lib/providers/types";
 import { resolveProviderConfigForRequest } from "@/lib/providers/team-config";
@@ -27,6 +28,7 @@ const audioGenerateBodySchema = z.object({
   voiceProfileId: z.string().trim().min(1).optional(),
   voiceCloneConsentAccepted: z.boolean().optional(),
   optimizeTextPreview: z.boolean().optional(),
+  parameterValues: z.unknown().optional(),
   referenceMedia: z.unknown().optional(),
   runningHubAccessPassword: z.unknown().optional(),
   runningHubNodeInfoList: z.unknown().optional(),
@@ -62,6 +64,7 @@ export async function POST(req: NextRequest) {
     const formatError = getReferenceMediaFormatError(referenceMedia);
     if (formatError) throw badRequest(formatError, "invalid_reference_media");
     validateInputModalityReferences(capability.inputModalities, referenceMedia);
+    const parameterValues = readAudioParameterValues(body.parameterValues, capability.parameterDescriptors);
     const payloadError = getReferenceMediaPayloadError(referenceMedia.map(reference => reference.dataUri));
     if (payloadError) return NextResponse.json({ error: payloadError, code: "payload_too_large" }, { status: 413 });
 
@@ -73,6 +76,7 @@ export async function POST(req: NextRequest) {
       referenceMedia,
       asrLanguage: body.asrLanguage,
       format: body.format,
+      parameterValues,
       stylePrompt: body.stylePrompt,
       voice: body.voice,
       voiceCloneConsentAccepted: body.voiceCloneConsentAccepted,
@@ -133,4 +137,18 @@ function getReferenceMediaFormatError(referenceMedia: ReferenceMedia[]): string 
     if (!actualType) return "Audio reference media must be data:image/*, data:video/* or data:audio/* base64 data URIs";
   }
   return null;
+}
+
+function readAudioParameterValues(
+  value: unknown,
+  descriptors: Parameters<typeof validateCapabilityParameterValues>[0],
+): ReturnType<typeof validateCapabilityParameterValues> {
+  try {
+    return validateCapabilityParameterValues(descriptors, readModelParameterValues(value));
+  } catch (error) {
+    if (error instanceof ModelCapabilityValidationError) {
+      throw badRequest(error.message, "invalid_audio_parameter");
+    }
+    throw error;
+  }
 }

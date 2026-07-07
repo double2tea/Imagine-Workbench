@@ -6,6 +6,7 @@ import {
 } from "./media-references";
 import type { AudioOperationMode } from "./providers/model-catalog";
 import type { CinematicProfile } from "./cinematic-controls";
+import type { ModelParameterValues } from "./providers/model-capabilities";
 import type { RunningHubTaskNodeBinding, RunningHubYouchuanAdvancedSettings } from "./providers/types";
 
 const DB_NAME = "ImagineWorkbenchDB";
@@ -48,6 +49,7 @@ export interface GenerationRequestSnapshot {
   videoResolution?: string;
   audioFormat?: string;
   audioMode?: AudioOperationMode;
+  parameterValues?: ModelParameterValues;
   audioStylePrompt?: string;
   asrLanguage?: "auto" | "zh" | "en";
   optimizeTextPreview?: boolean;

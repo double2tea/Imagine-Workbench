@@ -26,6 +26,7 @@ import {
   type GenerationTaskUpdate,
 } from "@/lib/generation-tasks";
 import type { RunningHubTaskNodeBinding, RunningHubYouchuanAdvancedSettings } from "@/lib/providers/types";
+import type { ModelParameterValues } from "@/lib/providers/model-capabilities";
 import { buildPromptWithReferenceMap } from "@/hooks/useReferenceState";
 import { audioOperationMissingReferenceMessage, audioOperationRequiresTextInput, readOptionalAudioFormat } from "@/lib/audio-operation-rules";
 import {
@@ -99,6 +100,7 @@ interface GenerationOverrides {
   audioStylePrompt?: string;
   asrLanguage?: "auto" | "zh" | "en";
   cinematicProfile?: CinematicProfile;
+  parameterValues?: ModelParameterValues;
   optimizeTextPreview?: boolean;
   voiceProfileId?: string;
   voiceCloneConsentAccepted?: boolean;
@@ -843,6 +845,7 @@ export function useGenerationActions({
       boardResultStackKey: overrides.boardResultStackKey,
       model: requestModel,
       optimizeTextPreview: overrides.optimizeTextPreview,
+      parameterValues: overrides.parameterValues,
       prompt: activePrompt,
       referenceImage: selectedReferenceImage,
       referenceImages: selectedReferenceImages.map(({ id, role, url }) => ({ id, role, url })),
@@ -933,6 +936,7 @@ export function useGenerationActions({
         referenceMedia: buildReferenceMediaSnapshot(audioReferences, audioReferencePayloads),
         audioFormat: requestAudioFormat,
         audioMode,
+        parameterValues: overrides.parameterValues,
         audioStylePrompt: resolvedAudioStylePrompt,
         asrLanguage: overrides.asrLanguage,
         optimizeTextPreview: overrides.optimizeTextPreview,
@@ -972,6 +976,7 @@ export function useGenerationActions({
             prompt: generationRequest.prompt,
             model: generationRequest.model,
             format: requestAudioFormat,
+            parameterValues: generationRequest.parameterValues,
             stylePrompt: resolvedAudioStylePrompt,
             asrLanguage: overrides.asrLanguage,
             voice: profileVoice,
@@ -1180,6 +1185,7 @@ export function useGenerationActions({
       audioStylePrompt: request.audioStylePrompt,
       model: request.model,
       optimizeTextPreview: request.optimizeTextPreview,
+      parameterValues: request.parameterValues,
       prompt: task.mediaType === "transcript" ? request.prompt : task.prompt,
       referenceImages: retryReferences,
       runningHubNodeInfoList: request.runningHubNodeInfoList,

@@ -62,6 +62,7 @@ import {
   type GenerationTaskStatus,
 } from "@/lib/generation-tasks";
 import { isKnownProvider } from "@/lib/providers/registry";
+import { readModelParameterValues } from "@/lib/providers/parameter-values";
 import {
   deleteVoiceProfile,
   listVoiceProfiles,
@@ -1352,6 +1353,7 @@ function parseGenerationRequest(value: unknown): GenerationRequestSnapshot | und
     videoResolution: readOptionalString(value, "videoResolution"),
     audioFormat: readOptionalString(value, "audioFormat"),
     audioMode: readOptionalAudioOperationMode(value.audioMode),
+    parameterValues: value.parameterValues === undefined ? undefined : readModelParameterValues(value.parameterValues),
     audioStylePrompt: readOptionalString(value, "audioStylePrompt"),
     asrLanguage: readAsrLanguage(value.asrLanguage),
     optimizeTextPreview: readOptionalBoolean(value, "optimizeTextPreview"),

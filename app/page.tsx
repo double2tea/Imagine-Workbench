@@ -96,6 +96,7 @@ import {
   type ModelOption,
   type VideoReferenceMode,
 } from "@/lib/providers/model-catalog";
+import { pruneCapabilityParameterValues, type ModelParameterValues } from "@/lib/providers/model-capabilities";
 import { getProviderMeta, type CustomProviderDefinition } from "@/lib/providers/registry";
 import { RUNNINGHUB_YOUCHUAN_ADVANCED_DEFAULTS, runningHubAppPresetRequiresPrompt } from "@/lib/providers/runninghub";
 import { buildGenerationModelPriceOptions } from "@/lib/providers/pricing";
@@ -315,6 +316,7 @@ export default function Home() {
   const [selectedAudioModel, setSelectedAudioModel] = useState(() => readDefaultGenerationModel("audio"));
   const [selectedAudioMode, setSelectedAudioMode] = useState<AudioOperationMode>("tts");
   const [audioFormat, setAudioFormat] = useState("wav");
+  const [audioParameterValues, setAudioParameterValues] = useState<ModelParameterValues>({});
   const [audioStylePrompt, setAudioStylePrompt] = useState("");
   const [asrLanguage, setAsrLanguage] = useState<"auto" | "zh" | "en">("auto");
   const [selectedVoiceProfileId, setSelectedVoiceProfileId] = useState("");
@@ -623,6 +625,9 @@ export default function Home() {
   const activeAudioFormat = audioFormatOptions.some(option => option.value === audioFormat)
     ? audioFormat
     : audioFormatOptions[0]?.value ?? "";
+  useEffect(() => {
+    setAudioParameterValues(current => pruneCapabilityParameterValues(audioCapabilities.parameterDescriptors, current));
+  }, [audioCapabilities.parameterDescriptors, selectedAudioModel]);
   const activeImageResolution = isCustomImageSize ? customImageSize.trim() : imageResolution;
   const activeImageQuality = imageCapabilities.qualities.some(option => option.value === imageQuality) ? imageQuality : undefined;
   const activeVideoSize = videoCapabilities.sizes.some(option => option.value === aspectRatio) ? aspectRatio : "auto";
@@ -918,6 +923,7 @@ export default function Home() {
       asrLanguage,
       allowEmptyPrompt: !audioTextInputRequired,
       model: selectedAudioModel,
+      parameterValues: audioParameterValues,
       referenceImage: audioReferenceImages[0]?.url ?? null,
       referenceImages: audioReferenceImages,
       voiceCloneConsentAccepted: selectedVoiceProfileProvidesCloneReference ? true : voiceCloneConsentAccepted,
@@ -1169,6 +1175,7 @@ export default function Home() {
     if (capabilities.formats.length > 0 && !capabilities.formats.some(option => option.value === audioFormat)) {
       setAudioFormat(capabilities.formats[0].value);
     }
+    setAudioParameterValues(current => pruneCapabilityParameterValues(capabilities.parameterDescriptors, current));
   };
 
   const handleImageResolutionChange = (value: string) => {
@@ -1227,6 +1234,7 @@ export default function Home() {
       handleSelectAudioModel(model);
       if (request?.audioMode) handleSelectAudioMode(request.audioMode);
       if (request?.audioFormat) setAudioFormat(request.audioFormat);
+      setAudioParameterValues(request?.parameterValues ?? {});
       setAudioStylePrompt(request?.audioStylePrompt ?? "");
       setAsrLanguage(request?.asrLanguage ?? "auto");
       setSelectedVoiceProfileId(request?.voiceProfileId ?? "");
@@ -2005,6 +2013,7 @@ export default function Home() {
           referenceImages={referenceImages}
           selectedFormat={activeAudioFormat}
           selectedModel={selectedAudioModel}
+          parameterValues={audioParameterValues}
           selectedVoiceProfileId={selectedVoiceProfileId}
           submitCount={audioSubmitCount}
           voiceCloneConsentAccepted={voiceCloneConsentAccepted}
@@ -2020,6 +2029,7 @@ export default function Home() {
           }}
           onGenerate={generateActiveAudio}
           onOptimizePrompt={optimizeActivePrompt}
+          onParameterValuesChange={setAudioParameterValues}
           onPromptChange={value => handleTextareaChange(value, "audio-prompt")}
           onPromptDropAsset={event => handlePromptDropAsset(event, "audio-prompt")}
           onReferenceDropAsset={asset => handleReferenceDropAsset(asset, "audio-prompt")}

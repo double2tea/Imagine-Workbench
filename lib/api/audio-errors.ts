@@ -26,6 +26,16 @@ export function audioOperationApiError(error: unknown): ApiError | null {
       return badRequest(error.message, "invalid_reference_media_count");
     default:
       if (
+        error.message.startsWith("Seed Audio sample_rate must be") ||
+        error.message.startsWith("Seed Audio speech_rate must be") ||
+        error.message.startsWith("Seed Audio loudness_rate must be") ||
+        error.message.startsWith("Seed Audio pitch_rate must be") ||
+        error.message.startsWith("Seed Audio enable_subtitle must be") ||
+        error.message.startsWith("Seed Audio aigc_")
+      ) {
+        return badRequest(error.message, "invalid_audio_parameter");
+      }
+      if (
         error.message.endsWith("audio operation is not supported yet") ||
         error.message.includes("audio operation currently supports MiMo-compatible")
       ) {

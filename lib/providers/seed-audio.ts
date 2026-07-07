@@ -5,6 +5,29 @@ import type { GenerateAudioOperationInput, ProviderConfig, ReferenceMedia } from
 export const SEED_AUDIO_MODEL = "seed-audio-1.0";
 
 type SeedAudioFormat = "wav" | "mp3" | "pcm" | "ogg_opus";
+type SeedAudioSampleRate = 8000 | 16000 | 24000 | 32000 | 44100 | 48000;
+
+interface SeedAudioAudioConfig {
+  format: SeedAudioFormat;
+  sample_rate?: SeedAudioSampleRate;
+  speech_rate?: number;
+  loudness_rate?: number;
+  pitch_rate?: number;
+  enable_subtitle?: boolean;
+}
+
+interface SeedAudioWatermarkMetadata {
+  enable?: boolean;
+  content_producer?: string;
+  produce_id?: string;
+  content_propagator?: string;
+  propagate_id?: string;
+}
+
+interface SeedAudioWatermark {
+  aigc_watermark?: boolean;
+  aigc_metadata?: SeedAudioWatermarkMetadata;
+}
 
 interface SeedAudioReference {
   speaker?: string;
@@ -16,9 +39,8 @@ interface SeedAudioRequest {
   model: typeof SEED_AUDIO_MODEL;
   text_prompt: string;
   references?: SeedAudioReference[];
-  audio_config: {
-    format: SeedAudioFormat;
-  };
+  audio_config: SeedAudioAudioConfig;
+  watermark?: SeedAudioWatermark;
 }
 
 interface SeedAudioResponse {
@@ -35,6 +57,8 @@ interface SeedAudioResult {
 }
 
 const SEED_AUDIO_SUPPORTED_FORMATS: readonly SeedAudioFormat[] = ["wav", "mp3", "pcm", "ogg_opus"];
+const SEED_AUDIO_SUPPORTED_SAMPLE_RATES: readonly SeedAudioSampleRate[] = [8000, 16000, 24000, 32000, 44100, 48000];
+const SEED_AUDIO_REFERENCE_MAX_BYTES = 10 * 1024 * 1024;
 
 export async function generateSeedAudio(
   config: ProviderConfig,
@@ -48,10 +72,12 @@ export async function generateSeedAudio(
   const request: SeedAudioRequest = {
     model: SEED_AUDIO_MODEL,
     text_prompt: requireText(input.prompt, "Seed Audio prompt"),
-    audio_config: { format },
+    audio_config: seedAudioConfig(input, format),
   };
   const references = seedAudioReferences(input);
   if (references.length > 0) request.references = references;
+  const watermark = seedAudioWatermark(input);
+  if (watermark) request.watermark = watermark;
 
   const response = await postSeedAudioCreate(config, request);
   assertSeedAudioSuccess(response);
@@ -97,7 +123,86 @@ function seedAudioReferences(input: GenerateAudioOperationInput): SeedAudioRefer
 }
 
 function referenceBase64(reference: ReferenceMedia): string {
-  return parseDataUri(reference.dataUri).base64;
+  const parsed = parseDataUri(reference.dataUri);
+  if (base64ByteLength(parsed.base64) > SEED_AUDIO_REFERENCE_MAX_BYTES) {
+    throw new ApiError(413, "payload_too_large", "Seed Audio reference media must be at most 10MB");
+  }
+  return parsed.base64;
+}
+
+function seedAudioConfig(input: GenerateAudioOperationInput, format: SeedAudioFormat): SeedAudioAudioConfig {
+  const values = input.parameterValues ?? {};
+  const config: SeedAudioAudioConfig = { format };
+  const sampleRate = readSeedAudioSampleRate(values.sample_rate);
+  if (sampleRate !== undefined) config.sample_rate = sampleRate;
+  const speechRate = readSeedAudioNumber(values.speech_rate, "speech_rate", -50, 100);
+  if (speechRate !== undefined) config.speech_rate = speechRate;
+  const loudnessRate = readSeedAudioNumber(values.loudness_rate, "loudness_rate", -50, 100);
+  if (loudnessRate !== undefined) config.loudness_rate = loudnessRate;
+  const pitchRate = readSeedAudioNumber(values.pitch_rate, "pitch_rate", -12, 12);
+  if (pitchRate !== undefined) config.pitch_rate = pitchRate;
+  const enableSubtitle = readSeedAudioBoolean(values.enable_subtitle, "enable_subtitle");
+  if (enableSubtitle !== undefined) config.enable_subtitle = enableSubtitle;
+  return config;
+}
+
+function seedAudioWatermark(input: GenerateAudioOperationInput): SeedAudioWatermark | undefined {
+  const values = input.parameterValues ?? {};
+  const watermark: SeedAudioWatermark = {};
+  const aigcWatermark = readSeedAudioBoolean(values.aigc_watermark, "aigc_watermark");
+  if (aigcWatermark !== undefined) watermark.aigc_watermark = aigcWatermark;
+
+  const metadata: SeedAudioWatermarkMetadata = {};
+  const metadataEnabled = readSeedAudioBoolean(values.aigc_metadata_enable, "aigc_metadata_enable");
+  if (metadataEnabled !== undefined) metadata.enable = metadataEnabled;
+  const contentProducer = readSeedAudioText(values.aigc_metadata_content_producer, "aigc_metadata_content_producer");
+  if (contentProducer) metadata.content_producer = contentProducer;
+  const produceId = readSeedAudioText(values.aigc_metadata_produce_id, "aigc_metadata_produce_id");
+  if (produceId) metadata.produce_id = produceId;
+  const contentPropagator = readSeedAudioText(values.aigc_metadata_content_propagator, "aigc_metadata_content_propagator");
+  if (contentPropagator) metadata.content_propagator = contentPropagator;
+  const propagateId = readSeedAudioText(values.aigc_metadata_propagate_id, "aigc_metadata_propagate_id");
+  if (propagateId) metadata.propagate_id = propagateId;
+  if (Object.keys(metadata).length > 0) watermark.aigc_metadata = metadata;
+
+  return Object.keys(watermark).length > 0 ? watermark : undefined;
+}
+
+function readSeedAudioSampleRate(value: unknown): SeedAudioSampleRate | undefined {
+  if (value === undefined) return undefined;
+  const rate = typeof value === "string" ? Number(value) : value;
+  if (typeof rate === "number" && isSeedAudioSampleRate(rate)) return rate;
+  throw new Error("Seed Audio sample_rate must be 8000, 16000, 24000, 32000, 44100, or 48000");
+}
+
+function isSeedAudioSampleRate(value: number): value is SeedAudioSampleRate {
+  return SEED_AUDIO_SUPPORTED_SAMPLE_RATES.some(item => item === value);
+}
+
+function readSeedAudioNumber(value: unknown, field: string, min: number, max: number): number | undefined {
+  if (value === undefined) return undefined;
+  if (typeof value !== "number" || !Number.isFinite(value) || value < min || value > max) {
+    throw new Error(`Seed Audio ${field} must be a number from ${min} to ${max}`);
+  }
+  return value;
+}
+
+function readSeedAudioBoolean(value: unknown, field: string): boolean | undefined {
+  if (value === undefined) return undefined;
+  if (typeof value === "boolean") return value;
+  throw new Error(`Seed Audio ${field} must be a boolean`);
+}
+
+function readSeedAudioText(value: unknown, field: string): string | undefined {
+  if (value === undefined) return undefined;
+  if (typeof value !== "string") throw new Error(`Seed Audio ${field} must be a string`);
+  return value.trim() || undefined;
+}
+
+function base64ByteLength(base64: string): number {
+  const normalized = base64.replace(/\s/g, "");
+  const padding = normalized.endsWith("==") ? 2 : normalized.endsWith("=") ? 1 : 0;
+  return Math.floor((normalized.length * 3) / 4) - padding;
 }
 
 async function postSeedAudioCreate(

@@ -134,6 +134,9 @@ test("Volcengine providers expose scoped capabilities", () => {
   assert.deepEqual(capability.audioModes, ["tts", "sfx", "music", "voice_clone"]);
   assert.deepEqual(capability.referenceMediaTypes, ["image", "audio"]);
   assert.equal(capability.maxReferenceImages, 3);
+  assert.equal(capability.parameterDescriptors.some(descriptor => descriptor.key === "sample_rate"), true);
+  assert.equal(capability.parameterDescriptors.some(descriptor => descriptor.key === "enable_subtitle"), true);
+  assert.equal(capability.parameterDescriptors.some(descriptor => descriptor.key === "aigc_watermark"), true);
 });
 
 test("model capability catalog fails fast on invalid provider keys", () => {
