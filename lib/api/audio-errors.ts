@@ -14,9 +14,15 @@ export function audioOperationApiError(error: unknown): ApiError | null {
     case "MiMo ASR supports wav or mp3 audio references only":
     case "MiMo ASR reference audio payload is required":
     case "MiMo ASR reference audio base64 payload exceeds 10MB":
+    case "Seed Audio does not support video references":
+    case "Seed Audio image references cannot be mixed with audio references or speaker IDs":
+    case "Seed Audio supports wav, mp3, pcm, or ogg_opus formats":
       return badRequest(error.message, "unsupported_reference_media");
     case "MiMo voice clone requires exactly one audio reference":
     case "MiMo ASR requires exactly one audio reference":
+    case "Seed Audio supports at most one image reference":
+    case "Seed Audio supports at most three audio references including speaker IDs":
+    case "Seed Audio voice clone requires an audio reference or speaker ID":
       return badRequest(error.message, "invalid_reference_media_count");
     default:
       if (

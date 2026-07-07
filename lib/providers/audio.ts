@@ -10,6 +10,7 @@ import {
   MIMO_TTS_VOICE_DESIGN_MODEL,
 } from "./mimo-tts";
 import { generateMimoAsr, MIMO_ASR_MODEL } from "./mimo-asr";
+import { generateSeedAudio } from "./seed-audio";
 import type {
   GenerateAudioInput,
   GenerateAudioOperationInput,
@@ -58,6 +59,16 @@ export async function generateAudioOperation(
   }
   if (input.voiceProfileId) {
     throw new Error("Voice profile IDs must be resolved before audio operation");
+  }
+
+  if (config.provider === "seedaudio") {
+    const result = await generateSeedAudio(config, input);
+    return {
+      type: "direct",
+      outputKind: "audio",
+      source: config.provider,
+      ...result,
+    };
   }
 
   if (config.provider === "runninghub" && getRunningHubStandardModel(input.model, "audio")) {

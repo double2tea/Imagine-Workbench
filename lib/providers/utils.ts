@@ -95,6 +95,7 @@ export async function postJson<T>(url: string, config: ProviderConfig, body: unk
 export function openAiCompatibleUrl(baseUrl: string, path: `/v1/${string}`): string {
   const normalizedBaseUrl = trimTrailingSlash(baseUrl);
   if (normalizedBaseUrl.endsWith("/v1")) return `${normalizedBaseUrl}${path.slice(3)}`;
+  if (normalizedBaseUrl.endsWith("/api/v3")) return `${normalizedBaseUrl}${path.slice(3)}`;
   return `${normalizedBaseUrl}${path}`;
 }
 

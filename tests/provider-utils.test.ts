@@ -37,6 +37,12 @@ test("authHeaders uses MiMo api-key header", () => {
     videoBaseUrl: "https://api.xiaomimimo.com",
   }), { "api-key": "mimo_key" });
   assert.deepEqual(authHeaders({
+    provider: "seedaudio",
+    apiKey: "seed_key",
+    baseUrl: "https://openspeech.bytedance.com",
+    videoBaseUrl: "https://openspeech.bytedance.com",
+  }), { "X-Api-Key": "seed_key" });
+  assert.deepEqual(authHeaders({
     provider: "12ai",
     apiKey: "twelve_key",
     baseUrl: "https://cdn.12ai.org",
@@ -101,7 +107,7 @@ test("resolveProviderConfig uses request credentials before injected team creden
   assert.equal(requestConfig.baseUrl, "https://api.xiaomimimo.com/v1");
 });
 
-test("openAiCompatibleUrl supports root and v1 base URLs", () => {
+test("openAiCompatibleUrl supports root, v1, and Ark api/v3 base URLs", () => {
   assert.equal(
     openAiCompatibleUrl("https://api.xiaomimimo.com", "/v1/chat/completions"),
     "https://api.xiaomimimo.com/v1/chat/completions",
@@ -109,6 +115,10 @@ test("openAiCompatibleUrl supports root and v1 base URLs", () => {
   assert.equal(
     openAiCompatibleUrl("https://token-plan-cn.xiaomimimo.com/v1", "/v1/chat/completions"),
     "https://token-plan-cn.xiaomimimo.com/v1/chat/completions",
+  );
+  assert.equal(
+    openAiCompatibleUrl("https://ark.cn-beijing.volces.com/api/v3", "/v1/chat/completions"),
+    "https://ark.cn-beijing.volces.com/api/v3/chat/completions",
   );
 });
 
