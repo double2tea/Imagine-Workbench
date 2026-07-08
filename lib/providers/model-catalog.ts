@@ -135,6 +135,14 @@ export const DEFAULT_CHAT_MODEL = "12ai:gemini-3.1-flash-lite-preview";
 /** @deprecated Agent no longer auto-switches models; alias kept for existing imports/tests. */
 export const DEFAULT_VISION_CHAT_MODEL = DEFAULT_CHAT_MODEL;
 
+const LEGACY_PROVIDER_MODEL_VALUES: Record<string, string> = {
+  "seedaudio:seed-audio-1.0": "volcengine:seed-audio-1.0",
+};
+
+export function normalizeProviderModelValue(value: string): string {
+  return LEGACY_PROVIDER_MODEL_VALUES[value] ?? value;
+}
+
 function imageResolutionOption(value: string): ParameterOption {
   return { value, label: getImageResolutionLabel(value) };
 }
@@ -469,22 +477,23 @@ export function parseProviderModel(value: string, fallbackProvider: AiProvider):
   model: string;
   async: boolean;
 } {
-  if (value.startsWith("12ai-async:")) {
-    return { provider: "12ai", model: value.slice("12ai-async:".length), async: true };
+  const normalizedValue = normalizeProviderModelValue(value);
+  if (normalizedValue.startsWith("12ai-async:")) {
+    return { provider: "12ai", model: normalizedValue.slice("12ai-async:".length), async: true };
   }
 
-  const separator = value.indexOf(":");
+  const separator = normalizedValue.indexOf(":");
   if (separator === -1) {
-    return { provider: fallbackProvider, model: value, async: false };
+    return { provider: fallbackProvider, model: normalizedValue, async: false };
   }
 
-  const provider = value.slice(0, separator);
-  const model = value.slice(separator + 1);
+  const provider = normalizedValue.slice(0, separator);
+  const model = normalizedValue.slice(separator + 1);
   if (isProviderKey(provider)) {
     return { provider, model, async: false };
   }
 
-  throw new ProviderModelParseError(`Invalid provider prefix "${provider}" in model "${value}"`);
+  throw new ProviderModelParseError(`Invalid provider prefix "${provider}" in model "${normalizedValue}"`);
 }
 
 export function tryParseProviderModel(

@@ -18,6 +18,7 @@ import {
   imageParameterValuesFromLegacy,
   imageParameterValuesToRunningHubYouchuan,
   isMimoWorkbenchTtsModel,
+  normalizeProviderModelValue,
   parseProviderModel,
   readModelCapabilityCatalog,
   resolveImageModelQuality,
@@ -131,9 +132,11 @@ test("Volcengine providers expose scoped capabilities", () => {
 
   assert.equal(isKnownProvider("seedaudio"), false);
   assert.equal(PROVIDER_KEYS.includes("seedaudio"), false);
+  assert.equal(normalizeProviderModelValue("seedaudio:seed-audio-1.0"), "volcengine:seed-audio-1.0");
 
   const capability = getModelCapability("volcengine:seed-audio-1.0", "audio");
   assert.equal(capability.provider, "volcengine");
+  assert.equal(getModelCapability("seedaudio:seed-audio-1.0", "audio").provider, "volcengine");
   assert.deepEqual(capability.audioModes, ["tts", "sfx", "music", "voice_clone"]);
   assert.deepEqual(capability.referenceMediaTypes, ["image", "audio"]);
   assert.equal(capability.maxReferenceImages, 3);

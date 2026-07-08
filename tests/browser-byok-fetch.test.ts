@@ -81,6 +81,127 @@ test("browser BYOK agent provider errors return assistant failure payload", asyn
   }
 });
 
+test("browser BYOK routes Seed Audio generation through same-origin edge route", async () => {
+  const originalByokFlag = process.env.NEXT_PUBLIC_IMAGINE_BROWSER_BYOK;
+  const originalFetch = globalThis.fetch;
+  const originalWindow = globalThis.window;
+  process.env.NEXT_PUBLIC_IMAGINE_BROWSER_BYOK = "1";
+  const calls: Array<{ url: string; headers: Headers; body: unknown }> = [];
+  Object.defineProperty(globalThis, "window", {
+    configurable: true,
+    value: { location: { origin: "http://local.test" } },
+  });
+  globalThis.fetch = (async (input: RequestInfo | URL, init?: RequestInit): Promise<Response> => {
+    calls.push({
+      url: input.toString(),
+      headers: new Headers(init?.headers),
+      body: init?.body ? JSON.parse(String(init.body)) as unknown : null,
+    });
+    return Response.json({
+      type: "direct",
+      outputKind: "audio",
+      source: "volcengine",
+      audioBase64: "seed_audio_base64",
+      format: "wav",
+      model: "seed-audio-1.0",
+      mimeType: "audio/wav",
+    });
+  }) as typeof fetch;
+
+  try {
+    const response = await browserByokFetch(API_ROUTES.media.generateAudio, {
+      method: "POST",
+      headers: {
+        "Content-Type": "application/json",
+        "x-ai-audio-api-key": "seed-audio-key",
+      },
+      body: JSON.stringify({
+        model: "seedaudio:seed-audio-1.0",
+        mode: "music",
+        prompt: "短促的电子提示音",
+      }),
+    });
+
+    assert.equal(response.status, 200);
+    const body = await response.json() as {
+      audioBase64?: unknown;
+      outputKind?: unknown;
+      source?: unknown;
+      type?: unknown;
+    };
+    assert.equal(body.type, "direct");
+    assert.equal(body.outputKind, "audio");
+    assert.equal(body.source, "volcengine");
+    assert.equal(body.audioBase64, "seed_audio_base64");
+    assert.equal(calls[0]?.url, API_ROUTES.media.generateSeedAudio);
+    assert.equal(calls[0]?.headers.get("x-ai-audio-api-key"), "seed-audio-key");
+    assert.equal((calls[0]?.body as { model?: unknown } | undefined)?.model, "volcengine:seed-audio-1.0");
+  } finally {
+    restoreEnv("NEXT_PUBLIC_IMAGINE_BROWSER_BYOK", originalByokFlag);
+    globalThis.fetch = originalFetch;
+    Object.defineProperty(globalThis, "window", {
+      configurable: true,
+      value: originalWindow,
+    });
+  }
+});
+
+test("browser BYOK keeps non-Seed-Audio generation on the direct provider path", async () => {
+  const originalByokFlag = process.env.NEXT_PUBLIC_IMAGINE_BROWSER_BYOK;
+  const originalFetch = globalThis.fetch;
+  const originalWindow = globalThis.window;
+  process.env.NEXT_PUBLIC_IMAGINE_BROWSER_BYOK = "1";
+  const calls: Array<{ url: string; headers: Headers; body: unknown }> = [];
+  Object.defineProperty(globalThis, "window", {
+    configurable: true,
+    value: { location: { origin: "http://local.test" } },
+  });
+  globalThis.fetch = (async (input: RequestInfo | URL, init?: RequestInit): Promise<Response> => {
+    calls.push({
+      url: input.toString(),
+      headers: new Headers(init?.headers),
+      body: init?.body ? JSON.parse(String(init.body)) as unknown : null,
+    });
+    return Response.json({ choices: [{ message: { audio: { data: "mimo_audio_base64" } } }] });
+  }) as typeof fetch;
+
+  try {
+    const response = await browserByokFetch(API_ROUTES.media.generateAudio, {
+      method: "POST",
+      headers: {
+        "Content-Type": "application/json",
+        "x-ai-api-key": "mimo-key",
+      },
+      body: JSON.stringify({
+        model: "mimo:mimo-v2.5-tts",
+        mode: "tts",
+        prompt: "hello",
+      }),
+    });
+
+    assert.equal(response.status, 200);
+    const body = await response.json() as {
+      audioBase64?: unknown;
+      outputKind?: unknown;
+      source?: unknown;
+      type?: unknown;
+    };
+    assert.equal(body.type, "direct");
+    assert.equal(body.outputKind, "audio");
+    assert.equal(body.source, "mimo");
+    assert.equal(body.audioBase64, "mimo_audio_base64");
+    assert.equal(calls[0]?.url, "https://api.xiaomimimo.com/v1/chat/completions");
+    assert.notEqual(calls[0]?.url, API_ROUTES.media.generateSeedAudio);
+  } finally {
+    restoreEnv("NEXT_PUBLIC_IMAGINE_BROWSER_BYOK", originalByokFlag);
+    globalThis.fetch = originalFetch;
+    Object.defineProperty(globalThis, "window", {
+      configurable: true,
+      value: originalWindow,
+    });
+  }
+});
+
 function restoreEnv(name: string, value: string | undefined): void {
   if (value === undefined) {
     delete process.env[name];

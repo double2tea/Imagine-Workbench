@@ -39,7 +39,7 @@ import {
   mediaReferenceLabel,
   parseMediaReferenceDimensions,
 } from "@/lib/media-references";
-import { getAudioModelCapabilities, getImageModelCapabilities, getVideoModelCapabilities, imageParameterValuesFromLegacy, imageParameterValuesToRunningHubYouchuan, parseProviderModel, resolveImageModelQuality, type AudioOperationMode, type VideoReferenceMode } from "@/lib/providers/model-catalog";
+import { getAudioModelCapabilities, getImageModelCapabilities, getVideoModelCapabilities, imageParameterValuesFromLegacy, imageParameterValuesToRunningHubYouchuan, normalizeProviderModelValue, parseProviderModel, resolveImageModelQuality, type AudioOperationMode, type VideoReferenceMode } from "@/lib/providers/model-catalog";
 import { isRunningHubTaskTarget } from "@/lib/providers/runninghub-node-info";
 import { getProviderMeta } from "@/lib/providers/registry";
 import { runningHubAppPresetRequiresPrompt } from "@/lib/providers/runninghub";
@@ -823,7 +823,7 @@ export function useGenerationActions({
     const activePrompt = overrides.prompt ?? prompt;
     const selectedReferenceImage = overrides.referenceImage ?? referenceImage;
     const selectedReferenceImages = overrides.referenceImages ?? referenceImages;
-    const requestModel = overrides.model?.trim();
+    const requestModel = normalizeProviderModelValue(overrides.model?.trim() ?? "");
 
     if (!requestModel) {
       pushWorkspaceNotice("error", t("common.notices.audioGenNeedModel"));

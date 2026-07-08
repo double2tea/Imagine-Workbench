@@ -26,6 +26,7 @@ import {
   DEFAULT_CHAT_MODEL,
   DEFAULT_IMAGE_MODEL,
   DEFAULT_VIDEO_MODEL,
+  formatProviderModel,
   getListedModelCapabilities,
   getImageModelCapabilities,
   getImageResolutionOptions,
@@ -33,6 +34,7 @@ import {
   getOptionalModelCapability,
   parseProviderModel,
   ProviderModelParseError,
+  tryParseProviderModel,
   type AiProvider,
 } from "@/lib/providers/model-catalog";
 import { createChatCompletionText, createChatCompletionWithTools, ChatJsonParseError, parseJsonObjectText } from "@/lib/providers/chat";
@@ -389,7 +391,17 @@ export async function browserByokFetch(input: RequestInfo | URL, init?: RequestI
     const path = url.pathname;
     if (path === API_ROUTES.media.generateImage) return withAbort(signal, jsonTask(generateImageForBrowser(headers, await readJsonBody(init), signal)));
     if (path === API_ROUTES.media.generateVideo) return withAbort(signal, jsonTask(generateVideoForBrowser(headers, await readJsonBody(init), signal)));
-    if (path === API_ROUTES.media.generateAudio) return withAbort(signal, jsonTask(generateAudioOperationForBrowser(headers, await readJsonBody(init), signal)));
+    if (path === API_ROUTES.media.generateAudio) {
+      const body = await readJsonBody(init);
+      const seedAudioModel = getSeedAudioBrowserRouteModel(body);
+      if (seedAudioModel) {
+        return fetch(API_ROUTES.media.generateSeedAudio, {
+          ...init,
+          body: JSON.stringify({ ...jsonRecord(body), model: seedAudioModel }),
+        });
+      }
+      return withAbort(signal, jsonTask(generateAudioOperationForBrowser(headers, body, signal)));
+    }
     if (path === API_ROUTES.media.generateAudioWorkflow) return withAbort(signal, jsonTask(generateAudioWorkflowForBrowser(headers, await readJsonBody(init), signal)));
     if (path === API_ROUTES.media.status) return withAbort(signal, jsonTask(getMediaStatusForBrowser(headers, await readJsonBody(init), signal)));
     if (path === API_ROUTES.media.imageDownload) return withAbort(signal, downloadImageForBrowser(headers, await readJsonBody(init), signal));
@@ -522,6 +534,15 @@ async function generateAudioOperationForBrowser(headers: Headers, body: unknown,
     runningHubAccessPassword: optionalText(parsedBody.runningHubAccessPassword),
     runningHubNodeInfoList,
   });
+}
+
+function getSeedAudioBrowserRouteModel(body: unknown): string | null {
+  if (typeof body !== "object" || body === null || !("model" in body)) return null;
+  const model = body.model;
+  if (typeof model !== "string") return null;
+  const parsed = tryParseProviderModel(model, "mimo");
+  if (!parsed || !isSeedAudioProviderModel(parsed.provider, parsed.model)) return null;
+  return formatProviderModel(parsed.provider, parsed.model);
 }
 
 async function generateAudioWorkflowForBrowser(headers: Headers, body: unknown, signal: AbortSignal | undefined): Promise<unknown> {

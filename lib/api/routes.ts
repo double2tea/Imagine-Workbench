@@ -13,6 +13,7 @@ export const API_ROUTES = {
     cancel: "/api/media/cancel",
     generateAudio: "/api/media/generate-audio",
     generateAudioWorkflow: "/api/media/generate-audio-workflow",
+    generateSeedAudio: "/api/media/generate-seed-audio",
     generateImage: "/api/media/generate-image",
     generateVideo: "/api/media/generate-video",
     imageDownload: "/api/media/image-download",

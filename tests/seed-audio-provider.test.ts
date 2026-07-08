@@ -6,6 +6,7 @@ import { generateAudioOperation } from "../lib/providers/audio";
 import { generateSeedAudio } from "../lib/providers/seed-audio";
 import { listProviderModels } from "../lib/providers/models";
 import { GET as listModelsRoute } from "../app/api/models/route";
+import { postBrowserSeedAudioOperation } from "../lib/api/seed-audio-browser-route";
 import type { ProviderConfig } from "../lib/providers/types";
 
 const seedAudioConfig: ProviderConfig = {
@@ -140,6 +141,86 @@ test("Seed Audio prompt generation sends OpenSpeech create request", async () =>
         },
       },
     });
+  } finally {
+    globalThis.fetch = originalFetch;
+  }
+});
+
+test("Seed Audio browser edge route uses audio-scoped request credentials", async () => {
+  const originalFetch = globalThis.fetch;
+  const calls: Array<{ url: string; headers: Headers; body: unknown }> = [];
+  globalThis.fetch = async (input: RequestInfo | URL, init?: RequestInit): Promise<Response> => {
+    calls.push({
+      url: input.toString(),
+      headers: new Headers(init?.headers),
+      body: init?.body ? JSON.parse(String(init.body)) as unknown : null,
+    });
+    return Response.json({ audio: "seed_audio_base64", duration: 1.2, original_duration: 1.2 });
+  };
+
+  try {
+    const response = await postBrowserSeedAudioOperation(new Request("http://local.test/api/media/generate-seed-audio", {
+      method: "POST",
+      headers: {
+        "Content-Type": "application/json",
+        "x-ai-audio-api-key": "browser_seed_audio_key",
+      },
+      body: JSON.stringify({
+        model: "volcengine:seed-audio-1.0",
+        mode: "music",
+        prompt: "短促的电子提示音",
+        format: "mp3",
+      }),
+    }));
+
+    assert.equal(response.status, 200);
+    const body = await response.json() as {
+      audioBase64?: unknown;
+      format?: unknown;
+      outputKind?: unknown;
+      source?: unknown;
+      type?: unknown;
+    };
+    assert.equal(body.type, "direct");
+    assert.equal(body.outputKind, "audio");
+    assert.equal(body.source, "volcengine");
+    assert.equal(body.audioBase64, "seed_audio_base64");
+    assert.equal(body.format, "mp3");
+    assert.equal(calls[0]?.url, "https://openspeech.bytedance.com/api/v3/tts/create");
+    assert.equal(calls[0]?.headers.get("X-Api-Key"), "browser_seed_audio_key");
+    assert.equal((calls[0]?.body as { model?: unknown; text_prompt?: unknown } | undefined)?.model, "seed-audio-1.0");
+    assert.equal((calls[0]?.body as { model?: unknown; text_prompt?: unknown } | undefined)?.text_prompt, "短促的电子提示音");
+  } finally {
+    globalThis.fetch = originalFetch;
+  }
+});
+
+test("Seed Audio browser edge route rejects non-Seed-Audio models", async () => {
+  const originalFetch = globalThis.fetch;
+  let fetchCount = 0;
+  globalThis.fetch = (async (): Promise<Response> => {
+    fetchCount += 1;
+    return Response.json({});
+  }) as typeof fetch;
+
+  try {
+    const response = await postBrowserSeedAudioOperation(new Request("http://local.test/api/media/generate-seed-audio", {
+      method: "POST",
+      headers: {
+        "Content-Type": "application/json",
+        "x-ai-audio-api-key": "browser_seed_audio_key",
+      },
+      body: JSON.stringify({
+        model: "mimo:mimo-v2.5-tts",
+        mode: "tts",
+        prompt: "hello",
+      }),
+    }));
+
+    assert.equal(response.status, 400);
+    const body = await response.json() as { code?: unknown };
+    assert.equal(body.code, "invalid_seed_audio_model");
+    assert.equal(fetchCount, 0);
   } finally {
     globalThis.fetch = originalFetch;
   }
