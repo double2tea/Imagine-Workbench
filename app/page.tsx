@@ -2201,7 +2201,11 @@ export default function Home() {
 
               {mobileWorkbenchPanel === "create" ? (
                 <section className="imagine-mobile-composer imagine-control-surface flex flex-col gap-3 rounded-xl p-3">
-                  <CreationModeTabs value={traditionalSubTab} onChange={setTraditionalSubTab} />
+                  <CreationModeTabs
+                    instance="mobile"
+                    value={traditionalSubTab}
+                    onChange={setTraditionalSubTab}
+                  />
                   <div className="imagine-mobile-creator-scroll flex min-h-0 flex-1 flex-col gap-3">
                     {renderCreationPanel(false)}
                   </div>
@@ -2240,7 +2244,11 @@ export default function Home() {
           {/* Active Creative Panel switch */}
           <div className="imagine-control-surface hidden rounded-xl lg:flex flex-col gap-2.5 min-h-0 max-h-[calc(100vh-5.5rem)] overflow-hidden">
             <div className="imagine-creator-scroll flex min-h-0 flex-1 flex-col gap-3">
-                <CreationModeTabs value={traditionalSubTab} onChange={setTraditionalSubTab} />
+                <CreationModeTabs
+                  instance="desktop"
+                  value={traditionalSubTab}
+                  onChange={setTraditionalSubTab}
+                />
 
                 {renderCreationPanel(false)}
 

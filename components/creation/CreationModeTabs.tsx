@@ -8,9 +8,15 @@ export type CreationMode = "image" | "video" | "audio";
 interface CreationModeTabsProps {
   value: CreationMode;
   onChange: (value: CreationMode) => void;
+  /** Distinguishes mobile vs desktop tablists so button ids stay unique in the DOM. */
+  instance?: "desktop" | "mobile";
 }
 
-export default function CreationModeTabs({ value, onChange }: CreationModeTabsProps) {
+export default function CreationModeTabs({
+  value,
+  onChange,
+  instance = "desktop",
+}: CreationModeTabsProps) {
   const { t } = useTranslations("creation");
   const tabs: Array<{ Icon: typeof ImageIcon; label: string; value: CreationMode }> = [
     { Icon: ImageIcon, label: t("tabs.image"), value: "image" },
@@ -29,7 +35,7 @@ export default function CreationModeTabs({ value, onChange }: CreationModeTabsPr
           key={tabValue}
           type="button"
           role="tab"
-          id={`creation-tab-${tabValue}`}
+          id={`creation-tab-${instance}-${tabValue}`}
           aria-selected={value === tabValue}
           onClick={() => onChange(tabValue)}
           data-active={value === tabValue}
