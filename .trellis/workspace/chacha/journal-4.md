@@ -92,3 +92,37 @@ Fixed duplicate `#creation-tab-*` ids when mobile and desktop creation tablists 
 ### Next Steps
 
 - Follow-up: align board/agent shell theme classes with home page.
+
+---
+
+## Session 180: ego-browser P5 UI regression script
+
+**Date**: 2026-07-08
+**Task**: P5 ego regression — durable script after tab id dedupe
+**Branch**: `main`
+
+### Summary
+
+Added `scripts/ego-p5-ui-regression.sh` for repeatable ego-browser checks: creation tab colors (CSS probe), sidebar density, theme sync, unique `creation-tab-{instance}-{mode}` ids, and mobile gallery filter wrap. Split `overallPass` (visual/layout) from `interactionPass` (React tab clicks — ego limitation).
+
+### Main Changes
+
+- `scripts/ego-p5-ui-regression.sh`: desktop selectors `#creation-tab-desktop-*`, probe-based screenshots to `.ego-audit/p5-*.png`.
+
+### Git Commits
+
+| Hash | Message |
+|------|---------|
+| `c67d4bde` | chore(qa): add ego-browser P5 UI regression script |
+
+### Testing
+
+- [OK] `./scripts/ego-p5-ui-regression.sh` → `overallPass: true` (18/18)
+
+### Status
+
+[OK] **Completed**
+
+### Next Steps
+
+- Follow-up: align board/agent shell theme classes with home page.
