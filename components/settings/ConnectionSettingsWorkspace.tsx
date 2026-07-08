@@ -193,6 +193,7 @@ export function ConnectionSettingsWorkspace({
 
   const selectedProviderMeta = getWorkspaceProviderMeta(selectedProvider);
   const selectedProviderCreds = providerCredentials[selectedProvider] ?? { apiKey: "", baseUrl: "" };
+  const selectedAudioCredential = selectedProviderMeta.audioCredential;
   const selectedProviderCapabilities = [
     selectedProviderMeta.supportsImage ? t("connections.capabilityImage") : null,
     selectedProviderMeta.supportsVideo ? t("connections.capabilityVideo") : null,
@@ -386,7 +387,10 @@ export function ConnectionSettingsWorkspace({
                 const creds = providerCredentials[provider] ?? { apiKey: "", baseUrl: "" };
                 const credentialStatus = providerCredentialStatus[provider];
                 const isSelected = provider === selectedProvider;
-                const hasKey = Boolean(creds.apiKey.trim()) || Boolean(credentialStatus?.apiKeyConfigured);
+                const hasKey = Boolean(creds.apiKey.trim()) ||
+                  Boolean(creds.audioApiKey?.trim()) ||
+                  Boolean(credentialStatus?.apiKeyConfigured) ||
+                  Boolean(credentialStatus?.audioApiKeyConfigured);
                 const testForProvider =
                   providerTest.provider === provider && providerTest.status !== "idle";
                 const countCategory: ModelCategory = section === "credentials" ? "chat" : section;
@@ -468,27 +472,50 @@ export function ConnectionSettingsWorkspace({
         </div>
 
         {section === "credentials" ? (
-          <ProviderCredentialCard
-            apiKey={selectedProviderCreds.apiKey}
-            apiKeyConfigured={providerCredentialStatus[selectedProvider]?.apiKeyConfigured}
-            apiPlaceholder={selectedProviderMeta.apiKeyPlaceholder}
-            baseUrl={selectedProviderCreds.baseUrl}
-            baseUrlPlaceholder={selectedProviderMeta.defaultBaseUrl}
-            clearLabel={providerClearLabel(selectedProvider)}
-            credentialHint={selectedProviderMeta.credentialHint}
-            endpoints={providerEndpointInfo(selectedProvider)}
-            provider={selectedProvider}
-            providerTest={providerTest}
-            registerUrl={selectedProviderMeta.registerUrl}
-            showBaseUrl={selectedProviderMeta.hasEditableBaseUrl}
-            title={t("connections.credentialCardTitleTemplate", { label: selectedProviderMeta.label })}
-            onClear={onClearCredentials}
-            onCommitApiKey={provider => onCommitCredential(provider, "apiKey")}
-            onCommitBaseUrl={provider => onCommitCredential(provider, "baseUrl")}
-            onSaveApiKey={(provider, value) => onSaveCredential(provider, "apiKey", value)}
-            onSaveBaseUrl={(provider, value) => onSaveCredential(provider, "baseUrl", value)}
-            onTest={testProviderConnection}
-          />
+          <div className="flex min-h-0 flex-col gap-3">
+            <ProviderCredentialCard
+              apiKey={selectedProviderCreds.apiKey}
+              apiKeyConfigured={providerCredentialStatus[selectedProvider]?.apiKeyConfigured}
+              apiPlaceholder={selectedProviderMeta.apiKeyPlaceholder}
+              baseUrl={selectedProviderCreds.baseUrl}
+              baseUrlPlaceholder={selectedProviderMeta.defaultBaseUrl}
+              clearLabel={providerClearLabel(selectedProvider)}
+              credentialHint={selectedProviderMeta.credentialHint}
+              endpoints={providerEndpointInfo(selectedProvider)}
+              provider={selectedProvider}
+              providerTest={providerTest}
+              registerUrl={selectedProviderMeta.registerUrl}
+              showBaseUrl={selectedProviderMeta.hasEditableBaseUrl}
+              title={t("connections.credentialCardTitleTemplate", { label: selectedProviderMeta.label })}
+              onClear={onClearCredentials}
+              onCommitApiKey={provider => onCommitCredential(provider, "apiKey")}
+              onCommitBaseUrl={provider => onCommitCredential(provider, "baseUrl")}
+              onSaveApiKey={(provider, value) => onSaveCredential(provider, "apiKey", value)}
+              onSaveBaseUrl={(provider, value) => onSaveCredential(provider, "baseUrl", value)}
+              onTest={testProviderConnection}
+            />
+            {selectedAudioCredential ? (
+              <ProviderCredentialCard
+                apiKey={selectedProviderCreds.audioApiKey ?? ""}
+                apiKeyConfigured={providerCredentialStatus[selectedProvider]?.audioApiKeyConfigured}
+                apiPlaceholder={selectedAudioCredential.apiKeyPlaceholder}
+                baseUrl={selectedProviderCreds.audioBaseUrl ?? ""}
+                baseUrlPlaceholder={selectedAudioCredential.defaultBaseUrl}
+                clearLabel={providerClearLabel(selectedProvider, "audio")}
+                credentialHint={selectedAudioCredential.credentialHint}
+                endpoints={providerEndpointInfo(selectedProvider, "audio")}
+                provider={selectedProvider}
+                providerTest={providerTest}
+                registerUrl={selectedAudioCredential.registerUrl}
+                showBaseUrl={selectedAudioCredential.hasEditableBaseUrl}
+                title={t("connections.credentialCardTitleTemplate", { label: selectedAudioCredential.label ?? selectedProviderMeta.label })}
+                onCommitApiKey={provider => onCommitCredential(provider, "audioApiKey")}
+                onCommitBaseUrl={provider => onCommitCredential(provider, "audioBaseUrl")}
+                onSaveApiKey={(provider, value) => onSaveCredential(provider, "audioApiKey", value)}
+                onSaveBaseUrl={(provider, value) => onSaveCredential(provider, "audioBaseUrl", value)}
+              />
+            ) : null}
+          </div>
         ) : (
           <div className="flex min-h-0 flex-col gap-3">
             <div className="imagine-settings-section">

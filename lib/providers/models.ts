@@ -27,10 +27,22 @@ export async function listProviderModels(config: ProviderConfig, kind: ModelKind
   if (config.provider === "agnes") {
     return listStaticProviderModels(config.provider, kind);
   }
-  if (config.provider === "mimo" || config.provider === "seedaudio") {
+  if (config.provider === "mimo") {
+    return listStaticProviderModels(config.provider, kind);
+  }
+  if (config.provider === "volcengine" && kind === "audio") {
     return listStaticProviderModels(config.provider, kind);
   }
 
+  const options = await listOpenAiCompatibleModels(config, kind);
+  if (config.provider === "volcengine" && kind === "all") {
+    return dedupeOptions([...options, ...listStaticProviderModels(config.provider, "audio")]);
+  }
+
+  return options;
+}
+
+async function listOpenAiCompatibleModels(config: ProviderConfig, kind: ModelKindFilter): Promise<ModelOption[]> {
   const response = await getJson<OpenAiModelsResponse>(openAiCompatibleUrl(config.baseUrl, "/v1/models"), config);
   if (!Array.isArray(response.data)) {
     throw new Error("Model list response did not include a data array");

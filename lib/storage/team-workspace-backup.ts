@@ -443,8 +443,12 @@ function convertProviderCredentials(value: string): {
     if (!isProviderKey(provider) || !isRecord(credentials)) continue;
     const apiKey = optionalString(credentials.apiKey)?.trim();
     const baseUrl = optionalString(credentials.baseUrl)?.trim();
+    const audioApiKey = optionalString(credentials.audioApiKey)?.trim();
+    const audioBaseUrl = optionalString(credentials.audioBaseUrl)?.trim();
     if (apiKey) teamSecrets.push(teamSetting("provider", `provider:${provider}:apiKey`, apiKey));
     if (baseUrl) teamSettings.push(teamSetting("provider", `provider:${provider}:baseUrl`, baseUrl));
+    if (audioApiKey) teamSecrets.push(teamSetting("provider", `provider:${provider}:audioApiKey`, audioApiKey));
+    if (audioBaseUrl) teamSettings.push(teamSetting("provider", `provider:${provider}:audioBaseUrl`, audioBaseUrl));
   }
   return { teamSecrets, teamSettings };
 }

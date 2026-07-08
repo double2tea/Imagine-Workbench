@@ -48,8 +48,12 @@ interface UseProviderSettingsParams {
 
 function defaultProviderCredentials(providerKeys: readonly AiProvider[]): Record<AiProvider, ProviderCredentials> {
   const record = {} as Record<AiProvider, ProviderCredentials>;
-  for (const provider of providerKeys) record[provider] = { apiKey: "", baseUrl: "" };
+  for (const provider of providerKeys) record[provider] = emptyProviderCredentials();
   return record;
+}
+
+function emptyProviderCredentials(): ProviderCredentials {
+  return { apiKey: "", baseUrl: "", audioApiKey: "", audioBaseUrl: "" };
 }
 
 function providerSettingSaveErrorMessage(error: unknown, fallback: string): string {
@@ -139,12 +143,15 @@ function hasChatModel(value: string, options: Record<AiProvider, ModelOption[]>,
   return providerKeys.some(provider => (options[provider] ?? []).some(option => option.value === value));
 }
 
-function providerApiKeySecretKey(provider: AiProvider): string {
-  return `provider:${provider}:apiKey`;
+type ApiKeyCredentialField = "apiKey" | "audioApiKey";
+type BaseUrlCredentialField = "baseUrl" | "audioBaseUrl";
+
+function providerApiKeySecretKey(provider: AiProvider, field: ApiKeyCredentialField = "apiKey"): string {
+  return `provider:${provider}:${field}`;
 }
 
-function providerBaseUrlSettingKey(provider: AiProvider): string {
-  return `provider:${provider}:baseUrl`;
+function providerBaseUrlSettingKey(provider: AiProvider, field: BaseUrlCredentialField = "baseUrl"): string {
+  return `provider:${provider}:${field}`;
 }
 
 const PROVIDER_SELECTED_SETTING_KEY = "provider:selected";
@@ -155,25 +162,31 @@ function providerModelOptionsSettingKey(category: ModelCategory): string {
   return `provider:modelOptions:${category}`;
 }
 
-function providerFromApiKeySecretKey(key: string): AiProvider | null {
+function providerFromApiKeySecretKey(key: string): { provider: AiProvider; field: ApiKeyCredentialField } | null {
   const prefix = "provider:";
-  const suffix = ":apiKey";
-  if (!key.startsWith(prefix) || !key.endsWith(suffix)) return null;
-  const provider = key.slice(prefix.length, -suffix.length);
-  return isProviderKey(provider) ? provider : null;
+  for (const field of ["apiKey", "audioApiKey"] as const) {
+    const suffix = `:${field}`;
+    if (!key.startsWith(prefix) || !key.endsWith(suffix)) continue;
+    const provider = key.slice(prefix.length, -suffix.length);
+    return isProviderKey(provider) ? { provider, field } : null;
+  }
+  return null;
 }
 
-function providerFromBaseUrlSettingKey(key: string): AiProvider | null {
+function providerFromBaseUrlSettingKey(key: string): { provider: AiProvider; field: BaseUrlCredentialField } | null {
   const prefix = "provider:";
-  const suffix = ":baseUrl";
-  if (!key.startsWith(prefix) || !key.endsWith(suffix)) return null;
-  const provider = key.slice(prefix.length, -suffix.length);
-  return isProviderKey(provider) ? provider : null;
+  for (const field of ["baseUrl", "audioBaseUrl"] as const) {
+    const suffix = `:${field}`;
+    if (!key.startsWith(prefix) || !key.endsWith(suffix)) continue;
+    const provider = key.slice(prefix.length, -suffix.length);
+    return isProviderKey(provider) ? { provider, field } : null;
+  }
+  return null;
 }
 
 function defaultProviderCredentialStatus(providerKeys: readonly AiProvider[]): Record<AiProvider, ProviderCredentialStatus> {
   const record = {} as Record<AiProvider, ProviderCredentialStatus>;
-  for (const provider of providerKeys) record[provider] = { apiKeyConfigured: false };
+  for (const provider of providerKeys) record[provider] = { apiKeyConfigured: false, audioApiKeyConfigured: false };
   return record;
 }
 
@@ -269,6 +282,8 @@ export function useProviderSettings({
     const creds = providerCredentials[provider];
     if (creds?.apiKey) headers["x-ai-api-key"] = creds.apiKey;
     if (creds?.baseUrl) headers["x-ai-base-url"] = creds.baseUrl;
+    if (creds?.audioApiKey) headers["x-ai-audio-api-key"] = creds.audioApiKey;
+    if (creds?.audioBaseUrl) headers["x-ai-audio-base-url"] = creds.audioBaseUrl;
     const customProvider = customProviderByKey.get(provider);
     if (customProvider) {
       headers["x-ai-provider-label"] = customProvider.label;
@@ -311,12 +326,14 @@ export function useProviderSettings({
 
   const handleSaveCredential = useCallback((provider: AiProvider, field: keyof ProviderCredentials, value: string) => {
     setProviderCredentials(prev => {
-      const current = prev[provider] ?? { apiKey: "", baseUrl: "" };
+      const current = prev[provider] ?? emptyProviderCredentials();
       const nextCredentials = { ...current, [field]: value.trim() };
       const next = { ...prev, [provider]: nextCredentials };
       if (credentialStorageTarget !== "postgres") {
         try { localStorage.setItem("imagine_provider_credentials", JSON.stringify(next)); } catch { /* storage unavailable */ }
-        syncResolveProviderCredentialIfEnabled(provider, nextCredentials, getProviderLabel(provider));
+        if (field === "apiKey" || field === "baseUrl") {
+          syncResolveProviderCredentialIfEnabled(provider, nextCredentials, getProviderLabel(provider));
+        }
       }
       return next;
     });
@@ -329,11 +346,11 @@ export function useProviderSettings({
       pushWorkspaceNotice("error", t("common.notices.providerCredentialCsrfMissing"));
       return;
     }
-    if (field === "baseUrl") {
-      const baseUrl = providerCredentials[provider]?.baseUrl.trim() ?? "";
-      const key = providerBaseUrlSettingKey(provider);
+    if (field === "baseUrl" || field === "audioBaseUrl") {
+      const baseUrl = providerCredentials[provider]?.[field]?.trim() ?? "";
+      const key = providerBaseUrlSettingKey(provider, field);
       const expectedUpdatedAt = teamSettingVersionsRef.current.get(key);
-      void (baseUrl || customProviderByKey.has(provider)
+      void (baseUrl || (field === "baseUrl" && customProviderByKey.has(provider))
         ? saveTeamSetting({ expectedUpdatedAt, group: "provider", key, value: baseUrl }, csrfToken)
           .then(result => {
             teamSettingVersionsRef.current.set(key, result.setting.updatedAt);
@@ -347,15 +364,18 @@ export function useProviderSettings({
       });
       return;
     }
-    const apiKey = providerCredentials[provider]?.apiKey.trim() ?? "";
-    const key = providerApiKeySecretKey(provider);
+    const apiKey = providerCredentials[provider]?.[field]?.trim() ?? "";
+    const key = providerApiKeySecretKey(provider, field);
     void (apiKey
       ? saveTeamSecret({ group: "provider", key, value: apiKey }, csrfToken)
       : deleteTeamSecret(key, csrfToken)
     ).then(() => {
       setProviderCredentialStatus(prev => ({
         ...prev,
-        [provider]: { apiKeyConfigured: Boolean(apiKey) },
+        [provider]: {
+          ...prev[provider],
+          [field === "audioApiKey" ? "audioApiKeyConfigured" : "apiKeyConfigured"]: Boolean(apiKey),
+        },
       }));
     }).catch(error => {
       pushWorkspaceNotice("error", toErrorMessage(error, t("common.notices.providerCredentialSaveFailed")));
@@ -364,7 +384,7 @@ export function useProviderSettings({
 
   const clearProviderCredentials = useCallback((provider: AiProvider) => {
     setProviderCredentials(prev => {
-      const next = { ...prev, [provider]: { apiKey: "", baseUrl: "" } };
+      const next = { ...prev, [provider]: emptyProviderCredentials() };
       if (credentialStorageTarget !== "postgres") {
         try { localStorage.setItem("imagine_provider_credentials", JSON.stringify(next)); } catch { /* storage unavailable */ }
         syncResolveProviderCredentialIfEnabled(provider, next[provider]);
@@ -378,9 +398,12 @@ export function useProviderSettings({
       return;
     }
     const baseUrlSettingKey = providerBaseUrlSettingKey(provider);
+    const audioBaseUrlSettingKey = providerBaseUrlSettingKey(provider, "audioBaseUrl");
     const expectedBaseUrlUpdatedAt = teamSettingVersionsRef.current.get(baseUrlSettingKey);
+    const expectedAudioBaseUrlUpdatedAt = teamSettingVersionsRef.current.get(audioBaseUrlSettingKey);
     void Promise.all([
       deleteTeamSecret(providerApiKeySecretKey(provider), csrfToken),
+      deleteTeamSecret(providerApiKeySecretKey(provider, "audioApiKey"), csrfToken),
       customProviderByKey.has(provider)
         ? saveTeamSetting({ expectedUpdatedAt: expectedBaseUrlUpdatedAt, group: "provider", key: baseUrlSettingKey, value: "" }, csrfToken)
           .then(result => {
@@ -390,11 +413,15 @@ export function useProviderSettings({
           .then(() => {
             teamSettingVersionsRef.current.delete(baseUrlSettingKey);
           }),
+      deleteTeamSetting(audioBaseUrlSettingKey, csrfToken, expectedAudioBaseUrlUpdatedAt)
+        .then(() => {
+          teamSettingVersionsRef.current.delete(audioBaseUrlSettingKey);
+        }),
     ])
       .then(() => {
         setProviderCredentialStatus(prev => ({
           ...prev,
-          [provider]: { apiKeyConfigured: false },
+          [provider]: { apiKeyConfigured: false, audioApiKeyConfigured: false },
         }));
       })
       .catch(error => {
@@ -436,14 +463,14 @@ export function useProviderSettings({
       return next;
     });
     setProviderCredentials(prev => {
-      const next = { ...prev, [key]: { apiKey: "", baseUrl: cleanBaseUrl } };
+      const next = { ...prev, [key]: { ...emptyProviderCredentials(), baseUrl: cleanBaseUrl } };
       if (credentialStorageTarget !== "postgres") {
         try { localStorage.setItem("imagine_provider_credentials", JSON.stringify(next)); } catch { /* storage unavailable */ }
         syncResolveProviderCredentialIfEnabled(key, next[key], cleanLabel);
       }
       return next;
     });
-    setProviderCredentialStatus(prev => ({ ...prev, [key]: { apiKeyConfigured: false } }));
+    setProviderCredentialStatus(prev => ({ ...prev, [key]: { apiKeyConfigured: false, audioApiKeyConfigured: false } }));
     setChatModelOptions(prev => ({ ...prev, [key]: [] }));
     setImageModelOptions(prev => ({ ...prev, [key]: [] }));
     setVideoModelOptions(prev => ({ ...prev, [key]: [] }));
@@ -718,9 +745,9 @@ export function useProviderSettings({
             merged[provider.key].baseUrl = provider.baseUrl;
           }
           for (const [key, value] of teamSettingsByKey) {
-            const provider = providerFromBaseUrlSettingKey(key);
-            if (provider && restoredProviderKeys.includes(provider)) {
-              merged[provider].baseUrl = value;
+            const credential = providerFromBaseUrlSettingKey(key);
+            if (credential && restoredProviderKeys.includes(credential.provider)) {
+              merged[credential.provider][credential.field] = value;
             }
           }
           setProviderCredentials(merged);
@@ -728,8 +755,13 @@ export function useProviderSettings({
             const secretStatuses = await fetchTeamSecrets({ groups: ["provider"] });
             if (!isActive) return;
             for (const secret of secretStatuses.secrets) {
-              const provider = providerFromApiKeySecretKey(secret.key);
-              if (provider) restoredCredentialStatus[provider] = { apiKeyConfigured: true };
+              const credential = providerFromApiKeySecretKey(secret.key);
+              if (credential) {
+                restoredCredentialStatus[credential.provider] = {
+                  ...restoredCredentialStatus[credential.provider],
+                  [credential.field === "audioApiKey" ? "audioApiKeyConfigured" : "apiKeyConfigured"]: true,
+                };
+              }
             }
           } catch {
             // Secret visibility is role-gated; unauthenticated/non-admin sessions simply have no status to show.
@@ -747,6 +779,8 @@ export function useProviderSettings({
               for (const provider of restoredProviderKeys) {
                 if (typeof parsed[provider]?.apiKey === "string") merged[provider].apiKey = parsed[provider].apiKey;
                 if (typeof parsed[provider]?.baseUrl === "string") merged[provider].baseUrl = parsed[provider].baseUrl;
+                if (typeof parsed[provider]?.audioApiKey === "string") merged[provider].audioApiKey = parsed[provider].audioApiKey;
+                if (typeof parsed[provider]?.audioBaseUrl === "string") merged[provider].audioBaseUrl = parsed[provider].audioBaseUrl;
               }
               setProviderCredentials(merged);
             } catch { /* ignore corrupt data */ }

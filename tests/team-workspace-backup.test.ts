@@ -291,6 +291,10 @@ test("restoreTeamWorkspaceBackup imports classified browser localStorage into te
               apiKey: "browser-grok-key",
               baseUrl: "https://grok.example.test",
             },
+            volcengine: {
+              audioApiKey: "browser-seed-audio-key",
+              audioBaseUrl: "https://openspeech.bytedance.com",
+            },
           }),
           imagine_runninghub_saved_targets: JSON.stringify([RUNNINGHUB_SAVED_TARGET]),
           "imagine_board_viewed_generated_asset_ids:board_1": JSON.stringify(["asset_1"]),
@@ -304,7 +308,7 @@ test("restoreTeamWorkspaceBackup imports classified browser localStorage into te
         true,
       );
 
-      assert.equal(result.settingsKeyCount, 7);
+      assert.equal(result.settingsKeyCount, 9);
       const settingWrites = queries.filter(query => query.text.startsWith("insert into settings"));
       assert.equal(settingWrites.find(query => query.values?.[1] === "provider:selected")?.values?.[3], "grok2api");
       assert.equal(settingWrites.find(query => query.values?.[1] === "provider:chatModel")?.values?.[3], "grok2api:grok-4-image");
@@ -312,6 +316,10 @@ test("restoreTeamWorkspaceBackup imports classified browser localStorage into te
       const secretValue = String(settingWrites.find(query => query.values?.[1] === "provider:grok2api:apiKey")?.values?.[3] ?? "");
       assert.equal(isEncryptedWorkspaceSecret(secretValue), true);
       assert.equal(decryptWorkspaceSecret(secretValue, ENCRYPTION_KEY), "browser-grok-key");
+      assert.equal(settingWrites.find(query => query.values?.[1] === "provider:volcengine:audioBaseUrl")?.values?.[3], "https://openspeech.bytedance.com");
+      const audioSecretValue = String(settingWrites.find(query => query.values?.[1] === "provider:volcengine:audioApiKey")?.values?.[3] ?? "");
+      assert.equal(isEncryptedWorkspaceSecret(audioSecretValue), true);
+      assert.equal(decryptWorkspaceSecret(audioSecretValue, ENCRYPTION_KEY), "browser-seed-audio-key");
 
       const promptWrite = queries.find(query => query.text.includes("insert into prompt_templates"));
       assert.equal(promptWrite?.values?.[0], CUSTOM_PROMPT_TEMPLATE.id);

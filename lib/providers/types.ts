@@ -5,6 +5,8 @@ import type { MediaReferenceType } from "@/lib/media-references";
 export interface ProviderCredentials {
   apiKey: string;
   baseUrl: string;
+  audioApiKey?: string;
+  audioBaseUrl?: string;
 }
 
 export interface ProviderConfig {

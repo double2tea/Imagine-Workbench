@@ -97,6 +97,31 @@ test("readTeamProviderConfigOverrides reads encrypted key and non-secret base UR
   });
 });
 
+test("readTeamProviderConfigOverrides reads audio scoped provider credentials", async () => {
+  const queries: Array<{ text: string; values?: readonly unknown[] }> = [];
+  const result = await readTeamProviderConfigOverrides(
+    createTeamProviderConfigQueryable(queries, {
+      audioBaseUrl: "https://openspeech.bytedance.com",
+      ciphertext: encryptWorkspaceSecret("seed-audio-team-key", ENCRYPTION_KEY),
+      role: "editor",
+    }),
+    { databaseUrl: "postgres://localhost/imagine", mediaDir: "/srv/imagine/media" },
+    requestWithSession(),
+    "volcengine",
+    ENCRYPTION_KEY,
+    "editor",
+    "audio",
+  );
+
+  assert.deepEqual(result, {
+    apiKey: "seed-audio-team-key",
+    baseUrl: "https://openspeech.bytedance.com",
+    providerLabel: undefined,
+  });
+  assert.ok(queries.some(query => query.values?.[1] === "provider:volcengine:audioApiKey"));
+  assert.ok(queries.some(query => query.values?.[1] === "provider:volcengine:audioBaseUrl"));
+});
+
 test("readTeamProviderConfigOverrides reads custom provider definition fallback", async () => {
   const result = await readTeamProviderConfigOverrides(
     createTeamProviderConfigQueryable([], {
@@ -183,6 +208,7 @@ function requestWithSession(): Request {
 function createTeamProviderConfigQueryable(
   queries: Array<{ text: string; values?: readonly unknown[] }>,
   options: {
+    audioBaseUrl?: string;
     baseUrl?: string;
     baseUrlIsSecret?: boolean;
     ciphertext: string;
@@ -213,10 +239,13 @@ function createTeamProviderConfigQueryable(
         if (key === "provider:custom-openai:baseUrl" && options.baseUrl !== undefined) {
           return typedQueryResult<T>([settingRow(key, options.baseUrl, options.baseUrlIsSecret ?? false)]);
         }
+        if (key === "provider:volcengine:audioBaseUrl" && options.audioBaseUrl !== undefined) {
+          return typedQueryResult<T>([settingRow(key, options.audioBaseUrl, false)]);
+        }
         if (key === "provider:customProviders" && options.customProviders !== undefined) {
           return typedQueryResult<T>([settingRow(key, options.customProviders, false)]);
         }
-        if (!key.endsWith(":apiKey")) return typedQueryResult<T>([]);
+        if (!key.endsWith(":apiKey") && !key.endsWith(":audioApiKey")) return typedQueryResult<T>([]);
         return typedQueryResult<T>([{
           group_name: "provider",
           is_secret: options.isSecret ?? true,

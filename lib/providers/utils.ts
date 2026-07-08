@@ -2,6 +2,7 @@ import { ApiError } from "../api/errors";
 import type { AiProvider } from "./model-catalog";
 import type { ProviderConfig, ProviderMediaType } from "./types";
 import {
+  getProviderCredentialMeta,
   getProviderMeta,
   isKnownProvider,
   isProviderKey,
@@ -9,6 +10,7 @@ import {
   resolveProviderApiKey,
   resolveProviderBaseUrl,
   resolveProviderVideoBaseUrl,
+  type ProviderCredentialScope,
 } from "./registry";
 
 export function requireText(value: unknown, name: string): string {
@@ -25,6 +27,7 @@ export function optionalText(value: unknown): string | undefined {
 export interface ResolveProviderConfigOptions {
   apiKeyOverride?: string;
   baseUrlOverride?: string;
+  credentialScope?: ProviderCredentialScope;
   ignoredBearerToken?: string;
   providerLabelOverride?: string;
 }
@@ -34,14 +37,17 @@ export function resolveProviderConfig(
   provider: AiProvider,
   options: ResolveProviderConfigOptions = {},
 ): ProviderConfig {
+  const credentialScope = options.credentialScope ?? "default";
   const requestKey = readProviderRequestApiKey(req, options);
-  const headerBaseUrl = trimCredential(req.headers.get("x-ai-base-url") ?? "");
+  const headerBaseUrl = trimCredential(req.headers.get(providerBaseUrlHeaderName(credentialScope)) ?? "");
   const providerLabel = optionalText(req.headers.get("x-ai-provider-label")) ?? optionalText(options.providerLabelOverride);
-  const envKey = trimCredential(resolveProviderApiKey(provider));
+  const envKey = trimCredential(resolveProviderApiKey(provider, credentialScope));
   const overrideKey = trimCredential(options.apiKeyOverride ?? "");
   const overrideBaseUrl = trimCredential(options.baseUrlOverride ?? "");
-  const configuredBaseUrl = headerBaseUrl || overrideBaseUrl || trimCredential(resolveProviderBaseUrl(provider));
-  const videoBaseUrl = resolveProviderVideoBaseUrl(provider) || configuredBaseUrl;
+  const configuredBaseUrl = headerBaseUrl || overrideBaseUrl || trimCredential(resolveProviderBaseUrl(provider, credentialScope));
+  const videoBaseUrl = credentialScope === "default"
+    ? resolveProviderVideoBaseUrl(provider) || configuredBaseUrl
+    : configuredBaseUrl;
 
   const apiKey = requestKey || overrideKey || envKey;
   if (!isKnownProvider(provider) && !apiKey) {
@@ -52,7 +58,9 @@ export function resolveProviderConfig(
   }
   if (isKnownProvider(provider) && !apiKey) {
     const meta = getProviderMeta(provider);
-    throw new Error(`${meta.label} API key is required. Set ${meta.envApiKey} or provide a custom API key.`);
+    const credentialMeta = getProviderCredentialMeta(provider, credentialScope);
+    const label = credentialScope === "audio" ? `${meta.label} audio` : meta.label;
+    throw new Error(`${label} API key is required. Set ${credentialMeta.envApiKey} or provide a custom API key.`);
   }
   const resolvedBaseUrl = resolveProviderRequestBaseUrl(provider, apiKey, configuredBaseUrl);
 
@@ -66,8 +74,10 @@ export function resolveProviderConfig(
 }
 
 export function readProviderRequestApiKey(req: Request, options: ResolveProviderConfigOptions = {}): string {
-  const headerKey = trimCredential(req.headers.get("x-ai-api-key") ?? "");
+  const credentialScope = options.credentialScope ?? "default";
+  const headerKey = trimCredential(req.headers.get(providerApiKeyHeaderName(credentialScope)) ?? "");
   if (headerKey) return headerKey;
+  if (credentialScope === "audio") return "";
   const rawBearerKey = readBearerToken(req.headers.get("authorization"));
   return rawBearerKey && rawBearerKey !== options.ignoredBearerToken ? trimCredential(rawBearerKey) : "";
 }
@@ -75,7 +85,6 @@ export function readProviderRequestApiKey(req: Request, options: ResolveProvider
 export function authHeaders(config: ProviderConfig): HeadersInit {
   if (!config.apiKey) return {};
   if (config.provider === "mimo") return { "api-key": config.apiKey };
-  if (config.provider === "seedaudio") return { "X-Api-Key": config.apiKey };
   return { Authorization: `Bearer ${config.apiKey}` };
 }
 
@@ -207,6 +216,14 @@ function trimTrailingSlash(value: string): string {
 
 function trimCredential(value: string): string {
   return value.trim();
+}
+
+function providerApiKeyHeaderName(scope: ProviderCredentialScope): string {
+  return scope === "audio" ? "x-ai-audio-api-key" : "x-ai-api-key";
+}
+
+function providerBaseUrlHeaderName(scope: ProviderCredentialScope): string {
+  return scope === "audio" ? "x-ai-audio-base-url" : "x-ai-base-url";
 }
 
 function readBearerToken(value: string | null): string | undefined {

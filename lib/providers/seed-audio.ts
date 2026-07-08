@@ -3,6 +3,11 @@ import { parseProviderResponseBody, isRecord, parseDataUri, requireText } from "
 import type { GenerateAudioOperationInput, ProviderConfig, ReferenceMedia } from "./types";
 
 export const SEED_AUDIO_MODEL = "seed-audio-1.0";
+export const SEED_AUDIO_PROVIDER = "volcengine";
+
+export function isSeedAudioProviderModel(provider: string, model: string): boolean {
+  return provider === SEED_AUDIO_PROVIDER && model === SEED_AUDIO_MODEL;
+}
 
 type SeedAudioFormat = "wav" | "mp3" | "pcm" | "ogg_opus";
 type SeedAudioSampleRate = 8000 | 16000 | 24000 | 32000 | 44100 | 48000;

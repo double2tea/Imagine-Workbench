@@ -2136,9 +2136,9 @@
       }
     },
     {
-      "value": "seedaudio:seed-audio-1.0",
+      "value": "volcengine:seed-audio-1.0",
       "label": "Seed Audio 1.0",
-      "provider": "seedaudio",
+      "provider": "volcengine",
       "model": "seed-audio-1.0",
       "kind": "audio",
       "listed": true,

@@ -6,7 +6,7 @@ import {
   resolveProviderConfig,
   type ResolveProviderConfigOptions,
 } from "@/lib/providers/utils";
-import { isKnownProvider, type CustomProviderDefinition } from "@/lib/providers/registry";
+import { isKnownProvider, type CustomProviderDefinition, type ProviderCredentialScope } from "@/lib/providers/registry";
 import { IMAGINE_STORAGE_TARGET_ENV, parseWorkspaceStorageMode } from "@/lib/storage/local-config";
 import { resolvePostgresStorageConfig, requireTeamSecretEncryptionKey, type PostgresStorageConfig } from "@/lib/storage/postgres/config";
 import { type PostgresQueryable, withPostgresClient } from "@/lib/storage/postgres/connection";
@@ -49,6 +49,7 @@ export async function resolveProviderConfigForRequest(
     provider,
     encryptionKey,
     options.minimumTeamRole ?? "editor",
+    options.credentialScope ?? "default",
   ));
   return resolveProviderConfig(req, provider, {
     ...options,
@@ -93,9 +94,10 @@ export async function readTeamProviderApiKey(
   provider: AiProvider,
   encryptionKey: string,
   minimumRole: TeamRole,
+  credentialScope: ProviderCredentialScope = "default",
 ): Promise<string | null> {
   const context = await createTeamWorkspaceStorageContext(queryable, config, req, { minimumRole });
-  const record = await context.repository.settings.get(`provider:${provider}:apiKey`);
+  const record = await context.repository.settings.get(providerApiKeySettingKey(provider, credentialScope));
   if (!record) return null;
   if (!record.isSecret || !isEncryptedWorkspaceSecret(record.value)) {
     throw new Error(`Team ${provider} API key must be stored as an encrypted secret`);
@@ -110,12 +112,15 @@ export async function readTeamProviderConfigOverrides(
   provider: AiProvider,
   encryptionKey: string,
   minimumRole: TeamRole,
+  credentialScope: ProviderCredentialScope = "default",
 ): Promise<TeamProviderConfigOverrides> {
   const context = await createTeamWorkspaceStorageContext(queryable, config, req, { minimumRole });
   const [apiKeyRecord, baseUrlRecord, customProvidersRecord] = await Promise.all([
-    context.repository.settings.get(`provider:${provider}:apiKey`),
-    context.repository.settings.get(`provider:${provider}:baseUrl`),
-    isKnownProvider(provider) ? Promise.resolve(null) : context.repository.settings.get("provider:customProviders"),
+    context.repository.settings.get(providerApiKeySettingKey(provider, credentialScope)),
+    context.repository.settings.get(providerBaseUrlSettingKey(provider, credentialScope)),
+    isKnownProvider(provider) || credentialScope === "audio"
+      ? Promise.resolve(null)
+      : context.repository.settings.get("provider:customProviders"),
   ]);
 
   let apiKey: string | null = null;
@@ -145,6 +150,18 @@ export async function readTeamProviderConfigOverrides(
     baseUrl,
     providerLabel: customProvider?.label,
   };
+}
+
+function providerApiKeySettingKey(provider: AiProvider, credentialScope: ProviderCredentialScope): string {
+  return credentialScope === "audio"
+    ? `provider:${provider}:audioApiKey`
+    : `provider:${provider}:apiKey`;
+}
+
+function providerBaseUrlSettingKey(provider: AiProvider, credentialScope: ProviderCredentialScope): string {
+  return credentialScope === "audio"
+    ? `provider:${provider}:audioBaseUrl`
+    : `provider:${provider}:baseUrl`;
 }
 
 function runningHubProviderTargetIdFromModel(model: string): string | null {

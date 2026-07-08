@@ -17,12 +17,12 @@ interface ProviderCredentialCardProps {
   registerUrl?: string;
   showBaseUrl: boolean;
   title: string;
-  onClear: (provider: AiProvider) => void;
+  onClear?: (provider: AiProvider) => void;
   onCommitApiKey?: (provider: AiProvider) => void;
   onCommitBaseUrl?: (provider: AiProvider) => void;
   onSaveApiKey: (provider: AiProvider, value: string) => void;
   onSaveBaseUrl: (provider: AiProvider, value: string) => void;
-  onTest: (provider: AiProvider) => void;
+  onTest?: (provider: AiProvider) => void;
 }
 
 export function ProviderCredentialCard({
@@ -101,25 +101,31 @@ export function ProviderCredentialCard({
           </a>
         </div>
       ) : null}
-      <div className="mt-3 flex items-center gap-2">
-        <button
-          type="button"
-          onClick={() => onTest(provider)}
-          disabled={isTesting}
-          className="imagine-settings-toolbar-btn"
-        >
-          <RefreshCw className={`h-3 w-3 ${isTesting ? "animate-spin" : ""}`} />
-          {t("providers.testButton")}
-        </button>
-        <button
-          type="button"
-          onClick={() => onClear(provider)}
-          className="imagine-danger-action h-8 rounded-lg px-3 text-[10px] font-semibold transition"
-        >
-          {clearLabel}
-        </button>
-      </div>
-      {providerTest.provider === provider && providerTest.message ? (
+      {onTest || onClear ? (
+        <div className="mt-3 flex items-center gap-2">
+          {onTest ? (
+            <button
+              type="button"
+              onClick={() => onTest(provider)}
+              disabled={isTesting}
+              className="imagine-settings-toolbar-btn"
+            >
+              <RefreshCw className={`h-3 w-3 ${isTesting ? "animate-spin" : ""}`} />
+              {t("providers.testButton")}
+            </button>
+          ) : null}
+          {onClear ? (
+            <button
+              type="button"
+              onClick={() => onClear(provider)}
+              className="imagine-danger-action h-8 rounded-lg px-3 text-[10px] font-semibold transition"
+            >
+              {clearLabel}
+            </button>
+          ) : null}
+        </div>
+      ) : null}
+      {onTest && providerTest.provider === provider && providerTest.message ? (
         <p
           className="imagine-tone-icon mt-2 font-mono text-[10px]"
           data-tone={providerTest.status === "error" ? "danger" : "success"}

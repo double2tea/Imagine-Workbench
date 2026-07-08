@@ -7,7 +7,7 @@ import { listProviderModels } from "../lib/providers/models";
 import type { ProviderConfig } from "../lib/providers/types";
 
 const seedAudioConfig: ProviderConfig = {
-  provider: "seedaudio",
+  provider: "volcengine",
   apiKey: "seed_audio_test_key",
   baseUrl: "https://openspeech.bytedance.com",
   videoBaseUrl: "https://openspeech.bytedance.com",
@@ -21,7 +21,7 @@ test("Seed Audio model listing uses static audio capabilities without fetching",
 
   try {
     assert.deepEqual(await listProviderModels(seedAudioConfig, "audio"), [
-      { value: "seedaudio:seed-audio-1.0", label: "Seed Audio 1.0" },
+      { value: "volcengine:seed-audio-1.0", label: "Seed Audio 1.0" },
     ]);
   } finally {
     globalThis.fetch = originalFetch;
@@ -89,7 +89,7 @@ test("Seed Audio prompt generation sends OpenSpeech create request", async () =>
     assert.deepEqual(result, {
       type: "direct",
       outputKind: "audio",
-      source: "seedaudio",
+      source: "volcengine",
       audioBase64: "seed_audio_base64",
       format: "mp3",
       model: "seed-audio-1.0",

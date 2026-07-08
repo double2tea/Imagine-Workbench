@@ -37,12 +37,6 @@ test("authHeaders uses MiMo api-key header", () => {
     videoBaseUrl: "https://api.xiaomimimo.com",
   }), { "api-key": "mimo_key" });
   assert.deepEqual(authHeaders({
-    provider: "seedaudio",
-    apiKey: "seed_key",
-    baseUrl: "https://openspeech.bytedance.com",
-    videoBaseUrl: "https://openspeech.bytedance.com",
-  }), { "X-Api-Key": "seed_key" });
-  assert.deepEqual(authHeaders({
     provider: "12ai",
     apiKey: "twelve_key",
     baseUrl: "https://cdn.12ai.org",
@@ -105,6 +99,25 @@ test("resolveProviderConfig uses request credentials before injected team creden
   );
   assert.equal(requestConfig.apiKey, "sk-request-key");
   assert.equal(requestConfig.baseUrl, "https://api.xiaomimimo.com/v1");
+});
+
+test("resolveProviderConfig uses Volcengine audio credential scope", () => {
+  const config = resolveProviderConfig(
+    new Request("https://local.test", {
+      headers: {
+        "x-ai-api-key": " ark_key ",
+        "x-ai-base-url": " https://ark.cn-beijing.volces.com/api/v3/ ",
+        "x-ai-audio-api-key": " seed_audio_key ",
+        "x-ai-audio-base-url": " https://openspeech.bytedance.com/ ",
+      },
+    }),
+    "volcengine",
+    { credentialScope: "audio" },
+  );
+
+  assert.equal(config.apiKey, "seed_audio_key");
+  assert.equal(config.baseUrl, "https://openspeech.bytedance.com");
+  assert.equal(config.videoBaseUrl, "https://openspeech.bytedance.com");
 });
 
 test("openAiCompatibleUrl supports root, v1, and Ark api/v3 base URLs", () => {

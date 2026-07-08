@@ -43,6 +43,7 @@ import { listProviderModels, type ModelKindFilter } from "@/lib/providers/models
 import { readModelParameterValues } from "@/lib/providers/parameter-values";
 import { fetchRunningHubAiAppSchema } from "@/lib/providers/runninghub-app";
 import { getRunningHubYouchuanCatalog } from "@/lib/providers/runninghub";
+import { isSeedAudioProviderModel } from "@/lib/providers/seed-audio";
 import {
   isRunningHubTaskTarget,
   readRunningHubNodeInfoList,
@@ -62,6 +63,7 @@ import {
   optionalText,
   parseMediaOperationName,
   resolveProviderConfig,
+  type ResolveProviderConfigOptions,
 } from "@/lib/providers/utils";
 import { isProviderKey } from "@/lib/providers/registry";
 import {
@@ -503,7 +505,9 @@ async function generateAudioOperationForBrowser(headers: Headers, body: unknown,
   const payloadError = getReferenceMediaPayloadError(referenceMedia.map(reference => reference.dataUri));
   if (payloadError) throw payloadTooLarge(payloadError);
 
-  return generateAudioOperation(resolveBrowserProviderConfig(headers, parsed.provider, signal), {
+  return generateAudioOperation(resolveBrowserProviderConfig(headers, parsed.provider, signal, {
+    credentialScope: isSeedAudioProviderModel(parsed.provider, parsed.model) ? "audio" : "default",
+  }), {
     mode: parsedBody.mode,
     prompt: parsedBody.mode === "asr" ? optionalText(parsedBody.prompt) ?? "" : requireApiText(parsedBody.prompt, "Prompt"),
     model: parsed.model,
@@ -767,13 +771,20 @@ async function getRunningHubAiAppSchemaForBrowser(headers: Headers, body: unknow
 async function listModelsForBrowser(headers: Headers, url: URL, signal: AbortSignal | undefined): Promise<unknown> {
   const provider = readProvider(url, headers);
   const kind = readKind(url);
-  const models = await listProviderModels(resolveBrowserProviderConfig(headers, provider, signal), kind);
+  const models = await listProviderModels(resolveBrowserProviderConfig(headers, provider, signal, {
+    credentialScope: provider === "volcengine" && kind === "audio" ? "audio" : "default",
+  }), kind);
   return { models, kind, source: "provider" };
 }
 
-function resolveBrowserProviderConfig(headers: Headers, provider: AiProvider, signal: AbortSignal | undefined): ProviderConfig {
+function resolveBrowserProviderConfig(
+  headers: Headers,
+  provider: AiProvider,
+  signal: AbortSignal | undefined,
+  options: ResolveProviderConfigOptions = {},
+): ProviderConfig {
   return {
-    ...resolveProviderConfig(new Request("https://imagine-workbench.local", { headers }), provider),
+    ...resolveProviderConfig(new Request("https://imagine-workbench.local", { headers }), provider, options),
     signal,
   };
 }

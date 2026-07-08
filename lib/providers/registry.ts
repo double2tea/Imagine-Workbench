@@ -1,16 +1,23 @@
-export interface ProviderMeta {
-  key: string;
-  label: string;
+export type ProviderCredentialScope = "default" | "audio";
+
+export interface ProviderCredentialMeta {
+  label?: string;
   envApiKey: string;
   envBaseUrl: string;
-  envVideoBaseUrl?: string;
   defaultBaseUrl: string;
-  defaultVideoBaseUrl: string;
   apiKeyPlaceholder: string;
   credentialHint?: string;
   endpointInfo?: string[];
   registerUrl?: string;
   hasEditableBaseUrl: boolean;
+}
+
+export interface ProviderMeta extends ProviderCredentialMeta {
+  key: string;
+  label: string;
+  envVideoBaseUrl?: string;
+  defaultVideoBaseUrl: string;
+  audioCredential?: ProviderCredentialMeta;
   supportsImage: boolean;
   supportsVideo: boolean;
   supportsAudio: boolean;
@@ -134,30 +141,24 @@ export const PROVIDER_REGISTRY = [
       "Ark Chat: https://ark.cn-beijing.volces.com/api/v3/chat/completions",
     ],
     registerUrl: "https://console.volcengine.com/ark",
-    hasEditableBaseUrl: true,
-    supportsImage: false,
-    supportsVideo: false,
-    supportsAudio: false,
-    supportsChat: true,
-  },
-  {
-    key: "seedaudio",
-    label: "Volcengine Seed Audio",
-    envApiKey: "VOLCENGINE_TTS_API_KEY",
-    envBaseUrl: "SEED_AUDIO_BASE_URL",
-    defaultBaseUrl: "https://openspeech.bytedance.com",
-    defaultVideoBaseUrl: "https://openspeech.bytedance.com",
-    apiKeyPlaceholder: "your_volcengine_tts_api_key",
-    credentialHint: "Uses Volcengine / BytePlus OpenSpeech tts/create X-Api-Key authentication.",
-    endpointInfo: [
-      "OpenSpeech: https://openspeech.bytedance.com/api/v3/tts/create",
-    ],
-    registerUrl: "https://console.volcengine.com/speech/service/10007",
+    audioCredential: {
+      label: "Volcengine Seed Audio",
+      envApiKey: "VOLCENGINE_TTS_API_KEY",
+      envBaseUrl: "SEED_AUDIO_BASE_URL",
+      defaultBaseUrl: "https://openspeech.bytedance.com",
+      apiKeyPlaceholder: "your_volcengine_tts_api_key",
+      credentialHint: "Uses Volcengine / BytePlus OpenSpeech tts/create X-Api-Key authentication.",
+      endpointInfo: [
+        "Seed Audio: https://openspeech.bytedance.com/api/v3/tts/create",
+      ],
+      registerUrl: "https://console.volcengine.com/speech/service/10007",
+      hasEditableBaseUrl: true,
+    },
     hasEditableBaseUrl: true,
     supportsImage: false,
     supportsVideo: false,
     supportsAudio: true,
-    supportsChat: false,
+    supportsChat: true,
   },
 ] as const;
 
@@ -193,14 +194,23 @@ export function isProviderKey(value: string): value is AiProvider {
   return /^[a-z0-9][a-z0-9_-]{1,63}$/.test(value);
 }
 
-export function resolveProviderApiKey(provider: AiProvider): string {
-  if (!isKnownProvider(provider)) return "";
+export function getProviderCredentialMeta(
+  provider: AiProvider,
+  scope: ProviderCredentialScope = "default",
+): ProviderCredentialMeta {
   const meta = getProviderMeta(provider);
-  return readEnv(meta.envApiKey) ?? readEnv("AI_API_KEY") ?? "";
+  if (scope === "audio" && meta.audioCredential) return meta.audioCredential;
+  return meta;
 }
 
-export function resolveProviderBaseUrl(provider: AiProvider): string {
-  const meta = getProviderMeta(provider);
+export function resolveProviderApiKey(provider: AiProvider, scope: ProviderCredentialScope = "default"): string {
+  if (!isKnownProvider(provider)) return "";
+  const meta = getProviderCredentialMeta(provider, scope);
+  return readEnv(meta.envApiKey) ?? (scope === "default" ? readEnv("AI_API_KEY") : undefined) ?? "";
+}
+
+export function resolveProviderBaseUrl(provider: AiProvider, scope: ProviderCredentialScope = "default"): string {
+  const meta = getProviderCredentialMeta(provider, scope);
   return readEnv(meta.envBaseUrl) ?? meta.defaultBaseUrl;
 }
 

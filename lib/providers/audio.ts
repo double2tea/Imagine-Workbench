@@ -10,7 +10,7 @@ import {
   MIMO_TTS_VOICE_DESIGN_MODEL,
 } from "./mimo-tts";
 import { generateMimoAsr, MIMO_ASR_MODEL } from "./mimo-asr";
-import { generateSeedAudio } from "./seed-audio";
+import { generateSeedAudio, isSeedAudioProviderModel } from "./seed-audio";
 import type {
   GenerateAudioInput,
   GenerateAudioOperationInput,
@@ -61,7 +61,7 @@ export async function generateAudioOperation(
     throw new Error("Voice profile IDs must be resolved before audio operation");
   }
 
-  if (config.provider === "seedaudio") {
+  if (isSeedAudioProviderModel(config.provider, input.model)) {
     const result = await generateSeedAudio(config, input);
     return {
       type: "direct",

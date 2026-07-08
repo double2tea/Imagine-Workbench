@@ -1,8 +1,8 @@
-import type { AiProvider } from "@/lib/providers/registry";
-import { getProviderMeta } from "@/lib/providers/registry";
+import { getProviderCredentialMeta, getProviderMeta, type AiProvider, type ProviderCredentialScope } from "@/lib/providers/registry";
 import { t } from "@/lib/i18n";
 
-export function providerEndpointInfo(provider: AiProvider): string[] | undefined {
+export function providerEndpointInfo(provider: AiProvider, scope: ProviderCredentialScope = "default"): string[] | undefined {
+  if (scope !== "default") return getProviderCredentialMeta(provider, scope).endpointInfo;
   const meta = getProviderMeta(provider);
   if (meta.endpointInfo) return meta.endpointInfo;
   if (
@@ -18,8 +18,8 @@ export function providerEndpointInfo(provider: AiProvider): string[] | undefined
   return undefined;
 }
 
-export function providerClearLabel(provider: AiProvider): string {
-  return getProviderMeta(provider).hasEditableBaseUrl
+export function providerClearLabel(provider: AiProvider, scope: ProviderCredentialScope = "default"): string {
+  return getProviderCredentialMeta(provider, scope).hasEditableBaseUrl
     ? t("settings.providers.clearKeyBaseUrl")
     : t("settings.providers.clearKey");
 }

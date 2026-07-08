@@ -11,7 +11,9 @@ export async function GET(req: NextRequest) {
   try {
     const provider = readProvider(req);
     const kind = readKind(req);
-    const config = await resolveProviderConfigForRequest(req, provider);
+    const config = await resolveProviderConfigForRequest(req, provider, {
+      credentialScope: provider === "volcengine" && kind === "audio" ? "audio" : "default",
+    });
     const models = await listProviderModels(config, kind);
     return NextResponse.json({ models, kind, source: "provider" });
   } catch (err) {

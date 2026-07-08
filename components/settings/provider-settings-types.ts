@@ -8,4 +8,5 @@ export interface ProviderTestState {
 
 export interface ProviderCredentialStatus {
   apiKeyConfigured: boolean;
+  audioApiKeyConfigured?: boolean;
 }

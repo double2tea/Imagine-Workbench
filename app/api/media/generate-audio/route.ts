@@ -10,6 +10,7 @@ import { generateAudioOperation } from "@/lib/providers/audio";
 import { getOptionalModelCapability, parseProviderModel, ProviderModelParseError } from "@/lib/providers/model-catalog";
 import { readModelParameterValues } from "@/lib/providers/parameter-values";
 import { readRunningHubNodeInfoList } from "@/lib/providers/runninghub-node-info";
+import { isSeedAudioProviderModel } from "@/lib/providers/seed-audio";
 import type { ReferenceMedia } from "@/lib/providers/types";
 import { resolveProviderConfigForRequest } from "@/lib/providers/team-config";
 import { optionalText } from "@/lib/providers/utils";
@@ -68,7 +69,9 @@ export async function POST(req: NextRequest) {
     const payloadError = getReferenceMediaPayloadError(referenceMedia.map(reference => reference.dataUri));
     if (payloadError) return NextResponse.json({ error: payloadError, code: "payload_too_large" }, { status: 413 });
 
-    const config = await resolveProviderConfigForRequest(req, parsed.provider);
+    const config = await resolveProviderConfigForRequest(req, parsed.provider, {
+      credentialScope: isSeedAudioProviderModel(parsed.provider, parsed.model) ? "audio" : "default",
+    });
     const result = await generateAudioOperation(config, {
       mode: body.mode,
       prompt: body.mode === "asr" ? optionalText(body.prompt) ?? "" : requireApiText(body.prompt, "Prompt"),

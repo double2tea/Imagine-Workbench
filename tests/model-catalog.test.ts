@@ -122,16 +122,18 @@ test("Volcengine providers expose scoped capabilities", () => {
   assert.equal(isKnownProvider("volcengine"), true);
   assert.equal(PROVIDER_KEYS.includes("volcengine"), true);
   assert.equal(getProviderMeta("volcengine").envApiKey, "VOLCENGINE_API_KEY");
+  assert.equal(getProviderMeta("volcengine").audioCredential?.envApiKey, "VOLCENGINE_TTS_API_KEY");
   assert.equal(getProviderMeta("volcengine").supportsChat, true);
   assert.equal(getProviderMeta("volcengine").supportsImage, false);
+  assert.equal(getProviderMeta("volcengine").supportsAudio, true);
   assert.equal(CHAT_MODEL_OPTIONS.volcengine.length, 0);
+  assert.equal(AUDIO_MODEL_OPTIONS.volcengine.some(option => option.value === "volcengine:seed-audio-1.0"), true);
 
-  assert.equal(isKnownProvider("seedaudio"), true);
-  assert.equal(PROVIDER_KEYS.includes("seedaudio"), true);
-  assert.equal(getProviderMeta("seedaudio").envApiKey, "VOLCENGINE_TTS_API_KEY");
-  assert.equal(AUDIO_MODEL_OPTIONS.seedaudio.some(option => option.value === "seedaudio:seed-audio-1.0"), true);
+  assert.equal(isKnownProvider("seedaudio"), false);
+  assert.equal(PROVIDER_KEYS.includes("seedaudio"), false);
 
-  const capability = getModelCapability("seedaudio:seed-audio-1.0", "audio");
+  const capability = getModelCapability("volcengine:seed-audio-1.0", "audio");
+  assert.equal(capability.provider, "volcengine");
   assert.deepEqual(capability.audioModes, ["tts", "sfx", "music", "voice_clone"]);
   assert.deepEqual(capability.referenceMediaTypes, ["image", "audio"]);
   assert.equal(capability.maxReferenceImages, 3);
