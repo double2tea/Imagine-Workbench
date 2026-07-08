@@ -219,13 +219,53 @@ Unified Seed Audio under Volcengine audio scope, removed unsupported subtitle UI
 
 ### Main Changes
 
-(Add details)
+- Added `/api/media/generate-seed-audio` as a Seed Audio-only Edge route for hosted Browser BYOK.
+- Routed Browser BYOK Seed Audio requests through the same-origin Edge route while keeping non-Seed-Audio audio providers on their direct browser path.
+- Normalized legacy `seedaudio:seed-audio-1.0` values to `volcengine:seed-audio-1.0`.
+- Added regression coverage for Seed Audio Edge routing, audio-scoped credentials, non-Seed direct routing, and route rejection for non-Seed models.
 
 ### Git Commits
 
 | Hash | Message |
 |------|---------|
 | `182a5f03` | (see git log) |
+
+### Testing
+
+- [OK] Targeted Seed Audio/browser BYOK tests: 16/16
+- [OK] `pnpm run check`
+- [OK] `pnpm run test:providers`: 598/598
+- [OK] `pnpm run build`
+- [OK] `pnpm run pages:build`
+
+### Status
+
+[OK] **Completed**
+
+### Next Steps
+
+- None - task complete
+
+
+## Session 184: Fix hosted Seed Audio BYOK CORS
+
+**Date**: 2026-07-08
+**Task**: Fix hosted Seed Audio BYOK CORS
+**Branch**: `main`
+
+### Summary
+
+Added a Seed Audio-only Edge route for hosted Browser BYOK, routed legacy Seed Audio model values through Volcengine audio credentials, and verified provider/build/Pages coverage.
+
+### Main Changes
+
+(Add details)
+
+### Git Commits
+
+| Hash | Message |
+|------|---------|
+| `81b89d20` | (see git log) |
 
 ### Testing
 
