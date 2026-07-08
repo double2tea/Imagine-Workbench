@@ -126,3 +126,42 @@ Added `scripts/ego-p5-ui-regression.sh` for repeatable ego-browser checks: creat
 ### Next Steps
 
 - Follow-up: align board/agent shell theme classes with home page.
+
+## Session 181: Fix P5 UI regression script false positives
+
+**Date**: 2026-07-08
+**Task**: Fix P5 UI regression script false positives
+**Branch**: `main`
+
+### Summary
+
+Fixed the P5 ego-browser regression script so mobile UI false positives fail fast: ignored .ego-audit artifacts, required real mobile workflow/gallery/filter selectors, removed synthetic display forcing, and made ego-browser internal failures propagate as non-zero shell exits. Verified shell and heredoc JS syntax, lint, typecheck, and confirmed the script now fails on the surfaced mobile workflow issue instead of passing.
+
+### Main Changes
+
+- Added `.ego-audit/` to `.gitignore` so generated ego-browser screenshots no longer pollute `git status`.
+- Wrapped `ego-browser nodejs` output so internal ego failures propagate to the shell exit code.
+- Replaced synthetic mobile filter measurement with real visible-selector checks for mobile workflow, gallery, and filters.
+- Added explicit failed assertion reporting for `pass` and `interaction` maps.
+
+### Git Commits
+
+| Hash | Message |
+|------|---------|
+| `6c55265c` | (see git log) |
+
+### Testing
+
+- [OK] `bash -n scripts/ego-p5-ui-regression.sh`
+- [OK] heredoc JS syntax check with `node --input-type=module --check -`
+- [OK] `pnpm run lint`
+- [OK] `pnpm run typecheck`
+- [OK] `./scripts/ego-p5-ui-regression.sh` now exits non-zero on the surfaced mobile workflow issue instead of passing falsely.
+
+### Status
+
+[OK] **Completed**
+
+### Next Steps
+
+- None - task complete

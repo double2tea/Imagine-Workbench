@@ -8,7 +8,7 @@
 
 <!-- @@@auto:current-status -->
 - **Active File**: `journal-4.md`
-- **Total Sessions**: 180
+- **Total Sessions**: 181
 - **Last Active**: 2026-07-08
 <!-- @@@/auto:current-status -->
 
@@ -19,7 +19,7 @@
 <!-- @@@auto:active-documents -->
 | File | Lines | Status |
 |------|-------|--------|
-| `journal-4.md` | ~120 | Active |
+| `journal-4.md` | ~160 | Active |
 | `journal-3.md` | ~1985 | Archived |
 | `journal-2.md` | ~1973 | Archived |
 | `journal-1.md` | ~1988 | Archived |
@@ -32,6 +32,7 @@
 <!-- @@@auto:session-history -->
 | # | Date | Title | Commits | Branch |
 |---|------|-------|---------|--------|
+| 181 | 2026-07-08 | Fix P5 UI regression script false positives | `6c55265c` | `main` |
 | 180 | 2026-07-08 | ego-browser P5 UI regression script | `c67d4bde` | `main` |
 | 179 | 2026-07-08 | Dedupe CreationModeTabs ids | `759c842d` | `main` |
 | 178 | 2026-07-08 | Creation UI polish and Seed Audio provider | `86cb8804`, `fe328d41`, `79953d3c`, `8ede2db3`, `2e6e5204`, `74519e3f`, `8d0091f2`, `aaa9d7f6`, `1111779d` | `main` |
