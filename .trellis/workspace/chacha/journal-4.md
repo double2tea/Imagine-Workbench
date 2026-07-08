@@ -165,3 +165,43 @@ Fixed the P5 ego-browser regression script so mobile UI false positives fail fas
 ### Next Steps
 
 - None - task complete
+
+
+## Session 182: Unify Volcengine Seed Audio provider
+
+**Date**: 2026-07-08
+**Task**: Unify Volcengine Seed Audio provider
+**Branch**: `main`
+
+### Summary
+
+Unified the Volcengine provider surface by moving Seed Audio under volcengine with an audio credential scope, updated UI/settings/request routing, and verified tests plus a real Seed Audio route call.
+
+### Main Changes
+
+- Removed the separate visible `seedaudio` provider and moved Seed Audio capability to `volcengine:seed-audio-1.0`.
+- Added Volcengine audio credential scope fields and routing for server, Browser BYOK, local settings, team settings, and workspace backup import.
+- Updated settings UI to keep one Volcengine provider row while showing Ark and Seed Audio credential cards under that provider.
+- Verified the real `/api/media/generate-audio` route with the provided Seed Audio key and a short mp3 request.
+
+### Git Commits
+
+| Hash | Message |
+|------|---------|
+| `a8f8e3ca` | (see git log) |
+
+### Testing
+
+- [OK] `pnpm run test:providers`
+- [OK] `pnpm run build`
+- [OK] `pnpm run check`
+- [OK] Chrome DevTools web smoke for settings/provider list/audio model tab
+- [OK] Real Seed Audio route call returned 200 with direct mp3 audio
+
+### Status
+
+[OK] **Completed**
+
+### Next Steps
+
+- None - task complete
