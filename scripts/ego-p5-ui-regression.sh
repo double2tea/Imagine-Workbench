@@ -6,9 +6,36 @@ set -euo pipefail
 ROOT="$(cd "$(dirname "$0")/.." && pwd)"
 AUDIT_DIR="${ROOT}/.ego-audit"
 
-ego-browser nodejs <<'EOF'
+set +e
+EGO_OUTPUT="$(ego-browser nodejs 2>&1 <<'EOF'
 const task = await useOrCreateTaskSpace('iw-p5-ego-regression-v2')
 const auditDir = '/Users/chacha/Documents/Projects/Imagine-Workbench/.ego-audit'
+
+async function waitForVisibleSelector(selector, label, timeoutSeconds = 8) {
+  const quotedSelector = JSON.stringify(selector)
+  const deadline = Date.now() + timeoutSeconds * 1000
+  while (Date.now() < deadline) {
+    const visible = await js(`(() => {
+      const el = document.querySelector(${quotedSelector})
+      if (!el) return false
+      const style = getComputedStyle(el)
+      const rect = el.getBoundingClientRect()
+      return style.display !== 'none'
+        && style.visibility !== 'hidden'
+        && rect.width > 0
+        && rect.height > 0
+    })()`)
+    if (visible) return true
+    await wait(0.25)
+  }
+  throw new Error('Timed out waiting for ' + label)
+}
+
+function failingKeys(record) {
+  return Object.entries(record)
+    .filter(([, value]) => value !== true)
+    .map(([key]) => key)
+}
 
 async function auditDesktop() {
   return await js(String.raw`(() => {
@@ -145,8 +172,9 @@ const pass = {
 }
 
 await cdp('Emulation.setDeviceMetricsOverride', { width: 390, height: 844, deviceScaleFactor: 3, mobile: true })
-await js(`(() => { matchMedia('(min-width: 1024px)').dispatchEvent(new Event('change')); dispatchEvent(new Event('resize')) })()`)
-await wait(2)
+await cdp('Page.reload', { ignoreCache: true })
+await waitForNetworkIdle({ timeout: 30 }).catch(() => {})
+await waitForVisibleSelector('.imagine-mobile-workflow', 'mobile workflow')
 
 const mobileIds = await js(String.raw`(() => {
   const ids = [...document.querySelectorAll('[id^="creation-tab-"]')].map((el) => el.id)
@@ -161,36 +189,37 @@ const mobileIds = await js(String.raw`(() => {
 })()`)
 results.check.mobileIds = mobileIds
 
-await click('.imagine-mobile-workbench-tab:nth-child(2)', { label: 'gallery' }).catch(() => {})
-await wait(2)
+await click('.imagine-mobile-workbench-tab:nth-child(2)', { label: 'mobile gallery tab' })
+await waitForVisibleSelector('.imagine-mobile-asset-stream', 'mobile gallery panel')
+await waitForVisibleSelector('.imagine-mobile-asset-stream .imagine-gallery-filters', 'mobile gallery filters')
 
 const mobile = await js(String.raw`(() => {
-  const filters = document.querySelector('.imagine-mobile-asset-stream .imagine-gallery-filters') || document.querySelector('.imagine-gallery-filters')
-  if (!filters) return { error: 'no filters' }
-  const saved = []
-  let node = filters
-  while (node && node !== document.body) {
-    saved.push({ el: node, display: node.style.display })
-    node.style.setProperty('display', node === filters ? 'flex' : 'block', 'important')
-    node = node.parentElement
-  }
+  const gallery = document.querySelector('.imagine-mobile-asset-stream')
+  const filters = gallery?.querySelector('.imagine-gallery-filters')
+  if (!filters) return { error: 'no mobile filters', galleryMounted: !!gallery }
   const cs = getComputedStyle(filters)
   const r = filters.getBoundingClientRect()
+  const visible = cs.display !== 'none' && cs.visibility !== 'hidden' && r.width > 0 && r.height > 0
   const segments = [...filters.querySelectorAll('.imagine-filter-segment')]
   const tops = [...new Set(segments.map((s) => Math.round(s.getBoundingClientRect().top)))]
-  const out = { viewport: { w: innerWidth, h: innerHeight }, filters: { w: Math.round(r.width), h: Math.round(r.height), flexWrap: cs.flexWrap, segmentRows: tops.length }, chipH: [...new Set([...filters.querySelectorAll('.imagine-filter-chip')].map((c) => Math.round(c.getBoundingClientRect().height)))] }
-  for (const item of saved) item.el.style.display = item.display
-  return out
+  return {
+    viewport: { w: innerWidth, h: innerHeight },
+    galleryMounted: !!gallery,
+    filters: { w: Math.round(r.width), h: Math.round(r.height), flexWrap: cs.flexWrap, segmentRows: tops.length, visible },
+    chipH: [...new Set([...filters.querySelectorAll('.imagine-filter-chip')].map((c) => Math.round(c.getBoundingClientRect().height)))],
+  }
 })()`)
 results.check.mobile390 = mobile
 await captureScreenshot(auditDir + '/p5-mobile-filters.png')
 
 pass.mobileUniqueTabIds = (mobileIds?.duplicateTabIds?.length ?? 1) === 0
-pass.mobileTabIdPrefix = !mobileIds?.mobileWorkflowMounted
-  || ((mobileIds?.mobileTabIds?.length ?? 0) === 3
-    && (mobileIds?.mobileTabIds ?? []).every((id) => id.startsWith('creation-tab-mobile-')))
-pass.mobileWrap = mobile?.filters?.flexWrap === 'wrap' && mobile?.filters?.segmentRows >= 2
-pass.mobileChipLe30 = (mobile?.chipH ?? []).every((h) => h <= 30)
+pass.mobileWorkflowMounted = mobileIds?.mobileWorkflowMounted === true
+pass.mobileTabIdPrefix = (mobileIds?.mobileTabIds?.length ?? 0) === 3
+  && (mobileIds?.mobileTabIds ?? []).every((id) => id.startsWith('creation-tab-mobile-'))
+pass.mobileGalleryMounted = mobile?.galleryMounted === true
+pass.mobileFiltersVisible = mobile?.filters?.visible === true
+pass.mobileWrap = mobile?.filters?.visible === true && mobile?.filters?.flexWrap === 'wrap' && mobile?.filters?.segmentRows >= 2
+pass.mobileChipLe30 = Array.isArray(mobile?.chipH) && mobile.chipH.length > 0 && mobile.chipH.every((h) => h <= 30)
 
 const interaction = {
   darkImageClick: results.interaction['dark-image'] === true,
@@ -209,4 +238,21 @@ results.overallPass = Object.values(pass).every(Boolean)
 cliLog('=== P5 EGO REGRESSION (updated script) ===')
 cliLog(JSON.stringify(results, null, 2))
 cliLog('overallPass: ' + results.overallPass)
+
+const failedPassKeys = failingKeys(pass)
+const failedInteractionKeys = failingKeys(interaction)
+if (failedPassKeys.length > 0 || failedInteractionKeys.length > 0) {
+  cliLog('failedPassKeys: ' + failedPassKeys.join(', '))
+  cliLog('failedInteractionKeys: ' + failedInteractionKeys.join(', '))
+  throw new Error('P5 UI regression failed')
+}
 EOF
+)"
+EGO_STATUS=$?
+set -e
+
+printf '%s\n' "$EGO_OUTPUT"
+
+if [ "$EGO_STATUS" -ne 0 ] || printf '%s\n' "$EGO_OUTPUT" | grep -Eq "ego's nodejs process exited with code [1-9]|P5 UI regression failed|Timed out waiting for"; then
+  exit 1
+fi

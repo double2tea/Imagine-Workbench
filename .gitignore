@@ -4,6 +4,7 @@ node_modules/
 .vercel/
 coverage/
 .tmp/
+.ego-audit/
 .trellis/
 .DS_Store
 *.log
