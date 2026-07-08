@@ -10,7 +10,7 @@ export interface ModelOptionGroup {
 }
 
 interface ModelSelectComboboxProps {
-  accent: "blue" | "cyan" | "violet";
+  accent: "blue" | "cyan" | "violet" | "neutral";
   ariaLabel: string;
   groups: ModelOptionGroup[];
   value: string;
@@ -21,6 +21,14 @@ const focusClassByAccent: Record<ModelSelectComboboxProps["accent"], string> = {
   blue: "focus-within:border-[color-mix(in_srgb,var(--iw-accent)_45%,transparent)]",
   cyan: "focus-within:border-[color-mix(in_srgb,var(--iw-tone-teal-border)_70%,transparent)]",
   violet: "focus-within:border-[color-mix(in_srgb,var(--iw-tone-violet-border)_70%,transparent)]",
+  neutral: "focus-within:border-[color-mix(in_srgb,var(--iw-text)_18%,var(--iw-border))]",
+};
+
+const selectedCheckClassByAccent: Record<ModelSelectComboboxProps["accent"], string> = {
+  blue: "text-[var(--iw-accent)]",
+  cyan: "text-[var(--iw-tone-teal-text)]",
+  violet: "text-[var(--iw-tone-violet-text)]",
+  neutral: "text-[var(--iw-text)]",
 };
 
 export default function ModelSelectCombobox({
@@ -107,7 +115,7 @@ export default function ModelSelectCombobox({
                       className="imagine-motion-interactive flex min-h-8 w-full items-center justify-between gap-2 rounded-md px-2 py-1.5 text-left text-[11px] text-[var(--iw-text)] hover:bg-[var(--iw-panel-soft)]"
                     >
                       <span className="min-w-0 truncate font-mono">{option.label}</span>
-                      {option.value === value && <Check className="h-3.5 w-3.5 shrink-0 text-[var(--iw-accent)]" />}
+                      {option.value === value && <Check className={`h-3.5 w-3.5 shrink-0 ${selectedCheckClassByAccent[accent]}`} />}
                     </button>
                   ))}
                 </div>

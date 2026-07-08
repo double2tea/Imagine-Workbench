@@ -2159,7 +2159,7 @@ export default function Home() {
   return (
     <div
       ref={workbenchShellRef}
-      className="imagine-workbench-shell imagine-theme-dark min-h-screen flex flex-col bg-[var(--iw-bg)] text-[var(--iw-text)] font-sans selection:bg-[color-mix(in_srgb,var(--iw-accent)_28%,transparent)] selection:text-[var(--iw-text)] relative overflow-hidden"
+      className="imagine-workbench-shell min-h-screen flex flex-col bg-[var(--iw-bg)] text-[var(--iw-text)] font-sans selection:bg-[color-mix(in_srgb,var(--iw-accent)_28%,transparent)] selection:text-[var(--iw-text)] relative overflow-hidden"
     >
 
       {/* Workbench depth layer */}
@@ -2189,7 +2189,7 @@ export default function Home() {
         } flex-1 w-full max-w-[1920px] mx-auto px-4 pt-5 sm:px-6 sm:pt-6 grid grid-cols-1 lg:grid-cols-[minmax(440px,520px)_minmax(0,1fr)] xl:grid-cols-[minmax(480px,560px)_minmax(0,1fr)] gap-4 xl:gap-5 items-start z-10`}
       >
 
-        <section className="imagine-creator-panel imagine-creation-sidebar flex flex-col gap-4 min-w-0">
+        <section className="imagine-creator-panel imagine-creation-sidebar flex flex-col gap-3 min-w-0">
           {isMobileLayout && (
             <section className="imagine-mobile-workflow flex flex-col gap-3 lg:hidden">
               <MobileWorkbenchTabs
@@ -2238,7 +2238,7 @@ export default function Home() {
           )}
 
           {/* Active Creative Panel switch */}
-          <div className="imagine-control-surface hidden rounded-xl lg:flex flex-col gap-3 min-h-[500px] max-h-[calc(100vh-5.5rem)] overflow-hidden">
+          <div className="imagine-control-surface hidden rounded-xl lg:flex flex-col gap-2.5 min-h-0 max-h-[calc(100vh-5.5rem)] overflow-hidden">
             <div className="imagine-creator-scroll flex min-h-0 flex-1 flex-col gap-3">
                 <CreationModeTabs value={traditionalSubTab} onChange={setTraditionalSubTab} />
 

@@ -198,7 +198,7 @@ export default function VideoGenerationPanel({
         }
         atDropdownNode={atDropdownNode}
         desktopHint={t("videoGeneration.desktopHint")}
-        headerAccent="violet"
+        headerAccent="neutral"
         headerVariant="toolbar"
         icon={<VideoIcon className="h-3.5 w-3.5" />}
         label={t("videoGeneration.promptLabel")}
@@ -216,7 +216,7 @@ export default function VideoGenerationPanel({
         <div className="imagine-parameter-field">
           <label className="imagine-parameter-label-row imagine-section-label">{t("videoGeneration.modelLabel")}</label>
           <ModelSelectCombobox
-            accent="violet"
+            accent="neutral"
             ariaLabel={t("videoGeneration.modelLabel")}
             groups={modelGroups}
             value={selectedModel}
@@ -255,7 +255,7 @@ export default function VideoGenerationPanel({
       )}
 
       <CinematicProfileControls
-        accent="violet"
+        accent="neutral"
         mediaType="video"
         variant="compact"
         value={cinematicProfile}
@@ -314,7 +314,7 @@ export default function VideoGenerationPanel({
       <ReferenceImagePicker
         acceptedMediaTypes={capabilities.referenceMediaTypes}
         addLabel={t("videoGeneration.addReferenceLabel")}
-        browseClassName="cursor-pointer font-medium text-[var(--iw-tone-violet-text)] underline-offset-4 hover:text-[var(--iw-tone-violet-text)] hover:underline"
+        browseClassName="cursor-pointer font-semibold text-[var(--iw-muted)] underline-offset-2 hover:text-[var(--iw-text)] hover:underline"
         clearLabel={clearReferenceLabel}
         emptyHelp={t("videoGeneration.emptyHelp", { referenceTypes: acceptedReferenceText, limit: referenceLimit, referenceHelp })}
         emptyLabel={t("videoGeneration.emptyLabel", { label: referenceLabel })}

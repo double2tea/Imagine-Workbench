@@ -33,7 +33,7 @@ import {
 } from "@/lib/cinematic-controls";
 
 interface CinematicProfileControlsProps {
-  accent?: "blue" | "violet";
+  accent?: "blue" | "violet" | "neutral";
   className?: string;
   mediaType: CinematicMediaType;
   variant?: "card" | "compact";
@@ -184,6 +184,13 @@ const accentClassNames: Record<NonNullable<CinematicProfileControlsProps["accent
     nav: "data-[selected=true]:border-[var(--iw-tone-violet-border)] data-[selected=true]:bg-[var(--iw-tone-violet-bg)]",
     ring: "data-[selected=true]:border-[var(--iw-tone-violet-border)] data-[selected=true]:shadow-[0_0_0_1px_var(--iw-tone-violet-border)]",
   },
+  neutral: {
+    active: "data-[active=true]:border-[var(--iw-border)] data-[active=true]:bg-[var(--iw-panel)]",
+    badge: "border-[var(--iw-border)] bg-[var(--iw-panel)] text-[var(--iw-text)]",
+    button: "border-[var(--iw-border)] bg-[var(--iw-panel-soft)] text-[var(--iw-text)] hover:border-[var(--iw-border)] hover:bg-[var(--iw-panel)]",
+    nav: "data-[selected=true]:border-[var(--iw-border)] data-[selected=true]:bg-[var(--iw-panel)]",
+    ring: "data-[selected=true]:border-[var(--iw-border)] data-[selected=true]:shadow-[inset_0_0_0_1px_color-mix(in_srgb,var(--iw-text)_8%,transparent)]",
+  },
 };
 
 function optionLabel<T extends string>(options: readonly CinematicOption<T>[], value: string): string {
@@ -278,7 +285,7 @@ function selectedSectionOption<T extends string>(section: CinematicSection<T>, v
 }
 
 export default function CinematicProfileControls({
-  accent = "blue",
+  accent = "neutral",
   className = "",
   mediaType,
   onChange,

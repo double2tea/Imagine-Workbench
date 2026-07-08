@@ -84,7 +84,11 @@ export function useThemeMode(): { themeMode: ThemeMode; toggleThemeMode: () => v
 /** Re-apply shell theme classes when a route mounts another `.imagine-workbench-shell`. */
 export function useWorkbenchThemeShellSync(): void {
   useLayoutEffect(() => {
-    applyThemeClassesToDom(resolveThemeMode());
+    const apply = (): void => {
+      applyThemeClassesToDom(resolveThemeMode());
+    };
+    apply();
+    requestAnimationFrame(apply);
   }, []);
 }
 

@@ -44,9 +44,8 @@ const PromptComposerToolbarActions = forwardRef<PromptTemplatePickerHandle, Prom
           className={`imagine-motion-interactive flex h-7 items-center gap-1 rounded-md px-2.5 text-[11px] font-semibold transition ${
             optimizeDisabled
               ? "cursor-not-allowed text-[var(--iw-faint)]"
-              : "imagine-tone-link cursor-pointer text-[var(--iw-muted)] hover:bg-[var(--iw-panel-soft)]"
+              : "cursor-pointer text-[var(--iw-muted)] hover:bg-[var(--iw-panel-soft)] hover:text-[var(--iw-text)]"
           }`}
-          data-tone={accent}
         >
           {isOptimizing ? (
             <RefreshCw className="h-3 w-3 animate-spin" />

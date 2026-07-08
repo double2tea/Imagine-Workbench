@@ -388,7 +388,7 @@ export default function AudioGenerationPanel({
         actions={
           <PromptComposerToolbarActions
             ref={templatePickerRef}
-            accent="amber"
+            accent="blue"
             isOptimizing={isOptimizing}
             optimizeDisabled={isOptimizing || !prompt.trim()}
             optimizeLabel={t("audio.optimizeLabel")}
@@ -398,9 +398,9 @@ export default function AudioGenerationPanel({
         }
         atDropdownNode={atDropdownNode}
         desktopHint={t("audio.desktopHint")}
-        headerAccent="amber"
+        headerAccent="neutral"
         headerVariant="toolbar"
-        icon={<AudioLines className="h-3.5 w-3.5 text-amber-600" />}
+        icon={<AudioLines className="h-3.5 w-3.5" />}
         label={t("audio.panelLabel")}
         onChange={handlePromptChange}
         onDropAsset={onPromptDropAsset}
@@ -451,7 +451,7 @@ export default function AudioGenerationPanel({
       <ReferenceImagePicker
         acceptedMediaTypes={acceptedMediaTypes}
         addLabel={t("audio.addReferenceLabel")}
-        browseClassName={referenceLimit > 0 ? "cursor-pointer font-semibold text-[var(--iw-tone-warning-text)] underline-offset-2 hover:underline" : "text-[var(--iw-faint)]"}
+        browseClassName={referenceLimit > 0 ? "cursor-pointer font-semibold text-[var(--iw-muted)] underline-offset-2 hover:text-[var(--iw-text)] hover:underline" : "text-[var(--iw-faint)]"}
         clearLabel={t("audio.clearReferenceLabel")}
         emptyHelp={referenceLimit > 0 ? t("audio.emptyHelpWithLimit") : t("audio.emptyHelpNoLimit")}
         emptyLabel={referenceLimit > 0 ? t("audio.emptyLabelWithLimit") : t("audio.emptyLabelNoLimit")}
@@ -501,8 +501,7 @@ export default function AudioGenerationPanel({
                 <button
                   type="button"
                   onClick={openNewVoiceProfileEditor}
-                  className="imagine-tone-chip flex h-7 items-center gap-1 rounded-md border px-2 text-[10px] font-semibold transition"
-                  data-tone="warning"
+                  className="imagine-secondary-action flex h-7 items-center gap-1 rounded-md border px-2 text-[10px] font-semibold"
                 >
                   {t("audio.saveButton")}
                 </button>
@@ -512,8 +511,7 @@ export default function AudioGenerationPanel({
                   <button
                     type="button"
                     onClick={() => openEditVoiceProfileEditor(selectedVoiceProfile)}
-                    className="imagine-tone-chip flex h-7 items-center gap-1 rounded-md border px-2 text-[10px] font-semibold transition"
-                    data-tone="warning"
+                    className="imagine-secondary-action flex h-7 items-center gap-1 rounded-md border px-2 text-[10px] font-semibold"
                   >
                     <Pencil className="h-3 w-3" />
                     {t("audio.editButton")}
@@ -596,10 +594,9 @@ export default function AudioGenerationPanel({
                             onClick={() => toggleVoiceProfileTag(tag)}
                             className={`rounded-md border px-2 py-1 text-[10px] font-semibold transition ${
                               voiceProfileTags.includes(tag)
-                                ? "imagine-tone-chip"
-                                : "border-[var(--iw-border)] bg-[var(--iw-panel)] text-[var(--iw-muted)] hover:text-[var(--iw-text)]"
+                                ? "border-[var(--iw-border)] bg-[var(--iw-panel)] text-[var(--iw-text)] shadow-[inset_0_0_0_1px_color-mix(in_srgb,var(--iw-text)_8%,transparent)]"
+                                : "border-[var(--iw-border)] bg-[var(--iw-panel-soft)] text-[var(--iw-muted)] hover:bg-[var(--iw-panel)] hover:text-[var(--iw-text)]"
                             }`}
-                            data-tone="warning"
                           >
                             {voiceProfileTagLabel(tag, commonT)}
                           </button>
@@ -645,7 +642,7 @@ export default function AudioGenerationPanel({
                 type="checkbox"
                 checked={voiceCloneConsentAccepted}
                 onChange={event => onVoiceCloneConsentChange(event.target.checked)}
-                className="mt-1 h-3.5 w-3.5 rounded border-[var(--iw-border)] bg-[var(--iw-panel)] text-amber-600 focus:ring-amber-500/25"
+                className="imagine-capability-checkbox mt-1"
               />
               {t("audio.cloneConsentText")}
             </label>

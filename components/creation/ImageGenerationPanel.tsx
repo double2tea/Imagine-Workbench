@@ -192,7 +192,7 @@ export default function ImageGenerationPanel({
         }
         atDropdownNode={atDropdownNode}
         desktopHint={t("imageGeneration.desktopHint")}
-        headerAccent="blue"
+        headerAccent="neutral"
         headerVariant="toolbar"
         icon={<Sparkles className="h-3.5 w-3.5" />}
         label={t("imageGeneration.promptLabel")}
@@ -225,7 +225,7 @@ export default function ImageGenerationPanel({
             )}
           </div>
           <ModelSelectCombobox
-            accent="blue"
+            accent="neutral"
             ariaLabel={t("imageGeneration.modelLabel")}
             groups={modelGroups}
             value={selectedModel}
@@ -256,7 +256,7 @@ export default function ImageGenerationPanel({
 
       <div className="flex flex-col gap-3">
         <CinematicProfileControls
-          accent="blue"
+          accent="neutral"
           mediaType="image"
           variant="compact"
           value={cinematicProfile}
@@ -360,7 +360,6 @@ export default function ImageGenerationPanel({
                     key={option.value}
                     type="button"
                     data-active={imageThinkingLevel === option.value}
-                    data-tone="amber"
                     onClick={() => onThinkingLevelChange(option.value)}
                     className="imagine-segment-btn"
                   >
@@ -381,7 +380,7 @@ export default function ImageGenerationPanel({
 
       <ReferenceImagePicker
         addLabel={t("imageGeneration.referenceAddLabel")}
-        browseClassName="cursor-pointer font-medium text-[var(--iw-tone-accent-text)] underline-offset-4 hover:text-[var(--iw-tone-accent-text)] hover:underline"
+        browseClassName="cursor-pointer font-semibold text-[var(--iw-muted)] underline-offset-2 hover:text-[var(--iw-text)] hover:underline"
         clearLabel={t("imageGeneration.referenceClearLabel")}
         emptyHelp={imageReferenceHelp}
         emptyLabel={imageReferenceLimit > 0 ? t("imageGeneration.referenceEmptySupported") : t("imageGeneration.referenceEmptyUnsupported")}

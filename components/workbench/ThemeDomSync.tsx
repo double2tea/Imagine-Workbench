@@ -10,6 +10,7 @@ export default function ThemeDomSync() {
       applyThemeClassesToDom(resolveThemeMode());
     };
     apply();
+    requestAnimationFrame(apply);
     const onThemeChange = (event: Event): void => {
       const detail = (event as CustomEvent<ThemeMode>).detail;
       if (detail === "light" || detail === "dark") {

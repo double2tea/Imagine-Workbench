@@ -17,7 +17,7 @@ interface PromptComposerSurfaceProps {
   actions: ReactNode;
   atDropdownNode: ReactNode;
   desktopHint: string;
-  headerAccent?: "blue" | "teal" | "violet" | "amber";
+  headerAccent?: "blue" | "teal" | "violet" | "amber" | "neutral";
   headerVariant?: "plain" | "toolbar";
   icon: ReactNode;
   label: string;
@@ -63,12 +63,18 @@ export default function PromptComposerSurface({
       {headerVariant === "toolbar" ? (
         <div className="mb-2 flex min-h-9 items-center justify-between gap-2">
           <label htmlFor={textareaId} className="flex min-w-0 items-center gap-2">
-            <span
-              className="imagine-tone-surface flex h-7 w-7 shrink-0 items-center justify-center rounded-md border"
-              data-tone={headerAccent}
-            >
-              {icon}
-            </span>
+            {headerAccent === "neutral" ? (
+              <span className="flex h-7 w-7 shrink-0 items-center justify-center rounded-md border border-[var(--iw-border)] bg-[var(--iw-panel-soft)] text-[var(--iw-muted)]">
+                {icon}
+              </span>
+            ) : (
+              <span
+                className="imagine-tone-surface flex h-7 w-7 shrink-0 items-center justify-center rounded-md border"
+                data-tone={headerAccent}
+              >
+                {icon}
+              </span>
+            )}
             <span className="iw-type-label truncate font-semibold text-[var(--iw-text)]">{label}</span>
           </label>
           <div className="flex shrink-0 items-center gap-1">

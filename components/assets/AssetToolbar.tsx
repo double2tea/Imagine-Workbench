@@ -231,87 +231,87 @@ export default function AssetToolbar({
       </div>
 
       <div className="imagine-gallery-filters">
-        <div className="imagine-filter-track" role="group" aria-label={t("gallery.filterStatus")}>
-            {STATUS_FILTER_OPTIONS.map(option => {
-              const count = getStatusCount(option.value);
-              return (
-                <FilterChip
-                  key={option.value}
-                  active={assetStatusFilter === option.value}
-                  count={count}
-                  empty={option.value !== "all" && count === 0}
-                  label={option.label}
-                  onClick={() => setAssetStatusFilter(option.value)}
-                />
-              );
-            })}
-        </div>
-
-        <span className="imagine-toolbar-chip-divider" aria-hidden="true" />
-
-        <div className="imagine-filter-track" role="group" aria-label={t("gallery.filterType")}>
-            {TYPE_FILTER_OPTIONS.map(option => {
-              const count = getTypeCount(option.value);
-              return (
-                <FilterChip
-                  key={option.value}
-                  active={filterType === option.value}
-                  count={count}
-                  empty={option.value !== "all" && count === 0}
-                  label={option.label}
-                  onClick={() => setFilterType(option.value)}
-                />
-              );
-            })}
-        </div>
-
-        <span className="imagine-toolbar-chip-divider" aria-hidden="true" />
-
-        <div className="imagine-filter-track" role="group" aria-label={t("gallery.filterTime")}>
-            {DATE_PRESET_OPTIONS.map(option => (
+        <div className="imagine-filter-segment" role="group" aria-label={t("gallery.filterStatus")}>
+          {STATUS_FILTER_OPTIONS.map(option => {
+            const count = getStatusCount(option.value);
+            return (
               <FilterChip
                 key={option.value}
-                active={
-                  assetDatePreset === option.value && !assetDateStart && !assetDateEnd
-                }
+                active={assetStatusFilter === option.value}
+                count={count}
+                empty={option.value !== "all" && count === 0}
                 label={option.label}
-                onClick={() => {
-                  setAssetDatePreset(option.value);
-                  setAssetDateStart("");
-                  setAssetDateEnd("");
-                }}
+                onClick={() => setAssetStatusFilter(option.value)}
               />
-            ))}
+            );
+          })}
+        </div>
+
+        <span className="imagine-toolbar-chip-divider" aria-hidden="true" />
+
+        <div className="imagine-filter-segment" role="group" aria-label={t("gallery.filterType")}>
+          {TYPE_FILTER_OPTIONS.map(option => {
+            const count = getTypeCount(option.value);
+            return (
+              <FilterChip
+                key={option.value}
+                active={filterType === option.value}
+                count={count}
+                empty={option.value !== "all" && count === 0}
+                label={option.label}
+                onClick={() => setFilterType(option.value)}
+              />
+            );
+          })}
+        </div>
+
+        <span className="imagine-toolbar-chip-divider" aria-hidden="true" />
+
+        <div className="imagine-filter-segment imagine-filter-segment--time" role="group" aria-label={t("gallery.filterTime")}>
+          {DATE_PRESET_OPTIONS.map(option => (
             <FilterChip
-              active={showCustomDateRange}
-              label={t("gallery.customDate")}
+              key={option.value}
+              active={
+                assetDatePreset === option.value && !assetDateStart && !assetDateEnd
+              }
+              label={option.label}
               onClick={() => {
-                if (!showCustomDateRange) {
-                  setAssetDatePreset("custom");
-                }
+                setAssetDatePreset(option.value);
+                setAssetDateStart("");
+                setAssetDateEnd("");
               }}
             />
-            {showCustomDateRange && (
-              <div className="imagine-filter-date-range">
-                <input
-                  type="date"
-                  name="asset-date-start"
-                  value={assetDateStart}
-                  onChange={(event) => handleDateStartChange(event.target.value)}
-                  className="imagine-filter-date-input"
-                  aria-label={t("gallery.dateFrom")}
-                />
-                <span className="iw-type-caption font-mono text-[var(--iw-faint)]">{t("gallery.dateRangeSeparator")}</span>
-                <input
-                  type="date"
-                  name="asset-date-end"
-                  value={assetDateEnd}
-                  onChange={(event) => handleDateEndChange(event.target.value)}
-                  className="imagine-filter-date-input"
-                  aria-label={t("gallery.dateTo")}
-                />
-              </div>
-            )}
+          ))}
+          <FilterChip
+            active={showCustomDateRange}
+            label={t("gallery.customDate")}
+            onClick={() => {
+              if (!showCustomDateRange) {
+                setAssetDatePreset("custom");
+              }
+            }}
+          />
+          {showCustomDateRange && (
+            <div className="imagine-filter-date-range">
+              <input
+                type="date"
+                name="asset-date-start"
+                value={assetDateStart}
+                onChange={(event) => handleDateStartChange(event.target.value)}
+                className="imagine-filter-date-input"
+                aria-label={t("gallery.dateFrom")}
+              />
+              <span className="iw-type-caption font-mono text-[var(--iw-faint)]">{t("gallery.dateRangeSeparator")}</span>
+              <input
+                type="date"
+                name="asset-date-end"
+                value={assetDateEnd}
+                onChange={(event) => handleDateEndChange(event.target.value)}
+                className="imagine-filter-date-input"
+                aria-label={t("gallery.dateTo")}
+              />
+            </div>
+          )}
         </div>
       </div>
     </div>

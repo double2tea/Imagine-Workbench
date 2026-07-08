@@ -1,6 +1,6 @@
 "use client";
 
-import type { ChangeEvent } from "react";
+import type { ChangeEvent, CSSProperties } from "react";
 import { ImagePlus, X } from "lucide-react";
 import { useTranslations, type TFunction } from "@/lib/i18n";
 import {
@@ -177,9 +177,16 @@ function NumberParameterControl({
     if (Number.isFinite(parsed)) onChange(parsed);
   };
 
+  const rangeSpan = descriptor.max - descriptor.min;
+  const rangePercent = rangeSpan > 0
+    ? Math.round((((value - descriptor.min) / rangeSpan) * 100) * 10) / 10
+    : 0;
+
   return (
-    <label className={`imagine-capability-slider${compact ? " imagine-capability-slider--compact" : ""}`}>
-      <span className={`flex items-center justify-between ${compact ? "gap-1" : "gap-2"}`}>
+    <label
+      className={`imagine-capability-slider imagine-capability-slider--range${compact ? " imagine-capability-slider--compact" : ""}`}
+    >
+      <span className={`imagine-capability-range-header${compact ? " imagine-capability-range-header--compact" : ""}`}>
         <span className="imagine-capability-field-label">{label}</span>
         <input
           type="number"
@@ -192,16 +199,21 @@ function NumberParameterControl({
           aria-label={label}
         />
       </span>
-      <input
-        type="range"
-        min={descriptor.min}
-        max={descriptor.max}
-        step={descriptor.step}
-        value={value}
-        onChange={event => handleChange(event.target.value)}
-        className="imagine-capability-range"
-        aria-label={label}
-      />
+      <div
+        className="imagine-capability-range-wrap"
+        style={{ "--range-pct": `${rangePercent}%` } as CSSProperties}
+      >
+        <input
+          type="range"
+          min={descriptor.min}
+          max={descriptor.max}
+          step={descriptor.step}
+          value={value}
+          onChange={event => handleChange(event.target.value)}
+          className="imagine-capability-range"
+          aria-label={label}
+        />
+      </div>
     </label>
   );
 }
