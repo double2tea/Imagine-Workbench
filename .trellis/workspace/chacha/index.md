@@ -8,7 +8,7 @@
 
 <!-- @@@auto:current-status -->
 - **Active File**: `journal-4.md`
-- **Total Sessions**: 182
+- **Total Sessions**: 183
 - **Last Active**: 2026-07-08
 <!-- @@@/auto:current-status -->
 
@@ -19,7 +19,7 @@
 <!-- @@@auto:active-documents -->
 | File | Lines | Status |
 |------|-------|--------|
-| `journal-4.md` | ~200 | Active |
+| `journal-4.md` | ~240 | Active |
 | `journal-3.md` | ~1985 | Archived |
 | `journal-2.md` | ~1973 | Archived |
 | `journal-1.md` | ~1988 | Archived |
@@ -32,6 +32,7 @@
 <!-- @@@auto:session-history -->
 | # | Date | Title | Commits | Branch |
 |---|------|-------|---------|--------|
+| 183 | 2026-07-08 | Volcengine Seed Audio support fixes | `182a5f03` | `main` |
 | 182 | 2026-07-08 | Unify Volcengine Seed Audio provider | `a8f8e3ca` | `main` |
 | 181 | 2026-07-08 | Fix P5 UI regression script false positives | `6c55265c` | `main` |
 | 180 | 2026-07-08 | ego-browser P5 UI regression script | `c67d4bde` | `main` |

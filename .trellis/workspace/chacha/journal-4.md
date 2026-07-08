@@ -205,3 +205,36 @@ Unified the Volcengine provider surface by moving Seed Audio under volcengine wi
 ### Next Steps
 
 - None - task complete
+
+
+## Session 183: Volcengine Seed Audio support fixes
+
+**Date**: 2026-07-08
+**Task**: Volcengine Seed Audio support fixes
+**Branch**: `main`
+
+### Summary
+
+Unified Seed Audio under Volcengine audio scope, removed unsupported subtitle UI exposure, tightened reference validation including speaker voice profiles, and verified providers/check/build.
+
+### Main Changes
+
+(Add details)
+
+### Git Commits
+
+| Hash | Message |
+|------|---------|
+| `182a5f03` | (see git log) |
+
+### Testing
+
+- [OK] (Add test results)
+
+### Status
+
+[OK] **Completed**
+
+### Next Steps
+
+- None - task complete
