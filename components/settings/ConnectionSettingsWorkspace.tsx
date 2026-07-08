@@ -64,7 +64,7 @@ export interface ConnectionSettingsWorkspaceProps {
   onSelectProvider: (value: AiProvider) => void;
   onToggleResolveIntegration?: (enabled: boolean) => void;
   onDeleteCustomProvider: (provider: AiProvider) => void;
-  refreshProviderModels: () => void;
+  refreshProviderModels: (category: ModelCategory) => void;
   testProviderConnection: (provider: AiProvider) => void;
 }
 
@@ -532,7 +532,7 @@ export function ConnectionSettingsWorkspace({
                 </div>
                 <button
                   type="button"
-                  onClick={refreshProviderModels}
+                  onClick={() => refreshProviderModels(modelCategory)}
                   disabled={isLoadingModels}
                   className="imagine-settings-toolbar-btn shrink-0"
                 >

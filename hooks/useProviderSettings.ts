@@ -643,12 +643,12 @@ export function useProviderSettings({
     pushWorkspaceNotice("success", message);
   };
 
-  const refreshProviderModels = async () => {
+  const refreshProviderModels = async (kind: ModelCategory = "chat") => {
     setIsLoadingModels(true);
     setModelListMessage("");
     try {
       const headers = buildProviderHeaders(selectedProvider);
-      const res = await browserByokFetch(`/api/models?provider=${selectedProvider}&kind=all`, { headers });
+      const res = await browserByokFetch(`/api/models?provider=${selectedProvider}&kind=${kind}`, { headers });
       if (!res.ok) {
         throw new Error(await readFetchError(res, t("common.notices.modelListFetchFailed")));
       }
@@ -669,10 +669,11 @@ export function useProviderSettings({
       setFetchedModelOptions(prev => ({
         ...prev,
         [selectedProvider]: {
-          chat: fetchedChat,
-          image: fetchedImage,
-          video: fetchedVideo,
-          audio: fetchedAudio,
+          ...(prev[selectedProvider] ?? { chat: [], image: [], video: [], audio: [] }),
+          chat: kind === "chat" ? fetchedChat : (prev[selectedProvider]?.chat ?? []),
+          image: kind === "image" ? fetchedImage : (prev[selectedProvider]?.image ?? []),
+          video: kind === "video" ? fetchedVideo : (prev[selectedProvider]?.video ?? []),
+          audio: kind === "audio" ? fetchedAudio : (prev[selectedProvider]?.audio ?? []),
         },
       }));
 

@@ -93,6 +93,7 @@
     "referenceLimitReached": "Reference limit reached: maximum {limit} images",
     "currentInputNotSupportMediaReference": "Current input does not support {type} references",
     "currentModelReferenceRange": "Current model supports {min}-{max} reference media",
+    "currentModelReferenceCombinationUnsupported": "Current model does not support mixing these reference media types",
     "referenceMediaFileTooLarge": "{type} reference file is too large, please compress to under {maxMB}MB and try again",
     "agentNotSupportMediaTypeRef": "Agent does not support {type} references yet",
     "agentReferenceReadFailed": "Agent reference read failed, please try a different file",

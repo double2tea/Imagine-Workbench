@@ -93,6 +93,7 @@
     "referenceLimitReached": "参考图已达上限：最多 {limit} 张",
     "currentInputNotSupportMediaReference": "当前输入不支持{type}参考",
     "currentModelReferenceRange": "当前模型支持 {min}-{max} 个参考媒体",
+    "currentModelReferenceCombinationUnsupported": "当前模型不支持混用这些参考媒体类型",
     "referenceMediaFileTooLarge": "{type}参考文件过大，请压缩到 {maxMB}MB 以内后重试",
     "agentNotSupportMediaTypeRef": "Agent 暂不支持{type}引用",
     "agentReferenceReadFailed": "Agent 引用读取失败，请换一个文件",

@@ -28,7 +28,7 @@ import {
 import type { RunningHubTaskNodeBinding, RunningHubYouchuanAdvancedSettings } from "@/lib/providers/types";
 import type { ModelParameterValues } from "@/lib/providers/model-capabilities";
 import { buildPromptWithReferenceMap } from "@/hooks/useReferenceState";
-import { audioOperationMissingReferenceMessage, audioOperationRequiresTextInput, readOptionalAudioFormat } from "@/lib/audio-operation-rules";
+import { audioOperationReferenceValidationMessage, audioOperationRequiresTextInput, readOptionalAudioFormat } from "@/lib/audio-operation-rules";
 import {
   CUSTOM_IMAGE_SIZE_GRID,
   CUSTOM_IMAGE_SIZE_MAX_ASPECT_RATIO,
@@ -909,17 +909,14 @@ export function useGenerationActions({
         pushWorkspaceNotice("error", audioPayloadError);
         return false;
       }
-      const audioReferenceTypes = audioReferences.map(reference => getMediaReferenceType(reference) ?? "image");
-      if (audioCapabilities && audioReferenceTypes.some(type => !audioCapabilities.referenceMediaTypes.includes(type))) {
-        pushWorkspaceNotice("error", t("common.notices.allReferenceMediaParseFailed"));
-        return false;
-      }
-      if (audioCapabilities && audioReferences.length < audioCapabilities.minReferenceMedia) {
-        pushWorkspaceNotice("error", audioOperationMissingReferenceMessage(audioCapabilities, t));
-        return false;
-      }
-      if (audioCapabilities && audioCapabilities.maxReferenceMedia >= 0 && audioReferences.length > audioCapabilities.maxReferenceMedia) {
-        pushWorkspaceNotice("error", t("common.notices.audioModelMaxMedia", { max: audioCapabilities.maxReferenceMedia }));
+      const audioReferenceError = audioCapabilities
+        ? audioOperationReferenceValidationMessage(audioCapabilities, audioReferences, {
+          extraReferenceTypes: profileVoice ? ["audio"] : [],
+          t,
+        })
+        : null;
+      if (audioReferenceError) {
+        pushWorkspaceNotice("error", audioReferenceError);
         return false;
       }
 

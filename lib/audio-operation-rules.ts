@@ -1,5 +1,6 @@
 import { t as globalT, type TFunction } from "@/lib/i18n-core";
-import { mediaReferenceLabel } from "./media-references";
+import { getMediaReferenceType, mediaReferenceLabel, type MediaReference, type MediaReferenceType } from "./media-references";
+import { ModelCapabilityValidationError, validateInputModalityReferenceCompatibility } from "./providers/model-capabilities";
 import {
   getAudioModelCapabilities,
   getModelCapabilities,
@@ -39,6 +40,12 @@ export interface AudioFunctionSelection {
   capabilities: AudioModelCapabilities;
   mode: AudioOperationMode;
   model: string;
+}
+
+export interface AudioOperationReferenceValidationOptions {
+  extraReferenceTypes?: readonly MediaReferenceType[];
+  skipMinReferenceMedia?: boolean;
+  t?: TFunction;
 }
 
 const AUDIO_MODE_LABELS_FALLBACK: Record<AudioOperationMode, string> = {
@@ -97,6 +104,40 @@ export function audioOperationMissingReferenceMessage(capabilities: AudioModelCa
   const labels = capabilities.referenceMediaTypes.map(type => mediaReferenceLabel(type, translator)).join(" / ");
   const referenceLabel = labels || translator("media.referenceLabels.audio");
   return translator("media.missingReferenceMessage", { min: capabilities.minReferenceMedia, referenceLabel });
+}
+
+export function audioOperationReferenceValidationMessage(
+  capabilities: AudioModelCapabilities,
+  references: readonly Pick<MediaReference, "type">[],
+  options: AudioOperationReferenceValidationOptions = {},
+): string | null {
+  const translator = options.t ?? globalT;
+  const referenceTypes = [
+    ...references.map(reference => getMediaReferenceType(reference)),
+    ...(options.extraReferenceTypes ?? []),
+  ];
+  const unsupportedType = referenceTypes.find(type => !capabilities.referenceMediaTypes.includes(type));
+  if (unsupportedType) {
+    return translator("common.notices.currentInputNotSupportMediaReference", {
+      type: mediaReferenceLabel(unsupportedType, translator),
+    });
+  }
+  if (!options.skipMinReferenceMedia && referenceTypes.length < capabilities.minReferenceMedia) {
+    return audioOperationMissingReferenceMessage(capabilities, translator);
+  }
+  if (capabilities.maxReferenceMedia >= 0 && referenceTypes.length > capabilities.maxReferenceMedia) {
+    return translator("common.notices.audioModelMaxMedia", { max: capabilities.maxReferenceMedia });
+  }
+  try {
+    validateInputModalityReferenceCompatibility(
+      capabilities.inputModalities,
+      referenceTypes.map(type => ({ type })),
+    );
+  } catch (error) {
+    if (error instanceof ModelCapabilityValidationError) return error.message;
+    throw error;
+  }
+  return null;
 }
 
 export function audioFunctionValue(model: string, mode: AudioOperationMode): AudioFunctionValue {

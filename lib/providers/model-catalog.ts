@@ -64,6 +64,7 @@ export interface AudioModelCapabilities {
   defaultMode: AudioOperationMode;
   formats: ParameterOption[];
   durations: ParameterOption[];
+  inputModalities: ModelInputModalityProfile;
   parameterDescriptors: ModelParameterDescriptor[];
   referenceSlots: ModelReferenceParameterDescriptor[];
   maxReferenceMedia: number;
@@ -447,6 +448,7 @@ export function getAudioModelCapabilities(value: string): AudioModelCapabilities
     defaultMode: capability?.audioDefaultMode ?? modes[0] ?? "tts",
     formats: capability?.presets ?? [],
     durations: capability?.durations ?? [],
+    inputModalities: capability?.inputModalities ?? { text: { required: true } },
     parameterDescriptors: capability?.parameterDescriptors ?? [],
     referenceSlots: capability?.referenceSlots ?? [],
     maxReferenceMedia: capability?.maxReferenceImages ?? 0,

@@ -52,7 +52,7 @@ import { useGenerationActions } from "@/hooks/useGenerationActions";
 import { useGenerationTaskStore } from "@/hooks/useGenerationTaskStore";
 import { useMediaPolling } from "@/hooks/useMediaPolling";
 import {
-  audioOperationMissingReferenceMessage,
+  audioOperationReferenceValidationMessage,
   audioOperationRequiresStylePrompt,
   audioOperationRequiresTextInput,
   resolveAudioFunctionSelection,
@@ -3820,9 +3820,13 @@ export default function BoardPage({ boardId = DEFAULT_BOARD_ID }: BoardPageProps
         return handledBoardAction(false);
       }
       const audioCapability = getAudioModelCapabilities(model);
-      const unsupportedAudioReference = references.find(reference => !audioCapability.referenceMediaTypes.includes(getMediaReferenceType(reference)));
-      if (unsupportedAudioReference) {
-        const message = t("board.agent.audioModelNotSupportMediaTypeInput", { type: mediaReferenceLabel(getMediaReferenceType(unsupportedAudioReference)) });
+      const audioReferenceError = audioOperationReferenceValidationMessage(audioCapability, references, {
+        extraReferenceTypes: defaults.voiceProfileId ? ["audio"] : [],
+        skipMinReferenceMedia: Boolean(defaults.voiceProfileId),
+        t,
+      });
+      if (audioReferenceError) {
+        const message = audioReferenceError;
         boardController.updateGenerateNode(generateNodeId, { errorMessage: message, status: "failed" });
         pushWorkspaceNotice("error", message);
         return handledBoardAction(false);
@@ -4640,17 +4644,17 @@ export default function BoardPage({ boardId = DEFAULT_BOARD_ID }: BoardPageProps
         return;
       }
       const audioVoiceProfileProvidesReference = node.kind === "audio-operation" && Boolean(node.voiceProfileId);
-      if (audioCapabilities && references.length < audioCapabilities.minReferenceMedia && !audioVoiceProfileProvidesReference) {
-        const message = audioOperationMissingReferenceMessage(audioCapabilities);
-        boardController.updateGenerateNode(nodeId, { status: "failed", errorMessage: message });
-        pushWorkspaceNotice("error", message);
-        return;
-      }
-      if (audioCapabilities && audioCapabilities.maxReferenceMedia > 0 && references.length > audioCapabilities.maxReferenceMedia) {
-        const message = t("board.agent.audioModelMaxReference", { maxCount: audioCapabilities.maxReferenceMedia });
-        boardController.updateGenerateNode(nodeId, { status: "failed", errorMessage: message });
-        pushWorkspaceNotice("error", message);
-        return;
+      if (audioCapabilities) {
+        const audioReferenceError = audioOperationReferenceValidationMessage(audioCapabilities, references, {
+          extraReferenceTypes: audioVoiceProfileProvidesReference ? ["audio"] : [],
+          skipMinReferenceMedia: audioVoiceProfileProvidesReference,
+          t,
+        });
+        if (audioReferenceError) {
+          boardController.updateGenerateNode(nodeId, { status: "failed", errorMessage: audioReferenceError });
+          pushWorkspaceNotice("error", audioReferenceError);
+          return;
+        }
       }
       if (node.kind === "video-generate") {
         const videoCapability = getVideoModelCapabilities(node.model);

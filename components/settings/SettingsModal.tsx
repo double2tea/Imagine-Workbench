@@ -110,7 +110,7 @@ interface SettingsModalProps {
   onSelectProvider: (value: AiProvider) => void;
   onToggleResolveIntegration?: (enabled: boolean) => void;
   onDeleteCustomProvider: (provider: AiProvider) => void;
-  refreshProviderModels: () => void;
+  refreshProviderModels: (category: ModelCategory) => void;
   testProviderConnection: (provider: AiProvider) => void;
 }
 

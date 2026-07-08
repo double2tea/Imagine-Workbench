@@ -138,9 +138,21 @@ test("Volcengine providers expose scoped capabilities", () => {
   assert.deepEqual(capability.referenceMediaTypes, ["image", "audio"]);
   assert.equal(capability.maxReferenceImages, 3);
   assert.equal(capability.parameterDescriptors.some(descriptor => descriptor.key === "sample_rate"), true);
-  assert.equal(capability.parameterDescriptors.some(descriptor => descriptor.key === "enable_subtitle"), true);
+  assert.equal(capability.inputModalities.mixed?.allowedCombinations?.includes("image"), true);
+  assert.equal(capability.inputModalities.mixed?.allowedCombinations?.includes("audio"), true);
+  assert.equal(capability.parameterDescriptors.some(descriptor => descriptor.key === "enable_subtitle"), false);
   assert.equal(capability.parameterDescriptors.some(descriptor => descriptor.key === "aigc_watermark"), true);
   assert.equal(capability.parameterDescriptors.every(descriptor => descriptor.labelKey?.startsWith("parameters.seedAudio.")), true);
+});
+
+test("Seed Audio capability rejects mixed image and audio references", () => {
+  const capability = getModelCapability("volcengine:seed-audio-1.0", "audio");
+  assert.doesNotThrow(() => validateInputModalityReferences(capability.inputModalities, [{ type: "image" }]));
+  assert.doesNotThrow(() => validateInputModalityReferences(capability.inputModalities, [{ type: "audio" }, { type: "audio" }]));
+  assert.throws(
+    () => validateInputModalityReferences(capability.inputModalities, [{ type: "image" }, { type: "audio" }]),
+    /不支持混用|reference media types/,
+  );
 });
 
 test("model capability catalog fails fast on invalid provider keys", () => {

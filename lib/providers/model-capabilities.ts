@@ -246,21 +246,33 @@ export function validateInputModalityReferences(
   profile: ModelInputModalityProfile,
   references: readonly { type: MediaReferenceType }[],
 ): void {
-  const acceptedTypes = inputModalitiesReferenceMediaTypes(profile);
-  const unsupported = references.find(reference => !acceptedTypes.includes(reference.type));
-  if (unsupported) throw new ModelCapabilityValidationError(t("common.notices.currentInputNotSupportMediaReference", { type: mediaReferenceLabel(unsupported.type) }));
-
+  validateInputModalityReferenceCompatibility(profile, references);
   const range = inputModalitiesReferenceCountRange(profile);
   if (references.length < range.minCount) {
     throw new ModelCapabilityValidationError(t("common.notices.imageModelNeedMinReferences", { min: range.minCount }));
-  }
-  if (references.length > range.maxCount) {
-    throw new ModelCapabilityValidationError(t("common.notices.currentModelReferenceRange", { min: range.minCount, max: range.maxCount }));
   }
 
   validateInputModalityTypeCount("image", profile.images, references, profile.mixed !== undefined);
   validateInputModalityTypeCount("video", profile.videos, references, profile.mixed !== undefined);
   validateInputModalityTypeCount("audio", profile.audio, references, profile.mixed !== undefined);
+}
+
+export function validateInputModalityReferenceCompatibility(
+  profile: ModelInputModalityProfile,
+  references: readonly { type: MediaReferenceType }[],
+): void {
+  const acceptedTypes = inputModalitiesReferenceMediaTypes(profile);
+  const unsupported = references.find(reference => !acceptedTypes.includes(reference.type));
+  if (unsupported) throw new ModelCapabilityValidationError(t("common.notices.currentInputNotSupportMediaReference", { type: mediaReferenceLabel(unsupported.type) }));
+
+  const range = inputModalitiesReferenceCountRange(profile);
+  if (references.length > range.maxCount) {
+    throw new ModelCapabilityValidationError(t("common.notices.currentModelReferenceRange", { min: range.minCount, max: range.maxCount }));
+  }
+  validateInputModalityTypeMaxCount("image", profile.images, references);
+  validateInputModalityTypeMaxCount("video", profile.videos, references);
+  validateInputModalityTypeMaxCount("audio", profile.audio, references);
+  validateInputModalityAllowedCombination(profile, references);
 }
 
 export function defaultCapabilityParameterValues(
@@ -364,6 +376,18 @@ function isReferenceParameterValue(value: unknown): value is ModelReferenceParam
     (record.role === undefined || typeof record.role === "string");
 }
 
+function validateInputModalityTypeMaxCount(
+  type: MediaReferenceType,
+  profile: ModelMediaInputProfile | undefined,
+  references: readonly { type: MediaReferenceType }[],
+): void {
+  if (!profile) return;
+  const count = references.filter(reference => reference.type === type).length;
+  if (count > profile.maxCount) {
+    throw new ModelCapabilityValidationError(t("common.notices.imageModelMaxReferences", { max: profile.maxCount }));
+  }
+}
+
 function validateInputModalityTypeCount(
   type: MediaReferenceType,
   profile: ModelMediaInputProfile | undefined,
@@ -375,5 +399,19 @@ function validateInputModalityTypeCount(
   const minCount = mixed ? 0 : profile.minCount;
   if (count < minCount || count > profile.maxCount) {
     throw new ModelCapabilityValidationError(t("common.notices.imageModelMaxReferences", { max: profile.maxCount }));
+  }
+}
+
+function validateInputModalityAllowedCombination(
+  profile: ModelInputModalityProfile,
+  references: readonly { type: MediaReferenceType }[],
+): void {
+  const allowed = profile.mixed?.allowedCombinations;
+  if (!allowed || references.length === 0) return;
+  const combination = (["image", "video", "audio"] as const)
+    .filter(type => references.some(reference => reference.type === type))
+    .join("+");
+  if (!allowed.includes(combination)) {
+    throw new ModelCapabilityValidationError(t("common.notices.currentModelReferenceCombinationUnsupported"));
   }
 }

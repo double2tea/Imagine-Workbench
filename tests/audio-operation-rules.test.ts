@@ -4,6 +4,7 @@ import {
   audioFunctionOptionsForProvider,
   audioFunctionValue,
   audioOperationFormatOptions,
+  audioOperationReferenceValidationMessage,
   audioOperationRequiresStylePrompt,
   audioOperationRequiresTextInput,
   audioProviderOptions,
@@ -25,6 +26,10 @@ test("audio operation rules separate text and transcript output contracts", () =
     defaultMode: "asr",
     durations: [],
     formats: [{ value: "wav", label: "WAV" }],
+    inputModalities: {
+      text: { required: false },
+      audio: { minCount: 1, maxCount: 1, delivery: "rawDataUri" },
+    },
     maxReferenceMedia: 1,
     minReferenceMedia: 1,
     modes: ["asr"],
@@ -39,6 +44,31 @@ test("audio operation rules separate text and transcript output contracts", () =
   assert.equal(audioOperationRequiresStylePrompt("voice_design"), true);
   assert.equal(audioOperationRequiresStylePrompt("voice_clone"), false);
   assert.deepEqual(audioOperationFormatOptions(transcriptCapabilities), []);
+});
+
+test("audio operation rules count speaker voice profile as an audio reference", () => {
+  const capabilities = getAudioModelCapabilities("volcengine:seed-audio-1.0");
+
+  assert.equal(
+    audioOperationReferenceValidationMessage(
+      capabilities,
+      [{ type: "image" }],
+      { extraReferenceTypes: ["audio"] },
+    ),
+    "当前模型不支持混用这些参考媒体类型",
+  );
+  assert.equal(
+    audioOperationReferenceValidationMessage(
+      capabilities,
+      [
+        { type: "audio" },
+        { type: "audio" },
+        { type: "audio" },
+      ],
+      { extraReferenceTypes: ["audio"] },
+    ),
+    "当前音频模型最多支持 3 个参考媒体",
+  );
 });
 
 test("audio function options derive provider functions from model groups", () => {

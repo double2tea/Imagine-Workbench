@@ -2212,7 +2212,11 @@
           "delivery": "rawDataUri"
         },
         "mixed": {
-          "maxTotalCount": 3
+          "maxTotalCount": 3,
+          "allowedCombinations": [
+            "image",
+            "audio"
+          ]
         }
       },
       "parameterDescriptors": [
@@ -2289,15 +2293,6 @@
           "min": -12,
           "max": 12,
           "step": 1
-        },
-        {
-          "key": "enable_subtitle",
-          "kind": "boolean",
-          "label": "Subtitle",
-          "labelKey": "parameters.seedAudio.subtitle",
-          "group": "advanced",
-          "providerField": "audio_config.enable_subtitle",
-          "defaultValue": false
         },
         {
           "key": "aigc_watermark",

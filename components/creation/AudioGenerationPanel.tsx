@@ -29,7 +29,7 @@ import {
   type PromptTemplateApplyMode,
   type PromptTemplateSlashCommand,
 } from "@/lib/prompt-templates";
-import { getMediaReferenceType } from "@/lib/media-references";
+import { getMediaReferenceType, type MediaReferenceType } from "@/lib/media-references";
 import { getAssetMetasByIds, hydrateAssets } from "@/lib/db";
 import { getAudioModelCapabilities, parseProviderModel, type AudioModelCapabilities, type AudioOperationMode } from "@/lib/providers/model-catalog";
 import type { ModelParameterValues } from "@/lib/providers/model-capabilities";
@@ -84,6 +84,39 @@ interface AudioGenerationPanelProps {
   onAudioStylePromptChange: (value: string) => void;
   onAsrLanguageChange: (value: "auto" | "zh" | "en") => void;
   showGenerateButton?: boolean;
+}
+
+interface AudioReferencePickerInput {
+  acceptedMediaTypes: MediaReferenceType[];
+  maxCount: number;
+}
+
+function audioReferencePickerInput(
+  capabilities: AudioModelCapabilities,
+  references: ReferenceImageRef[],
+): AudioReferencePickerInput {
+  const defaultInput = {
+    acceptedMediaTypes: capabilities.referenceMediaTypes,
+    maxCount: capabilities.maxReferenceMedia,
+  };
+  const allowed = capabilities.inputModalities.mixed?.allowedCombinations;
+  if (!allowed) return defaultInput;
+
+  const activeTypes = capabilities.referenceMediaTypes.filter(type =>
+    references.some(reference => getMediaReferenceType(reference) === type),
+  );
+  if (activeTypes.length !== 1 || !allowed.includes(activeTypes[0])) return defaultInput;
+
+  const activeType = activeTypes[0];
+  const profile =
+    activeType === "image"
+      ? capabilities.inputModalities.images
+      : activeType === "video"
+        ? capabilities.inputModalities.videos
+        : capabilities.inputModalities.audio;
+  return profile
+    ? { acceptedMediaTypes: [activeType], maxCount: profile.maxCount }
+    : defaultInput;
 }
 
 export default function AudioGenerationPanel({
@@ -143,8 +176,12 @@ export default function AudioGenerationPanel({
   const providerOptions = audioProviderOptions(modelGroups);
   const functionOptions = audioFunctionOptionsForProvider(modelGroups, selectedProvider, getAudioModelCapabilities);
   const selectedFunctionValue = audioFunctionValue(selectedModel, mode);
-  const referenceLimit = capabilities.maxReferenceMedia;
-  const acceptedMediaTypes = capabilities.referenceMediaTypes;
+  const referenceInput = useMemo(
+    () => audioReferencePickerInput(capabilities, referenceImages),
+    [capabilities, referenceImages],
+  );
+  const referenceLimit = referenceInput.maxCount;
+  const acceptedMediaTypes = referenceInput.acceptedMediaTypes;
   const visibleVoiceProfiles = useMemo(
     () => getVisibleVoiceProfilesForAudioModel(selectedModel, mode, voiceProfiles),
     [mode, selectedModel, voiceProfiles],

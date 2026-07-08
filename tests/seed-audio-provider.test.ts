@@ -1,9 +1,11 @@
 import assert from "node:assert/strict";
 import test from "node:test";
+import { NextRequest } from "next/server";
 
 import { generateAudioOperation } from "../lib/providers/audio";
 import { generateSeedAudio } from "../lib/providers/seed-audio";
 import { listProviderModels } from "../lib/providers/models";
+import { GET as listModelsRoute } from "../app/api/models/route";
 import type { ProviderConfig } from "../lib/providers/types";
 
 const seedAudioConfig: ProviderConfig = {
@@ -21,6 +23,27 @@ test("Seed Audio model listing uses static audio capabilities without fetching",
 
   try {
     assert.deepEqual(await listProviderModels(seedAudioConfig, "audio"), [
+      { value: "volcengine:seed-audio-1.0", label: "Seed Audio 1.0" },
+    ]);
+  } finally {
+    globalThis.fetch = originalFetch;
+  }
+});
+
+test("Volcengine audio model route uses Seed Audio credential scope", async () => {
+  const originalFetch = globalThis.fetch;
+  globalThis.fetch = async (): Promise<Response> => {
+    throw new Error("Seed Audio scoped model listing should not fetch Ark models");
+  };
+
+  try {
+    const response = await listModelsRoute(new NextRequest("http://local.test/api/models?provider=volcengine&kind=audio", {
+      headers: { "x-ai-audio-api-key": "seed_audio_test_key" },
+    }));
+    assert.equal(response.status, 200);
+    const body = await response.json() as { models?: Array<{ value?: unknown; label?: unknown }>; kind?: unknown };
+    assert.equal(body.kind, "audio");
+    assert.deepEqual(body.models, [
       { value: "volcengine:seed-audio-1.0", label: "Seed Audio 1.0" },
     ]);
   } finally {
@@ -77,7 +100,6 @@ test("Seed Audio prompt generation sends OpenSpeech create request", async () =>
         speech_rate: 12,
         loudness_rate: -4,
         pitch_rate: 2,
-        enable_subtitle: true,
         aigc_watermark: true,
         aigc_metadata_enable: true,
         aigc_metadata_content_producer: "Imagine Workbench",
@@ -108,7 +130,6 @@ test("Seed Audio prompt generation sends OpenSpeech create request", async () =>
         speech_rate: 12,
         loudness_rate: -4,
         pitch_rate: 2,
-        enable_subtitle: true,
       },
       watermark: {
         aigc_watermark: true,
@@ -187,6 +208,60 @@ test("Seed Audio rejects mixed image and audio references before fetch", async (
         format: "wav",
       }),
       /cannot be mixed/,
+    );
+    assert.equal(fetchCount, 0);
+  } finally {
+    globalThis.fetch = originalFetch;
+  }
+});
+
+test("Seed Audio rejects image and speaker references before fetch", async () => {
+  const originalFetch = globalThis.fetch;
+  let fetchCount = 0;
+  globalThis.fetch = async (): Promise<Response> => {
+    fetchCount += 1;
+    throw new Error("Image and speaker references must be rejected before fetch");
+  };
+
+  try {
+    await assert.rejects(
+      () => generateSeedAudio(seedAudioConfig, {
+        mode: "tts",
+        prompt: "Describe the scene.",
+        model: "seed-audio-1.0",
+        referenceMedia: [{ dataUri: "data:image/png;base64,scene_image", type: "image" }],
+        format: "wav",
+        voice: "speaker-1",
+      }),
+      /cannot be mixed/,
+    );
+    assert.equal(fetchCount, 0);
+  } finally {
+    globalThis.fetch = originalFetch;
+  }
+});
+
+test("Seed Audio rejects multiple image references before fetch", async () => {
+  const originalFetch = globalThis.fetch;
+  let fetchCount = 0;
+  globalThis.fetch = async (): Promise<Response> => {
+    fetchCount += 1;
+    throw new Error("Multiple image references must be rejected before fetch");
+  };
+
+  try {
+    await assert.rejects(
+      () => generateSeedAudio(seedAudioConfig, {
+        mode: "sfx",
+        prompt: "Generate a scene.",
+        model: "seed-audio-1.0",
+        referenceMedia: [
+          { dataUri: "data:image/png;base64,scene_image_1", type: "image" },
+          { dataUri: "data:image/png;base64,scene_image_2", type: "image" },
+        ],
+        format: "wav",
+      }),
+      /at most one image/,
     );
     assert.equal(fetchCount, 0);
   } finally {

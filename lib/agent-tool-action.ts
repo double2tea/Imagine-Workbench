@@ -1,7 +1,7 @@
 import { t } from "@/lib/i18n-core";
 import { AGENT_BOARD_PATCH_MAX_OPERATIONS, type AgentGenerationParams, type AgentToolAction } from "./agent-actions";
-import { audioOperationMissingReferenceMessage, audioOperationRequiresTextInput } from "./audio-operation-rules";
-import { getMediaReferenceType, mediaReferenceLabel, type MediaReference } from "./media-references";
+import { audioOperationReferenceValidationMessage, audioOperationRequiresTextInput } from "./audio-operation-rules";
+import type { MediaReference, MediaReferenceType } from "./media-references";
 import {
   getAudioModelCapabilities,
   getImageModelCapabilities,
@@ -225,12 +225,9 @@ export function validateAgentToolAction(
     if (audioOperationRequiresTextInput(audioMode) && !params.prompt?.trim()) return t("common.notices.agentPromptRequired");
     if (audioMode === "voice_clone" && params.voiceCloneConsentAccepted !== true) return t("common.notices.voiceCloneNeedsConsent");
     const references = context.references ?? [];
-    const unsupportedReference = references.find(reference => !capabilities.referenceMediaTypes.includes(getMediaReferenceType(reference)));
-    if (unsupportedReference) return t("common.notices.currentInputNotSupportMediaReference", {
-      type: mediaReferenceLabel(getMediaReferenceType(unsupportedReference), t),
-    });
-    if (references.length < capabilities.minReferenceMedia) return audioOperationMissingReferenceMessage(capabilities);
-    if (references.length > capabilities.maxReferenceMedia) return t("common.notices.audioModelMaxMedia", { max: capabilities.maxReferenceMedia });
+    const extraReferenceTypes: MediaReferenceType[] = params.voiceProfileId?.trim() ? ["audio"] : [];
+    const referenceError = audioOperationReferenceValidationMessage(capabilities, references, { extraReferenceTypes, t });
+    if (referenceError) return referenceError;
     return null;
   }
 
