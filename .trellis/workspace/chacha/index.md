@@ -8,7 +8,7 @@
 
 <!-- @@@auto:current-status -->
 - **Active File**: `journal-4.md`
-- **Total Sessions**: 178
+- **Total Sessions**: 179
 - **Last Active**: 2026-07-08
 <!-- @@@/auto:current-status -->
 
@@ -19,7 +19,7 @@
 <!-- @@@auto:active-documents -->
 | File | Lines | Status |
 |------|-------|--------|
-| `journal-4.md` | ~70 | Active |
+| `journal-4.md` | ~95 | Active |
 | `journal-3.md` | ~1985 | Archived |
 | `journal-2.md` | ~1973 | Archived |
 | `journal-1.md` | ~1988 | Archived |
@@ -32,6 +32,7 @@
 <!-- @@@auto:session-history -->
 | # | Date | Title | Commits | Branch |
 |---|------|-------|---------|--------|
+| 179 | 2026-07-08 | Dedupe CreationModeTabs ids | `759c842d` | `main` |
 | 178 | 2026-07-08 | Creation UI polish and Seed Audio provider | `86cb8804`, `fe328d41`, `79953d3c`, `8ede2db3`, `2e6e5204`, `74519e3f`, `8d0091f2`, `aaa9d7f6`, `1111779d` | `main` |
 | 177 | 2026-07-02 | Restore Cloudflare Pages deploy | `a6364800` | `main` |
 | 176 | 2026-07-02 | Team mode security and board media refs | `bacc300d` | `codex/team-mode-security-board-polish` |

@@ -56,4 +56,39 @@ Shipped workstation UI polish from the ego-browser audit (creation tab mode colo
 
 ### Next Steps
 
-- Follow-up: dedupe `CreationModeTabs` ids (mobile + desktop), align board/agent shell theme classes with home page.
+- Follow-up: align board/agent shell theme classes with home page.
+
+---
+
+## Session 179: Dedupe CreationModeTabs ids
+
+**Date**: 2026-07-08
+**Task**: Code review follow-up — duplicate tab button ids
+**Branch**: `main`
+
+### Summary
+
+Fixed duplicate `#creation-tab-*` ids when mobile and desktop creation tablists both mount in the DOM. Added an `instance` prop (`desktop` | `mobile`) so ids become `creation-tab-{instance}-{mode}`.
+
+### Main Changes
+
+- `CreationModeTabs.tsx`: `instance` prop, scoped tab `id`s.
+- `app/page.tsx`: pass `instance="mobile"` and `instance="desktop"` on the two tablists.
+
+### Git Commits
+
+| Hash | Message |
+|------|---------|
+| `759c842d` | fix(creation): dedupe CreationModeTabs ids for mobile and desktop |
+
+### Testing
+
+- [OK] `pnpm run lint`
+
+### Status
+
+[OK] **Completed**
+
+### Next Steps
+
+- Follow-up: align board/agent shell theme classes with home page.
