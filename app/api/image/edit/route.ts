@@ -50,6 +50,10 @@ export async function POST(req: NextRequest) {
         "unsupported_image_edit_provider",
       );
     }
+    const imageResolution = optionalText(body.imageResolution) ?? "auto";
+    if (imageResolution === "custom") {
+      throw new ImageEditRequestValidationError("imageResolution custom must be resolved to a concrete size before image editing");
+    }
     const config = await resolveProviderConfigForRequest(req, parsed.provider);
     const result = await editImage(config, {
       operation,
@@ -58,7 +62,7 @@ export async function POST(req: NextRequest) {
       image: { dataUri: image },
       ...(mask ? { mask: { dataUri: mask } } : {}),
       ...(guide ? { guide: { dataUri: guide } } : {}),
-      imageResolution: optionalText(body.imageResolution) ?? "auto",
+      imageResolution,
       imageQuality: optionalText(body.imageQuality),
     });
 

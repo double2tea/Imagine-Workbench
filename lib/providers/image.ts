@@ -188,7 +188,14 @@ const ASYNC_IMAGE_FAILED_STATUSES = new Set(["failed", "failure", "canceled", "c
 const MODELSCOPE_IMAGE_SUCCESS_STATUSES = new Set(["succeed", "success", "succeeded", "completed"]);
 const MODELSCOPE_IMAGE_FAILED_STATUSES = new Set(["failed", "fail", "error", "canceled", "cancelled", "timeout", "revoked"]);
 
+function assertConcreteImageResolution(imageResolution: string, operation: string): void {
+  if (imageResolution === "custom") {
+    throw new Error(`Custom image size must be resolved to a concrete size before ${operation}`);
+  }
+}
+
 export async function generateImage(config: ProviderConfig, input: GenerateImageInput): Promise<GenerateImageResult> {
+  assertConcreteImageResolution(input.imageResolution, "image generation");
   if (!isKnownProvider(config.provider)) {
     if (input.async) throw new Error("Custom OpenAI-compatible providers do not support async image generation");
     return generateOpenAiCompatibleImage(config, input, config.provider);
@@ -215,6 +222,7 @@ export async function generateImage(config: ProviderConfig, input: GenerateImage
 }
 
 export async function editImage(config: ProviderConfig, input: EditImageInput): Promise<GenerateImageResult> {
+  assertConcreteImageResolution(input.imageResolution, "image editing");
   if (!isKnownProvider(config.provider) || config.provider === "grok2api") {
     return editOpenAiCompatibleImageWithOperation(config, input, config.provider);
   }

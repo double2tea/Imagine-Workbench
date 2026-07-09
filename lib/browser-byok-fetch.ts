@@ -428,6 +428,9 @@ async function generateImageForBrowser(headers: Headers, body: unknown, signal: 
   const isRunningHubImageTask = parsed.provider === "runninghub" && isRunningHubTaskTarget(parsed.model, "image");
   const modelCapability = isRunningHubImageTask ? null : getModelCapability(modelValue, "image");
   const requestImageResolution = optionalText(record.imageResolution);
+  if (requestImageResolution === "custom") {
+    throw badRequest("imageResolution custom must be resolved to a concrete size before image generation", "unsupported_image_resolution");
+  }
   const aspectRatio = customImageSizeAspectRatio(requestImageResolution) ?? optionalText(record.aspectRatio) ?? "1:1";
   const imageResolution = isRunningHubImageTask ? requestImageResolution ?? "auto" : resolveImageResolution(modelValue, aspectRatio, requestImageResolution);
   const imageQuality = isRunningHubImageTask ? optionalText(record.imageQuality) : resolveImageQuality(modelValue, optionalText(record.imageQuality));
@@ -625,6 +628,10 @@ async function editImageForBrowser(headers: Headers, body: unknown, signal: Abor
   if (parsed.provider === "runninghub") {
     throw badRequest("RunningHub quick image edits require /api/media/generate-image with an image-to-image Standard Model, AI App, or workflow target", "unsupported_image_edit_provider");
   }
+  const imageResolution = optionalText(record.imageResolution) ?? "auto";
+  if (imageResolution === "custom") {
+    throw badRequest("imageResolution custom must be resolved to a concrete size before image editing", "unsupported_image_resolution");
+  }
   const config = resolveBrowserProviderConfig(headers, parsed.provider, signal);
   const result = await editImage(config, {
     operation,
@@ -633,7 +640,7 @@ async function editImageForBrowser(headers: Headers, body: unknown, signal: Abor
     image: { dataUri: image },
     ...(mask ? { mask: { dataUri: mask } } : {}),
     ...(guide ? { guide: { dataUri: guide } } : {}),
-    imageResolution: optionalText(record.imageResolution) ?? "auto",
+    imageResolution,
     imageQuality: optionalText(record.imageQuality),
   });
   return normalizeGeneratedImageResult(result);
@@ -977,6 +984,7 @@ function resolveImageResolution(modelValue: string, aspectRatio: string, imageRe
   const options = getImageResolutionOptions(modelValue, aspectRatio);
   if (options.length === 0) return imageResolution ?? "auto";
   if (!imageResolution) throw badRequest("imageResolution is required for this image model", "missing_required_field");
+  if (imageResolution === "custom") throw badRequest("imageResolution custom must be resolved to a concrete size before image generation", "unsupported_image_resolution");
   if (options.some(option => option.value === imageResolution)) return imageResolution;
   if (options.some(option => option.value === "custom") && isValidCustomImageResolution(imageResolution, aspectRatio)) return imageResolution;
   throw badRequest(`Unsupported imageResolution "${imageResolution}" for aspectRatio "${aspectRatio}"`, "unsupported_image_resolution");

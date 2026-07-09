@@ -58,6 +58,10 @@ function firstOptionValue(options: Array<{ value: string }>, fallback: string): 
   return options[0]?.value ?? fallback;
 }
 
+function concreteImageResolutionOptions<T extends { value: string }>(options: T[]): T[] {
+  return options.filter(option => option.value !== "custom");
+}
+
 function describePatchOperation(operation: AgentBoardPatchOperation, t: { (key: string, params?: Record<string, string>): string }): string {
   if (operation.op === "create_node") return t("pendingActionEditor.describePatchCreateNode", { kind: operation.kind, title: operation.title ?? operation.tempId });
   if (operation.op === "update_node") return t("pendingActionEditor.describePatchUpdateNode", { nodeId: operation.nodeId });
@@ -114,8 +118,11 @@ export function AgentPendingActionEditor({
     if (!imageCapabilities || !imageModel) return [];
     const aspectRatio = params.aspectRatio ?? firstOptionValue(imageCapabilities.aspectRatios, "1:1");
     const fromAspect = getImageResolutionOptions(imageModel, aspectRatio);
-    return fromAspect.length > 0 ? fromAspect : imageCapabilities.resolutions;
+    return concreteImageResolutionOptions(fromAspect.length > 0 ? fromAspect : imageCapabilities.resolutions);
   }, [imageCapabilities, imageModel, params.aspectRatio]);
+  const selectedImageResolution = params.imageResolution && imageResolutionOptions.some(option => option.value === params.imageResolution)
+    ? params.imageResolution
+    : imageResolutionOptions[0]?.value ?? "1K";
 
   const videoCapabilities = useMemo(
     () => (isVideo && videoModel ? getVideoModelCapabilities(videoModel) : null),
@@ -191,9 +198,10 @@ export function AgentPendingActionEditor({
     const resolutionSource = resolutionOptions.length > 0
       ? resolutionOptions
       : getImageModelCapabilities(imageModel).resolutions;
-    const imageResolution = params.imageResolution && resolutionSource.some(option => option.value === params.imageResolution)
+    const concreteResolutionSource = concreteImageResolutionOptions(resolutionSource);
+    const imageResolution = params.imageResolution && params.imageResolution !== "custom" && resolutionSource.some(option => option.value === params.imageResolution)
       ? params.imageResolution
-      : firstOptionValue(resolutionSource, "1K");
+      : firstOptionValue(concreteResolutionSource, firstOptionValue(resolutionSource, "1K"));
     updateParams({ aspectRatio, imageResolution });
   };
 
@@ -422,7 +430,7 @@ export function AgentPendingActionEditor({
         <label className="imagine-agent-action-field">
           <span className="imagine-agent-action-field-label">{t("pendingActionEditor.resolutionLabel")}</span>
           <select
-            value={params.imageResolution ?? imageResolutionOptions[0]?.value ?? "1K"}
+            value={selectedImageResolution}
             disabled={disabled}
             onChange={event => updateParams({ imageResolution: event.target.value })}
             className="imagine-agent-model-select w-full"

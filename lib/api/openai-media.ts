@@ -39,6 +39,13 @@ const TRANSCRIPTION_FORM_FIELDS = new Set(["file", "language", "model", "prompt"
 type ImageResponseFormat = "url" | "b64_json";
 type SpeechFormat = "wav" | "pcm16";
 
+function concreteOpenAiImageSize(size: string): string {
+  if (size === "custom") {
+    throw badRequest("size custom must be resolved to a concrete image size", "unsupported_image_resolution");
+  }
+  return size;
+}
+
 export async function postOpenAiImageGenerations(req: Request): Promise<Response> {
   try {
     const gatewayKey = assertOpenAiCompatibleGatewayAccess(req);
@@ -49,8 +56,8 @@ export async function postOpenAiImageGenerations(req: Request): Promise<Response
 
     const parsed = parseProviderModel(body.model, "12ai");
     assertImmediateOpenAiImageTarget(parsed.provider, parsed.async, "/v1/images/generations");
+    const imageResolution = concreteOpenAiImageSize(body.size ?? "1024x1024");
     const config = resolveOpenAiCompatibleProviderConfigForRequest(req, parsed.provider, gatewayKey);
-    const imageResolution = body.size ?? "1024x1024";
     const result = await generateImage(config, {
       prompt: body.prompt,
       model: parsed.model,
@@ -96,10 +103,10 @@ export async function postOpenAiImageEdits(req: Request): Promise<Response> {
 
     const parsed = parseProviderModel(modelValue, "12ai");
     assertImmediateOpenAiImageTarget(parsed.provider, parsed.async, "/v1/images/edits");
-    const config = resolveOpenAiCompatibleProviderConfigForRequest(req, parsed.provider, gatewayKey);
     const images = await readRequiredImageEditDataUris(form);
     const mask = await readOptionalFileDataUri(form, "mask", "image/png", REFERENCE_IMAGE_MAX_BYTES);
-    const imageResolution = readOptionalFormText(form, "size") ?? "1024x1024";
+    const imageResolution = concreteOpenAiImageSize(readOptionalFormText(form, "size") ?? "1024x1024");
+    const config = resolveOpenAiCompatibleProviderConfigForRequest(req, parsed.provider, gatewayKey);
     const result = await editImage(config, {
       operation,
       prompt,

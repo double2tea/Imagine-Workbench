@@ -478,6 +478,10 @@ export function useGenerationActions({
         : overrides.size ?? activeImageAspectRatio;
 
     if (!activePrompt.trim() && overrides.allowEmptyPrompt !== true && runningHubAppPresetRequiresPrompt(requestModel)) return false;
+    if (requestImageResolution === "custom") {
+      pushWorkspaceNotice("error", t("common.notices.customImageSizeInvalid", { error: t("common.notices.imageSizeInvalid") }));
+      return false;
+    }
     if (requestIsCustomImageResolution) {
       const sizeError = validateCustomImageSize(requestImageResolution, t);
       if (sizeError) {

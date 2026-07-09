@@ -160,6 +160,10 @@ type WorkspaceAssetStorageTarget = "indexeddb" | "postgres";
 type AssetLibraryMode = "manage" | "reference";
 type ImageSizeMode = "preset" | "custom";
 
+function firstConcreteImageResolution(options: Array<{ value: string }>): string | undefined {
+  return options.find(option => option.value !== "custom")?.value;
+}
+
 interface WorkspaceImageQuickEditJob {
   controller: AbortController;
   editAspectRatio: string;
@@ -632,7 +636,10 @@ export default function Home() {
   useEffect(() => {
     setAudioParameterValues(current => pruneCapabilityParameterValues(audioCapabilities.parameterDescriptors, current));
   }, [selectedAudioModel]);
-  const activeImageResolution = isCustomImageSize ? customImageSize.trim() : imageResolution;
+  const activePresetImageResolution = imageResolution !== "custom" && imageResolutionOptions.some(option => option.value === imageResolution)
+    ? imageResolution
+    : firstConcreteImageResolution(imageResolutionOptions) ?? imageResolution;
+  const activeImageResolution = isCustomImageSize ? customImageSize.trim() : activePresetImageResolution;
   const activeImageQuality = imageCapabilities.qualities.some(option => option.value === imageQuality) ? imageQuality : undefined;
   const activeVideoSize = videoCapabilities.sizes.some(option => option.value === aspectRatio) ? aspectRatio : "auto";
   const activeVideoResolution = videoCapabilities.resolutions.some(option => option.value === videoResolution)
@@ -764,7 +771,7 @@ export default function Home() {
     traditionalSubTab === "audio"
       ? (audioTextInputRequired && !prompt.trim()) || (audioStylePromptRequired && !audioStylePrompt.trim()) || !hasRequiredAudioReferences || (needsManualVoiceCloneConsent && !voiceCloneConsentAccepted)
       : (traditionalSubTab === "image" ? imagePromptRequired : videoPromptRequired) && !prompt.trim();
-  const isCreatorGenerateDisabled = isCreatorSubmitting || isCreatorInputDisabled;
+  const isCreatorGenerateDisabled = isCreatorInputDisabled;
   const creatorGenerateDisabledHint = (() => {
     if (isCreatorSubmitting || !isCreatorInputDisabled) return undefined;
     if (traditionalSubTab === "audio") {
@@ -1123,8 +1130,8 @@ export default function Home() {
     if (!canKeepCustomImageSize) {
       setImageSizeMode("preset");
     }
-    if (!canKeepCustomImageSize && nextResolutionOptions.length > 0 && !nextResolutionOptions.some(option => option.value === imageResolution)) {
-      setImageResolution(nextResolutionOptions.find(option => option.value !== "custom")?.value ?? nextResolutionOptions[0].value);
+    if (!canKeepCustomImageSize && nextResolutionOptions.length > 0 && !nextResolutionOptions.some(option => option.value === imageResolution && option.value !== "custom")) {
+      setImageResolution(firstConcreteImageResolution(nextResolutionOptions) ?? nextResolutionOptions[0].value);
     }
     if (capabilities.qualities.length > 0 && !capabilities.qualities.some(option => option.value === imageQuality)) {
       setImageQuality(capabilities.qualities[0].value);
@@ -1146,8 +1153,8 @@ export default function Home() {
     setImageSizeMode("preset");
     setAspectRatio(value);
     const nextResolutionOptions = getImageResolutionOptions(selectedModel, value);
-    if (nextResolutionOptions.length > 0 && !nextResolutionOptions.some(option => option.value === imageResolution)) {
-      setImageResolution(nextResolutionOptions[0].value);
+    if (nextResolutionOptions.length > 0 && !nextResolutionOptions.some(option => option.value === imageResolution && option.value !== "custom")) {
+      setImageResolution(firstConcreteImageResolution(nextResolutionOptions) ?? nextResolutionOptions[0].value);
     }
   };
 
@@ -1257,12 +1264,18 @@ export default function Home() {
         setAspectRatio(resolvedAspectRatio);
       }
       const nextResolutionOptions = getImageResolutionOptions(imageModel, resolvedAspectRatio);
-      if (nextResolutionOptions.some(option => option.value === nextResolution)) {
+      if (nextResolution !== "custom" && nextResolutionOptions.some(option => option.value === nextResolution)) {
         setImageSizeMode("preset");
         setImageResolution(nextResolution);
       } else if (/^\d+x\d+$/.test(nextResolution) && nextResolutionOptions.some(option => option.value === "custom")) {
         setImageSizeMode("custom");
         setCustomImageSize(nextResolution);
+      } else {
+        const nextPresetResolution = firstConcreteImageResolution(nextResolutionOptions);
+        if (nextPresetResolution) {
+          setImageSizeMode("preset");
+          setImageResolution(nextPresetResolution);
+        }
       }
       if (request?.imageQuality) setImageQuality(request.imageQuality);
       if (request?.thinkingLevel) setImageThinkingLevel(request.thinkingLevel);

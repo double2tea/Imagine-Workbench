@@ -46,8 +46,10 @@ export async function POST(req: NextRequest) {
     const parsed = parseProviderModel(modelValue, "12ai");
     const isRunningHubImageTask = parsed.provider === "runninghub" && isRunningHubTaskTarget(parsed.model, "image");
     const modelCapability = isRunningHubImageTask ? null : getModelCapability(modelValue, "image");
-    const config = await resolveProviderConfigForRequest(req, parsed.provider);
     const requestImageResolution = optionalText(body.imageResolution);
+    if (requestImageResolution === "custom") {
+      throw new ImageRequestValidationError("imageResolution custom must be resolved to a concrete size before image generation");
+    }
     const aspectRatio = customImageSizeAspectRatio(requestImageResolution) ?? optionalText(body.aspectRatio) ?? "1:1";
     const imageResolution = isRunningHubImageTask ? requestImageResolution ?? "auto" : resolveImageResolution(modelValue, aspectRatio, requestImageResolution);
     const imageQuality = isRunningHubImageTask ? optionalText(body.imageQuality) : resolveImageQuality(modelValue, optionalText(body.imageQuality));
@@ -73,6 +75,7 @@ export async function POST(req: NextRequest) {
       parsed.model,
       optionalText(body.runningHubAccessPassword),
     );
+    const config = await resolveProviderConfigForRequest(req, parsed.provider);
     const result = await generateImage(config, {
       prompt: allowsEmptyPrompt ? optionalText(body.prompt) ?? "" : requireApiText(body.prompt, "Prompt"),
       model: parsed.model,
@@ -273,6 +276,9 @@ function resolveImageResolution(modelValue: string, aspectRatio: string, imageRe
   if (options.length === 0) return imageResolution ?? "auto";
   if (!imageResolution) {
     throw new ImageRequestValidationError("imageResolution is required for this image model");
+  }
+  if (imageResolution === "custom") {
+    throw new ImageRequestValidationError("imageResolution custom must be resolved to a concrete size before image generation");
   }
   if (options.some(option => option.value === imageResolution)) return imageResolution;
   if (options.some(option => option.value === "custom") && isValidCustomImageResolution(imageResolution, aspectRatio)) {

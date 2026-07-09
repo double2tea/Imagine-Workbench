@@ -699,7 +699,7 @@ export default function AudioGenerationPanel({
       {showGenerateButton && (
         <CreatorGenerateButton
           mode="audio"
-          disabled={isSubmitting || !hasRequiredInput || (needsCloneConsent && !voiceCloneConsentAccepted)}
+          disabled={!hasRequiredInput || (needsCloneConsent && !voiceCloneConsentAccepted)}
           isSubmitting={isSubmitting}
           label={mode === "asr" ? t("audio.generateLabelASR") : t("audio.generateLabelDefault")}
           submitCount={submitCount}

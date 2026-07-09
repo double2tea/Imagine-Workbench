@@ -34,6 +34,10 @@ function firstOptionValue(options: Array<{ value: string }>, fallback: string): 
   return options[0]?.value ?? fallback;
 }
 
+function concreteImageResolutionOptions(options: Array<{ value: string }>): Array<{ value: string }> {
+  return options.filter(option => option.value !== "custom");
+}
+
 export function resolveImageActionParams(
   model: string,
   current: AgentGenerationParams = {},
@@ -44,9 +48,10 @@ export function resolveImageActionParams(
     : firstOptionValue(capabilities.aspectRatios, "1:1");
   const resolutionOptions = getImageResolutionOptions(model, aspectRatio);
   const resolutionSource = resolutionOptions.length > 0 ? resolutionOptions : capabilities.resolutions;
-  const imageResolution = current.imageResolution && resolutionSource.some(option => option.value === current.imageResolution)
+  const concreteResolutionSource = concreteImageResolutionOptions(resolutionSource);
+  const imageResolution = current.imageResolution && current.imageResolution !== "custom" && resolutionSource.some(option => option.value === current.imageResolution)
     ? current.imageResolution
-    : firstOptionValue(resolutionSource, "1K");
+    : firstOptionValue(concreteResolutionSource, firstOptionValue(resolutionSource, "1K"));
   const imageQuality = resolveImageModelQuality(model, current.imageQuality) ?? capabilities.qualities[0]?.value;
   const thinkingLevel = current.thinkingLevel && capabilities.thinkingLevels.some(option => option.value === current.thinkingLevel)
     ? current.thinkingLevel
