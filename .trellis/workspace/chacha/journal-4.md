@@ -278,3 +278,36 @@ Added a Seed Audio-only Edge route for hosted Browser BYOK, routed legacy Seed A
 ### Next Steps
 
 - None - task complete
+
+
+## Session 185: Fix submit queue lock after generation
+
+**Date**: 2026-07-09
+**Task**: Fix submit queue lock after generation
+**Branch**: `main`
+
+### Summary
+
+Kept generation submit controls usable while tasks are pending, resolved image custom-size sentinels before API/provider boundaries, and verified check/provider tests plus browser queue behavior.
+
+### Main Changes
+
+(Add details)
+
+### Git Commits
+
+| Hash | Message |
+|------|---------|
+| `442091f4` | (see git log) |
+
+### Testing
+
+- [OK] (Add test results)
+
+### Status
+
+[OK] **Completed**
+
+### Next Steps
+
+- None - task complete
