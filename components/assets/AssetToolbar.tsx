@@ -87,7 +87,7 @@ export default function AssetToolbar({
   setSearchQuery,
 }: AssetToolbarProps) {
   const { t } = useTranslations("common");
-  const [mobileFiltersExpanded, setMobileFiltersExpanded] = useState(false);
+  const [moreFiltersOpen, setMoreFiltersOpen] = useState(false);
 
   const TYPE_FILTER_OPTIONS = [
     { value: "all", label: t("library.all") },
@@ -127,6 +127,12 @@ export default function AssetToolbar({
 
   const showCustomDateRange =
     assetDatePreset === "custom" || assetDateStart.length > 0 || assetDateEnd.length > 0;
+  const hasSecondaryFilters =
+    filterType !== "all" ||
+    assetDatePreset !== "all" ||
+    assetDateStart.length > 0 ||
+    assetDateEnd.length > 0;
+
   const handleDateStartChange = (value: string) => {
     setAssetDatePreset("custom");
     setAssetDateStart(value);
@@ -232,24 +238,7 @@ export default function AssetToolbar({
         </button>
       </div>
 
-      <button
-        type="button"
-        className="imagine-gallery-filters-toggle imagine-secondary-action iw-type-caption mt-2 flex h-9 w-full items-center justify-center gap-1.5 font-semibold lg:hidden"
-        aria-expanded={mobileFiltersExpanded}
-        aria-controls="imagine-gallery-filters-panel"
-        onClick={() => setMobileFiltersExpanded((expanded) => !expanded)}
-      >
-        <SlidersHorizontal className="h-3.5 w-3.5" aria-hidden="true" />
-        <span>{t("gallery.filtersToggle")}</span>
-        <span className="sr-only">
-          {mobileFiltersExpanded ? t("gallery.filtersToggleCollapse") : t("gallery.filtersToggleExpand")}
-        </span>
-      </button>
-
-      <div
-        id="imagine-gallery-filters-panel"
-        className={`imagine-gallery-filters ${mobileFiltersExpanded ? "flex" : "hidden"} lg:flex`}
-      >
+      <div className="imagine-gallery-filters">
         <div className="imagine-filter-segment" role="group" aria-label={t("gallery.filterStatus")}>
           {STATUS_FILTER_OPTIONS.map(option => {
             const count = getStatusCount(option.value);
@@ -266,73 +255,94 @@ export default function AssetToolbar({
           })}
         </div>
 
-        <span className="imagine-toolbar-chip-divider" aria-hidden="true" />
+        <button
+          type="button"
+          className="imagine-gallery-more-filters-trigger imagine-secondary-action iw-type-caption flex h-7 shrink-0 items-center gap-1.5 px-2.5 font-semibold"
+          aria-expanded={moreFiltersOpen}
+          aria-controls="imagine-gallery-more-filters-panel"
+          data-active={hasSecondaryFilters ? "true" : "false"}
+          onClick={() => setMoreFiltersOpen((open) => !open)}
+        >
+          <SlidersHorizontal className="h-3.5 w-3.5" aria-hidden="true" />
+          <span>{t("gallery.moreFilters")}</span>
+          {hasSecondaryFilters && (
+            <span className="imagine-gallery-more-filters-badge" aria-hidden="true" />
+          )}
+          <span className="sr-only">
+            {moreFiltersOpen ? t("gallery.filtersToggleCollapse") : t("gallery.filtersToggleExpand")}
+          </span>
+        </button>
+      </div>
 
-        <div className="imagine-filter-segment" role="group" aria-label={t("gallery.filterType")}>
-          {TYPE_FILTER_OPTIONS.map(option => {
-            const count = getTypeCount(option.value);
-            return (
+      {moreFiltersOpen && (
+        <div
+          id="imagine-gallery-more-filters-panel"
+          className="imagine-gallery-more-filters"
+        >
+          <div className="imagine-filter-segment" role="group" aria-label={t("gallery.filterType")}>
+            {TYPE_FILTER_OPTIONS.map(option => {
+              const count = getTypeCount(option.value);
+              return (
+                <FilterChip
+                  key={option.value}
+                  active={filterType === option.value}
+                  count={count}
+                  empty={option.value !== "all" && count === 0}
+                  label={option.label}
+                  onClick={() => setFilterType(option.value)}
+                />
+              );
+            })}
+          </div>
+
+          <div className="imagine-filter-segment imagine-filter-segment--time" role="group" aria-label={t("gallery.filterTime")}>
+            {DATE_PRESET_OPTIONS.map(option => (
               <FilterChip
                 key={option.value}
-                active={filterType === option.value}
-                count={count}
-                empty={option.value !== "all" && count === 0}
+                active={
+                  assetDatePreset === option.value && !assetDateStart && !assetDateEnd
+                }
                 label={option.label}
-                onClick={() => setFilterType(option.value)}
+                onClick={() => {
+                  setAssetDatePreset(option.value);
+                  setAssetDateStart("");
+                  setAssetDateEnd("");
+                }}
               />
-            );
-          })}
-        </div>
-
-        <span className="imagine-toolbar-chip-divider" aria-hidden="true" />
-
-        <div className="imagine-filter-segment imagine-filter-segment--time" role="group" aria-label={t("gallery.filterTime")}>
-          {DATE_PRESET_OPTIONS.map(option => (
+            ))}
             <FilterChip
-              key={option.value}
-              active={
-                assetDatePreset === option.value && !assetDateStart && !assetDateEnd
-              }
-              label={option.label}
+              active={showCustomDateRange}
+              label={t("gallery.customDate")}
               onClick={() => {
-                setAssetDatePreset(option.value);
-                setAssetDateStart("");
-                setAssetDateEnd("");
+                if (!showCustomDateRange) {
+                  setAssetDatePreset("custom");
+                }
               }}
             />
-          ))}
-          <FilterChip
-            active={showCustomDateRange}
-            label={t("gallery.customDate")}
-            onClick={() => {
-              if (!showCustomDateRange) {
-                setAssetDatePreset("custom");
-              }
-            }}
-          />
-          {showCustomDateRange && (
-            <div className="imagine-filter-date-range">
-              <input
-                type="date"
-                name="asset-date-start"
-                value={assetDateStart}
-                onChange={(event) => handleDateStartChange(event.target.value)}
-                className="imagine-filter-date-input"
-                aria-label={t("gallery.dateFrom")}
-              />
-              <span className="iw-type-caption font-mono text-[var(--iw-faint)]">{t("gallery.dateRangeSeparator")}</span>
-              <input
-                type="date"
-                name="asset-date-end"
-                value={assetDateEnd}
-                onChange={(event) => handleDateEndChange(event.target.value)}
-                className="imagine-filter-date-input"
-                aria-label={t("gallery.dateTo")}
-              />
-            </div>
-          )}
+            {showCustomDateRange && (
+              <div className="imagine-filter-date-range">
+                <input
+                  type="date"
+                  name="asset-date-start"
+                  value={assetDateStart}
+                  onChange={(event) => handleDateStartChange(event.target.value)}
+                  className="imagine-filter-date-input"
+                  aria-label={t("gallery.dateFrom")}
+                />
+                <span className="iw-type-caption font-mono text-[var(--iw-faint)]">{t("gallery.dateRangeSeparator")}</span>
+                <input
+                  type="date"
+                  name="asset-date-end"
+                  value={assetDateEnd}
+                  onChange={(event) => handleDateEndChange(event.target.value)}
+                  className="imagine-filter-date-input"
+                  aria-label={t("gallery.dateTo")}
+                />
+              </div>
+            )}
+          </div>
         </div>
-      </div>
+      )}
     </div>
   );
 }

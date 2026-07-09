@@ -479,11 +479,19 @@ export default function AudioGenerationPanel({
         )}
       </div>
 
-      <CapabilityParameterControls
-        descriptors={capabilities.parameterDescriptors}
-        value={parameterValues}
-        onChange={onParameterValuesChange}
-      />
+      {capabilities.parameterDescriptors.length > 0 && (
+        <details className="imagine-panel-disclosure">
+          <summary className="imagine-panel-disclosure-summary">{t("advanced.summary")}</summary>
+          <div className="imagine-panel-disclosure-body">
+            <CapabilityParameterControls
+              hideTitle
+              descriptors={capabilities.parameterDescriptors}
+              value={parameterValues}
+              onChange={onParameterValuesChange}
+            />
+          </div>
+        </details>
+      )}
 
       <ReferenceImagePicker
         acceptedMediaTypes={acceptedMediaTypes}

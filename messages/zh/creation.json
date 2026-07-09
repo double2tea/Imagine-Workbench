@@ -246,6 +246,9 @@
     "libraryTileLabel": "素材库",
     "uploadLabel": "浏览上传"
   },
+  "advanced": {
+    "summary": "高级参数"
+  },
   "parameters": {
     "defaultTitle": "模型高级参数",
     "clearButton": "清空",

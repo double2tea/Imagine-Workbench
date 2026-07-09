@@ -547,6 +547,7 @@
     "filtersToggle": "Filters",
     "filtersToggleExpand": "Expand filters",
     "filtersToggleCollapse": "Collapse filters",
+    "moreFilters": "More filters",
     "dayCount": "{count} days",
     "customDate": "Custom",
     "dateFrom": "Start date",

@@ -568,6 +568,7 @@
     "filtersToggle": "筛选",
     "filtersToggleExpand": "展开筛选",
     "filtersToggleCollapse": "收起筛选",
+    "moreFilters": "更多筛选",
     "dayCount": "{count} 天",
     "customDate": "自定义",
     "dateFrom": "开始日期",

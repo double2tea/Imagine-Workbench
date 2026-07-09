@@ -20,12 +20,14 @@ interface CapabilityParameterControlsProps {
   value: ModelParameterValues;
   onChange: (value: ModelParameterValues) => void;
   compact?: boolean;
+  hideTitle?: boolean;
   title?: string;
 }
 
 export default function CapabilityParameterControls({
   compact = false,
   descriptors,
+  hideTitle = false,
   onChange,
   title,
   value,
@@ -38,6 +40,7 @@ export default function CapabilityParameterControls({
   const referenceDescriptors = descriptors.filter((descriptor): descriptor is ModelReferenceParameterDescriptor => descriptor.kind === "reference");
   const booleanDescriptors = scalarDescriptors.filter(descriptor => descriptor.kind === "boolean");
   const fieldDescriptors = scalarDescriptors.filter(descriptor => descriptor.kind !== "boolean");
+  const showTitleRow = !hideTitle || booleanDescriptors.length > 0;
 
   const patchValue = (key: string, nextValue: ModelParameterValues[string]): void => {
     onChange({ ...value, [key]: nextValue });
@@ -45,27 +48,31 @@ export default function CapabilityParameterControls({
 
   return (
     <div className={`imagine-capability-panel${compact ? " imagine-capability-panel--compact" : ""}`}>
-      <div className={`${compact ? "mb-2" : "mb-3"} flex items-center justify-between gap-2`}>
-        <span className={compact ? "imagine-capability-field-label" : "imagine-section-label"}>{resolvedTitle}</span>
-        {booleanDescriptors.length > 0 && (
-          <div className="flex flex-wrap items-center justify-end gap-2">
-            {booleanDescriptors.map(descriptor => {
-              const label = parameterLabel(descriptor, t);
-              return (
-                <label key={descriptor.key} className={`imagine-inline-chip-toggle${compact ? " h-6 px-2 text-[9px]" : ""}`}>
-                  <input
-                    type="checkbox"
-                    checked={readBooleanValue(value, descriptor)}
-                    onChange={event => patchValue(descriptor.key, event.target.checked)}
-                    className="imagine-capability-checkbox"
-                  />
-                  {label}
-                </label>
-              );
-            })}
-          </div>
-        )}
-      </div>
+      {showTitleRow && (
+        <div className={`${compact ? "mb-2" : "mb-3"} flex items-center justify-between gap-2`}>
+          {!hideTitle && (
+            <span className={compact ? "imagine-capability-field-label" : "imagine-section-label"}>{resolvedTitle}</span>
+          )}
+          {booleanDescriptors.length > 0 && (
+            <div className="flex flex-wrap items-center justify-end gap-2">
+              {booleanDescriptors.map(descriptor => {
+                const label = parameterLabel(descriptor, t);
+                return (
+                  <label key={descriptor.key} className={`imagine-inline-chip-toggle${compact ? " h-6 px-2 text-[9px]" : ""}`}>
+                    <input
+                      type="checkbox"
+                      checked={readBooleanValue(value, descriptor)}
+                      onChange={event => patchValue(descriptor.key, event.target.checked)}
+                      className="imagine-capability-checkbox"
+                    />
+                    {label}
+                  </label>
+                );
+              })}
+            </div>
+          )}
+        </div>
+      )}
 
       {fieldDescriptors.length > 0 && (
         <div className={compact ? "grid grid-cols-2 gap-2" : "grid gap-3 sm:grid-cols-2"}>

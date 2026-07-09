@@ -191,24 +191,29 @@ results.check.mobileIds = mobileIds
 
 await click('.imagine-mobile-workbench-tab:nth-child(2)', { label: 'mobile gallery tab' })
 await waitForVisibleSelector('.imagine-mobile-asset-stream', 'mobile gallery panel')
-await waitForVisibleSelector('.imagine-gallery-filters-toggle', 'mobile gallery filters toggle')
-await click('.imagine-gallery-filters-toggle', { label: 'expand mobile gallery filters' })
-await waitForVisibleSelector('.imagine-mobile-asset-stream .imagine-gallery-filters', 'mobile gallery filters')
+await waitForVisibleSelector('.imagine-mobile-asset-stream .imagine-gallery-filters', 'mobile gallery status filters')
+await waitForVisibleSelector('.imagine-gallery-more-filters-trigger', 'mobile gallery more filters trigger')
+await click('.imagine-gallery-more-filters-trigger', { label: 'expand mobile gallery more filters' })
+await waitForVisibleSelector('.imagine-mobile-asset-stream .imagine-gallery-more-filters', 'mobile gallery more filters')
 
 const mobile = await js(String.raw`(() => {
   const gallery = document.querySelector('.imagine-mobile-asset-stream')
   const filters = gallery?.querySelector('.imagine-gallery-filters')
+  const more = gallery?.querySelector('.imagine-gallery-more-filters')
   if (!filters) return { error: 'no mobile filters', galleryMounted: !!gallery }
   const cs = getComputedStyle(filters)
   const r = filters.getBoundingClientRect()
   const visible = cs.display !== 'none' && cs.visibility !== 'hidden' && r.width > 0 && r.height > 0
-  const segments = [...filters.querySelectorAll('.imagine-filter-segment')]
+  const segments = [
+    ...filters.querySelectorAll('.imagine-filter-segment'),
+    ...(more ? more.querySelectorAll('.imagine-filter-segment') : []),
+  ]
   const tops = [...new Set(segments.map((s) => Math.round(s.getBoundingClientRect().top)))]
   return {
     viewport: { w: innerWidth, h: innerHeight },
     galleryMounted: !!gallery,
     filters: { w: Math.round(r.width), h: Math.round(r.height), flexWrap: cs.flexWrap, segmentRows: tops.length, visible },
-    chipH: [...new Set([...filters.querySelectorAll('.imagine-filter-chip')].map((c) => Math.round(c.getBoundingClientRect().height)))],
+    chipH: [...new Set([...filters.querySelectorAll('.imagine-filter-chip'), ...(more ? more.querySelectorAll('.imagine-filter-chip') : [])].map((c) => Math.round(c.getBoundingClientRect().height)))],
   }
 })()`)
 results.check.mobile390 = mobile

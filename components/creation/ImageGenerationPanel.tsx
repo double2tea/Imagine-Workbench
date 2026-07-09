@@ -254,129 +254,133 @@ export default function ImageGenerationPanel({
         </div>
       </div>
 
-      <div className="flex flex-col gap-3">
-        <CinematicProfileControls
-          accent="neutral"
-          mediaType="image"
-          variant="compact"
-          value={cinematicProfile}
-          onChange={onCinematicProfileChange}
-        />
+      <details className="imagine-panel-disclosure">
+        <summary className="imagine-panel-disclosure-summary">{t("advanced.summary")}</summary>
+        <div className="imagine-panel-disclosure-body">
+          <CinematicProfileControls
+            accent="neutral"
+            mediaType="image"
+            variant="compact"
+            value={cinematicProfile}
+            onChange={onCinematicProfileChange}
+          />
 
-        <div>
-          <label htmlFor={negativePromptId} className="mb-1.5 block imagine-section-label">{t("imageGeneration.negativePromptLabel")}</label>
-          <input
-            id={negativePromptId}
-            name="image-negative-prompt"
-            type="text"
-            value={negativePrompt}
-            onChange={(event) => onNegativePromptChange(event.target.value)}
-            placeholder={t("imageGeneration.negativePromptPlaceholder")}
-            className="imagine-input py-2.5"
+          <div>
+            <label htmlFor={negativePromptId} className="mb-1.5 block imagine-section-label">{t("imageGeneration.negativePromptLabel")}</label>
+            <input
+              id={negativePromptId}
+              name="image-negative-prompt"
+              type="text"
+              value={negativePrompt}
+              onChange={(event) => onNegativePromptChange(event.target.value)}
+              placeholder={t("imageGeneration.negativePromptPlaceholder")}
+              className="imagine-input py-2.5"
+            />
+          </div>
+
+          <div className="grid grid-cols-1 gap-3 sm:grid-cols-2">
+            {presetResolutionOptions.length > 0 && (
+              <div>
+                <label className="mb-1.5 block imagine-section-label">
+                  {t("imageGeneration.outputResolutionLabel")}
+                </label>
+                <div className="imagine-option-group grid-cols-4">
+                  {presetResolutionOptions.map((option) => (
+                    <button
+                      key={option.value}
+                      type="button"
+                      data-active={!isCustomImageSize && imageResolution === option.value}
+                      onClick={() => onImageResolutionChange(option.value)}
+                      className="imagine-segment-btn"
+                    >
+                      {option.label}
+                    </button>
+                  ))}
+                </div>
+              </div>
+            )}
+
+            {supportsCustomImageSize && (
+              <div>
+                <label htmlFor={customImageSizeId} className="mb-1.5 block imagine-section-label">
+                  {t("imageGeneration.outputSizeLabel")}
+                </label>
+                <button
+                  type="button"
+                  onClick={() => onImageSizeModeChange("custom")}
+                  data-active={isCustomImageSize}
+                  className="imagine-segment-btn border border-[var(--iw-border)]"
+                >
+                  {t("imageGeneration.customSizeButton")}
+                </button>
+                {isCustomImageSize && (
+                  <div className="mt-2">
+                    <input
+                      id={customImageSizeId}
+                      name="image-custom-size"
+                      type="text"
+                      value={customImageSize}
+                      onChange={(event) => onCustomImageSizeChange(event.target.value)}
+                      placeholder={t("imageGeneration.customSizePlaceholder")}
+                      className="imagine-input py-2.5 font-mono"
+                    />
+                    <p className="mt-1.5 font-mono text-[10px] leading-relaxed text-[var(--iw-faint)]">
+                      {t("imageGeneration.customSizeHint")}
+                    </p>
+                  </div>
+                )}
+              </div>
+            )}
+
+            {capabilities.qualities.length > 0 && (
+              <div>
+                <label className="mb-1.5 block imagine-section-label">
+                  {t("imageGeneration.qualityLabel")}
+                </label>
+                <div className="imagine-option-group grid-cols-4">
+                  {capabilities.qualities.map((option) => (
+                    <button
+                      key={option.value}
+                      type="button"
+                      data-active={imageQuality === option.value}
+                      onClick={() => onImageQualityChange(option.value)}
+                      className="imagine-segment-btn"
+                    >
+                      {option.label}
+                    </button>
+                  ))}
+                </div>
+              </div>
+            )}
+
+            {capabilities.thinkingLevels.length > 0 && (
+              <div>
+                <label className="mb-1.5 block imagine-section-label">{t("imageGeneration.thinkingLevelLabel")}</label>
+                <div className="imagine-option-group grid-cols-2">
+                  {capabilities.thinkingLevels.map(option => (
+                    <button
+                      key={option.value}
+                      type="button"
+                      data-active={imageThinkingLevel === option.value}
+                      onClick={() => onThinkingLevelChange(option.value)}
+                      className="imagine-segment-btn"
+                    >
+                      {option.label}
+                    </button>
+                  ))}
+                </div>
+              </div>
+            )}
+          </div>
+
+          <CapabilityParameterControls
+            hideTitle
+            descriptors={capabilities.parameterDescriptors}
+            value={parameterValues}
+            onChange={onParameterValuesChange}
           />
         </div>
-
-        <div className="grid grid-cols-1 gap-3 sm:grid-cols-2">
-          {presetResolutionOptions.length > 0 && (
-            <div>
-              <label className="mb-1.5 block imagine-section-label">
-                {t("imageGeneration.outputResolutionLabel")}
-              </label>
-              <div className="imagine-option-group grid-cols-4">
-                {presetResolutionOptions.map((option) => (
-                  <button
-                    key={option.value}
-                    type="button"
-                    data-active={!isCustomImageSize && imageResolution === option.value}
-                    onClick={() => onImageResolutionChange(option.value)}
-                    className="imagine-segment-btn"
-                  >
-                    {option.label}
-                  </button>
-                ))}
-              </div>
-            </div>
-          )}
-
-          {supportsCustomImageSize && (
-            <div>
-              <label htmlFor={customImageSizeId} className="mb-1.5 block imagine-section-label">
-                {t("imageGeneration.outputSizeLabel")}
-              </label>
-              <button
-                type="button"
-                onClick={() => onImageSizeModeChange("custom")}
-                data-active={isCustomImageSize}
-                className="imagine-segment-btn border border-[var(--iw-border)]"
-              >
-                {t("imageGeneration.customSizeButton")}
-              </button>
-              {isCustomImageSize && (
-                <div className="mt-2">
-                  <input
-                    id={customImageSizeId}
-                    name="image-custom-size"
-                    type="text"
-                    value={customImageSize}
-                    onChange={(event) => onCustomImageSizeChange(event.target.value)}
-                    placeholder={t("imageGeneration.customSizePlaceholder")}
-                    className="imagine-input py-2.5 font-mono"
-                  />
-                  <p className="mt-1.5 font-mono text-[10px] leading-relaxed text-[var(--iw-faint)]">
-                    {t("imageGeneration.customSizeHint")}
-                  </p>
-                </div>
-              )}
-            </div>
-          )}
-
-          {capabilities.qualities.length > 0 && (
-            <div>
-              <label className="mb-1.5 block imagine-section-label">
-                {t("imageGeneration.qualityLabel")}
-              </label>
-              <div className="imagine-option-group grid-cols-4">
-                {capabilities.qualities.map((option) => (
-                  <button
-                    key={option.value}
-                    type="button"
-                    data-active={imageQuality === option.value}
-                    onClick={() => onImageQualityChange(option.value)}
-                    className="imagine-segment-btn"
-                  >
-                    {option.label}
-                  </button>
-                ))}
-              </div>
-            </div>
-          )}
-
-          {capabilities.thinkingLevels.length > 0 && (
-            <div>
-              <label className="mb-1.5 block imagine-section-label">{t("imageGeneration.thinkingLevelLabel")}</label>
-              <div className="imagine-option-group grid-cols-2">
-                {capabilities.thinkingLevels.map(option => (
-                  <button
-                    key={option.value}
-                    type="button"
-                    data-active={imageThinkingLevel === option.value}
-                    onClick={() => onThinkingLevelChange(option.value)}
-                    className="imagine-segment-btn"
-                  >
-                    {option.label}
-                  </button>
-                ))}
-              </div>
-            </div>
-          )}
-        </div>
-      </div>
-
-      <CapabilityParameterControls
-        descriptors={capabilities.parameterDescriptors}
-        value={parameterValues}
-        onChange={onParameterValuesChange}
-      />
+      </details>
 
       <ReferenceImagePicker
         addLabel={t("imageGeneration.referenceAddLabel")}

@@ -254,14 +254,6 @@ export default function VideoGenerationPanel({
         </div>
       )}
 
-      <CinematicProfileControls
-        accent="neutral"
-        mediaType="video"
-        variant="compact"
-        value={cinematicProfile}
-        onChange={onCinematicProfileChange}
-      />
-
       {(resolutionOptions.length > 0 || durationOptions.length > 0 || presetOptions.length > 0) && (
         <div className={`grid grid-cols-1 gap-3 ${controlGridClass}`}>
           {resolutionOptions.length > 0 && (
@@ -310,6 +302,19 @@ export default function VideoGenerationPanel({
           )}
         </div>
       )}
+
+      <details className="imagine-panel-disclosure">
+        <summary className="imagine-panel-disclosure-summary">{t("advanced.summary")}</summary>
+        <div className="imagine-panel-disclosure-body">
+          <CinematicProfileControls
+            accent="neutral"
+            mediaType="video"
+            variant="compact"
+            value={cinematicProfile}
+            onChange={onCinematicProfileChange}
+          />
+        </div>
+      </details>
 
       <ReferenceImagePicker
         acceptedMediaTypes={capabilities.referenceMediaTypes}

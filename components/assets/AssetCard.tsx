@@ -63,6 +63,28 @@ function AssetMetaErrorChip({ message }: { message: string }) {
   );
 }
 
+function FailedErrorSummary({ message }: { message: string | undefined }) {
+  const [expanded, setExpanded] = useState(false);
+  const summary = getUserFacingErrorSummary(message);
+  const detail = getUserFacingErrorDetail(message);
+  return (
+    <button
+      type="button"
+      className="mt-1 max-w-full text-center text-[10px] leading-4 text-[var(--iw-muted)]"
+      data-expanded={expanded ? "true" : "false"}
+      title={expanded ? undefined : detail}
+      onClick={event => {
+        event.stopPropagation();
+        setExpanded(current => !current);
+      }}
+    >
+      <span className={expanded ? "break-words whitespace-pre-wrap" : "line-clamp-1"}>
+        {expanded && detail ? detail : summary}
+      </span>
+    </button>
+  );
+}
+
 type AssetSelectionEvent = { shiftKey?: boolean };
 
 interface AssetCardProps {
@@ -408,7 +430,7 @@ export default function AssetCard({
         selected ? "border-[var(--iw-accent)] ring-2 ring-[var(--iw-accent-soft)]" : "border-[var(--iw-border)]"
       }`}
     >
-      {(item.status === "failed" || item.status === "pending" || item.status === "processing") && (
+      {(item.status === "pending" || item.status === "processing") && (
         <div className="imagine-asset-controlbar imagine-asset-controlbar-spacer" aria-hidden="true" />
       )}
 
@@ -506,21 +528,16 @@ export default function AssetCard({
             </button>
           </div>
         ) : item.status === "failed" ? (
-          <div className="imagine-asset-failed-stage select-none text-[var(--iw-tone-danger-text)]">
-            <X className="mb-2 h-6 w-6 shrink-0 text-[var(--iw-tone-danger-text)]" />
-            <p className="text-xs font-semibold leading-5 text-[var(--iw-text)]">{failedTitle}</p>
-            <p
-              className="mt-1 line-clamp-2 max-w-full break-words text-[10px] leading-4 text-[var(--iw-muted)]"
-              title={getUserFacingErrorDetail(item.errorMessage)}
-            >
-              {getUserFacingErrorSummary(item.errorMessage)}
-            </p>
-            <div className="mt-3 flex flex-wrap items-center justify-center gap-2">
+          <div className="imagine-asset-failed-stage select-none">
+            <X className="mb-1.5 h-4 w-4 shrink-0 text-[var(--iw-tone-danger-text)]" />
+            <p className="text-[11px] font-semibold leading-4 text-[var(--iw-text)]">{failedTitle}</p>
+            <FailedErrorSummary message={item.errorMessage} />
+            <div className="mt-2.5 flex flex-wrap items-center justify-center gap-1.5">
               <button
                 type="button"
                 onClick={() => onRetry(item)}
                 data-size="compact"
-                className="imagine-primary-action flex items-center gap-1.5 rounded-lg px-3 py-1.5 text-[10px] font-semibold"
+                className="imagine-primary-action flex items-center gap-1.5 rounded-lg px-2.5 py-1 text-[10px] font-semibold"
               >
                 <RefreshCw className="h-3 w-3" />
                 {t("assetCard.retry")}
@@ -529,7 +546,7 @@ export default function AssetCard({
                 type="button"
                 onClick={() => onReuseTask(item)}
                 data-size="compact"
-                className="imagine-secondary-action flex items-center gap-1.5 rounded-lg px-3 py-1.5 text-[10px] font-semibold"
+                className="imagine-secondary-action flex items-center gap-1.5 rounded-lg px-2.5 py-1 text-[10px] font-semibold"
               >
                 <WorkbenchOperationIcon operation="reuse" className="h-3 w-3" />
                 {t("assetCard.reuseParams")}
@@ -584,7 +601,7 @@ export default function AssetCard({
 
             {isMobileActionsOpen && (
               <div className="imagine-mobile-action-sheet">
-                <div className="flex items-center justify-between border-b border-white/10 px-3 py-2">
+                <div className="flex items-center justify-between border-b border-[var(--iw-border)] px-3 py-2">
                   <span className="imagine-mobile-action-sheet-title text-[11px] font-semibold">{t("assetCard.mobileActionsTitle")}</span>
                   <button
                     type="button"
@@ -709,9 +726,9 @@ export default function AssetCard({
           </span>
           <span className="imagine-meta-chip">{formatDisplayedAspectRatio(item)}</span>
           <span className="imagine-meta-chip imagine-status-chip" data-status={item.status}>
-            {item.status}
+            {t(`statusLabels.${item.status}`)}
           </span>
-          {item.errorMessage ? <AssetMetaErrorChip message={item.errorMessage} /> : null}
+          {item.errorMessage && item.status !== "failed" ? <AssetMetaErrorChip message={item.errorMessage} /> : null}
           <span className="imagine-meta-chip imagine-meta-chip-time ml-auto shrink-0 tabular-nums">
             {formatCreatedAt(item.createdAt)}
           </span>

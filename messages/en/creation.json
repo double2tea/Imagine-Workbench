@@ -246,6 +246,9 @@
       "voiceCloneConsent": "Confirm voice-clone consent first"
     }
   },
+  "advanced": {
+    "summary": "Advanced"
+  },
   "parameters": {
     "defaultTitle": "Advanced Model Parameters",
     "clearButton": "Clear",
