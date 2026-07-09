@@ -970,9 +970,18 @@ html::-webkit-scrollbar-thumb:hover {
   margin-bottom: 8px;
 }
 
+.imagine-gallery-toolbar-buttons {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  justify-content: flex-end;
+  gap: 6px;
+  min-width: 0;
+}
+
 @media (min-width: 640px) {
   .imagine-gallery-toolbar-actions {
-    grid-template-columns: minmax(0, 1fr) minmax(9rem, 14rem) auto auto;
+    grid-template-columns: minmax(0, 1fr) minmax(9rem, 14rem) auto;
     align-items: center;
   }
 }
@@ -7773,8 +7782,7 @@ html[data-imagine-theme="light"] .imagine-mark-xs,
   }
 
   .imagine-mobile-asset-stream .imagine-gallery-toolbar-actions .imagine-toolbar-select,
-  .imagine-mobile-asset-stream .imagine-gallery-toolbar-actions .imagine-secondary-action,
-  .imagine-mobile-asset-stream .imagine-gallery-toolbar-actions .imagine-danger-action {
+  .imagine-mobile-asset-stream .imagine-gallery-toolbar-actions .imagine-gallery-toolbar-buttons {
     display: none !important;
   }
 

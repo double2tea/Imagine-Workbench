@@ -205,38 +205,40 @@ export default function AssetToolbar({
             <option key={model} value={model}>{formatModelLabel(model, selectedProvider)}</option>
           ))}
         </select>
-        <button
-          type="button"
-          onClick={exportMetadataJson}
-          className="imagine-secondary-action iw-type-caption h-9 shrink-0 px-3 font-semibold"
-        >
-          {t("gallery.export")}
-        </button>
-        {canRetryFailed ? (
+        <div className="imagine-gallery-toolbar-buttons">
           <button
             type="button"
-            onClick={onRetryFailed}
+            onClick={exportMetadataJson}
             className="imagine-secondary-action iw-type-caption h-9 shrink-0 px-3 font-semibold"
           >
-            {t("gallery.retryFailed", { count: retryableFailedCount })}
+            {t("gallery.export")}
           </button>
-        ) : null}
-        <button
-          type="button"
-          onClick={() => deleteItemsByStatus(["failed"])}
-          disabled={!canClearFailed}
-          className="imagine-danger-action iw-type-caption h-9 shrink-0 rounded-lg px-3 font-semibold transition-colors duration-150 disabled:cursor-not-allowed disabled:opacity-45"
-        >
-          {t("gallery.clearFailed")}
-        </button>
+          {canRetryFailed ? (
+            <button
+              type="button"
+              onClick={onRetryFailed}
+              className="imagine-secondary-action iw-type-caption h-9 shrink-0 px-3 font-semibold"
+            >
+              {t("gallery.retryFailed", { count: retryableFailedCount })}
+            </button>
+          ) : null}
+          <button
+            type="button"
+            onClick={() => deleteItemsByStatus(["failed"])}
+            disabled={!canClearFailed}
+            className="imagine-danger-action iw-type-caption h-9 shrink-0 rounded-lg px-3 font-semibold transition-colors duration-150 disabled:cursor-not-allowed disabled:opacity-45"
+          >
+            {t("gallery.clearFailed")}
+          </button>
+        </div>
       </div>
 
-      <div className="imagine-gallery-toolbar-mobile-actions mt-2 flex items-center gap-2 lg:hidden">
+      <div className="imagine-gallery-toolbar-mobile-actions mt-2 flex min-w-0 flex-wrap items-center gap-2 lg:hidden">
         <select
           name="asset-model-filter-mobile"
           value={assetModelFilter}
           onChange={(e) => setAssetModelFilter(e.target.value)}
-          className="imagine-toolbar-select iw-type-caption h-9 min-w-0 flex-1 px-3 font-mono"
+          className="imagine-toolbar-select iw-type-caption h-9 min-w-0 flex-1 basis-[min(100%,12rem)] px-3 font-mono"
           aria-label={t("gallery.filterByModel")}
         >
           <option value="all">{t("gallery.allModels")}</option>
@@ -244,30 +246,32 @@ export default function AssetToolbar({
             <option key={model} value={model}>{formatModelLabel(model, selectedProvider)}</option>
           ))}
         </select>
-        <button
-          type="button"
-          onClick={exportMetadataJson}
-          className="imagine-secondary-action iw-type-caption h-9 shrink-0 px-2.5 font-semibold"
-        >
-          {t("gallery.export")}
-        </button>
-        {canRetryFailed ? (
+        <div className="imagine-gallery-toolbar-buttons flex-1 justify-end">
           <button
             type="button"
-            onClick={onRetryFailed}
+            onClick={exportMetadataJson}
             className="imagine-secondary-action iw-type-caption h-9 shrink-0 px-2.5 font-semibold"
           >
-            {t("gallery.retryFailed", { count: retryableFailedCount })}
+            {t("gallery.export")}
           </button>
-        ) : null}
-        <button
-          type="button"
-          onClick={() => deleteItemsByStatus(["failed"])}
-          disabled={!canClearFailed}
-          className="imagine-danger-action iw-type-caption h-9 shrink-0 rounded-lg px-2.5 font-semibold transition-colors duration-150 disabled:cursor-not-allowed disabled:opacity-45"
-        >
-          {t("gallery.clearFailed")}
-        </button>
+          {canRetryFailed ? (
+            <button
+              type="button"
+              onClick={onRetryFailed}
+              className="imagine-secondary-action iw-type-caption h-9 shrink-0 px-2.5 font-semibold"
+            >
+              {t("gallery.retryFailed", { count: retryableFailedCount })}
+            </button>
+          ) : null}
+          <button
+            type="button"
+            onClick={() => deleteItemsByStatus(["failed"])}
+            disabled={!canClearFailed}
+            className="imagine-danger-action iw-type-caption h-9 shrink-0 rounded-lg px-2.5 font-semibold transition-colors duration-150 disabled:cursor-not-allowed disabled:opacity-45"
+          >
+            {t("gallery.clearFailed")}
+          </button>
+        </div>
       </div>
 
       <div className="imagine-gallery-filters">
