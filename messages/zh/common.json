@@ -563,7 +563,7 @@
     "filterByModel": "按模型筛选",
     "allModels": "全部模型",
     "export": "导出",
-    "clearFailed": "清失败",
+    "clearFailed": "清除失败任务",
     "retryFailed": "重试失败 ({count})",
     "retryFailedConfirm": "重试",
     "filterStatus": "状态",

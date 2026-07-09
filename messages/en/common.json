@@ -542,7 +542,7 @@
     "filterByModel": "Filter by model",
     "allModels": "All models",
     "export": "Export",
-    "clearFailed": "Clear failed",
+    "clearFailed": "Clear failed tasks",
     "retryFailed": "Retry failed ({count})",
     "retryFailedConfirm": "Retry",
     "filterStatus": "Status",
