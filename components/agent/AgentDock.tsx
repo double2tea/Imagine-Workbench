@@ -768,7 +768,7 @@ const AgentDock = forwardRef<HTMLElement, AgentDockProps>(function AgentDock(
 
   const dockShellClass = isIdleOrb
     ? "imagine-agent-dock imagine-agent-dock-idle-orb imagine-theme-dark pointer-events-none fixed bottom-[5.5rem] right-4 z-40 flex sm:bottom-16 sm:right-10"
-    : "imagine-agent-dock imagine-agent-dock-panel imagine-theme-dark pointer-events-auto fixed right-4 bottom-12 z-50 w-[min(420px,calc(100vw-2rem))] rounded-2xl p-3 sm:bottom-16 sm:right-10";
+    : "imagine-agent-dock imagine-agent-dock-panel imagine-theme-dark pointer-events-auto fixed right-4 bottom-12 z-50 w-[min(840px,calc(100vw-2rem))] rounded-2xl p-3 sm:bottom-16 sm:right-10";
   const dockStateClass = [
     isIdleOrb && isOrbDragging ? "is-dragging" : "",
   ].filter(Boolean).join(" ");
@@ -916,7 +916,7 @@ const AgentDock = forwardRef<HTMLElement, AgentDockProps>(function AgentDock(
               hint={agentReferenceHint}
               value={selectedChatModel}
               onChange={onSelectChatModel}
-              className="max-w-[min(14rem,100%)]"
+              className="max-w-[min(22rem,100%)]"
             />
           ) : null}
         </div>
