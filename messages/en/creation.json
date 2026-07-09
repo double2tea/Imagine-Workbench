@@ -247,7 +247,8 @@
     }
   },
   "advanced": {
-    "summary": "Advanced"
+    "summary": "Advanced",
+    "activeCount": "{count} active"
   },
   "parameters": {
     "defaultTitle": "Advanced Model Parameters",

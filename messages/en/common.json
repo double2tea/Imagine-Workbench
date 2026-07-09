@@ -128,6 +128,7 @@
     "videoPromptRequired": "Please enter a video prompt",
     "videoModelRequired": "Please select a video model",
     "taskRetryFailed": "Task retry failed",
+    "retryFailedBatchStarted": "Retrying {count} failed task(s)…",
     "audioModelRequestFailed": "{providerLabel} ({model}) audio generation request failed: {error}",
     "originalMediaReadFailed": "Failed to read original media",
     "originalImageReadFailed": "Failed to read original image",
@@ -269,6 +270,7 @@
     "deleteSelectedItems": "Are you sure you want to permanently delete the selected {count} creative asset(s) or task(s)?",
     "deleteSingleItem": "Are you sure you want to delete this creative item or task?",
     "deleteTasksByStatus": "Are you sure you want to delete {count} {statuses} task(s)?",
+    "retryFailedItems": "Retry {count} failed image/video task(s)? Audio and transcript failures cannot be retried.",
     "cancelVideoTask": "Are you sure you want to cancel this video generation task?",
     "cancelLocalTask": "Are you sure you want to cancel this task locally? The remote generation may still continue.",
     "resetAllHistory": "This will clear all generation history cards and cannot be undone!",
@@ -541,6 +543,8 @@
     "allModels": "All models",
     "export": "Export",
     "clearFailed": "Clear failed",
+    "retryFailed": "Retry failed ({count})",
+    "retryFailedConfirm": "Retry",
     "filterStatus": "Status",
     "filterType": "Type",
     "filterTime": "Time",
@@ -648,7 +652,9 @@
     "generating": "Generating",
     "canceling": "Canceling",
     "retry": "Retry",
-    "reuseParams": "Reuse parameters"
+    "reuseParams": "Reuse parameters",
+    "openSettings": "Open settings",
+    "copyError": "Copy error"
   },
   "references": {
     "imageToken": "@图片{n}",

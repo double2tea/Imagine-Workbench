@@ -247,7 +247,8 @@
     "uploadLabel": "浏览上传"
   },
   "advanced": {
-    "summary": "高级参数"
+    "summary": "高级参数",
+    "activeCount": "{count} 项已设"
   },
   "parameters": {
     "defaultTitle": "模型高级参数",

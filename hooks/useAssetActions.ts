@@ -353,6 +353,9 @@ export function useAssetActions({
     URL.revokeObjectURL(url);
   };
 
+  const isRetryableFailedItem = (item: StorageItem): boolean =>
+    item.status === "failed" && item.type !== "audio" && item.type !== "transcript";
+
   const retryFailedItem = async (item: StorageItem) => {
     if (item.status !== "failed") return;
     if (item.type === "audio" || item.type === "transcript") {
@@ -435,6 +438,22 @@ export function useAssetActions({
       await saveItemOrWarn(failedItem, saveAsset, pushWorkspaceNotice, t);
       setItems(prev => prev.map(current => current.id === item.id ? failedItem : current));
       pushWorkspaceNotice("error", message);
+    }
+  };
+
+  const retryFailedItems = async (candidates: StorageItem[]) => {
+    const targets = candidates.filter(isRetryableFailedItem);
+    if (targets.length === 0) return;
+    if (!(await confirmAction({
+      message: t("common.confirmDialogs.retryFailedItems", { count: targets.length }),
+      tone: "default",
+      confirmLabel: t("common.gallery.retryFailedConfirm"),
+    }))) {
+      return;
+    }
+    pushWorkspaceNotice("info", t("common.notices.retryFailedBatchStarted", { count: targets.length }));
+    for (const item of targets) {
+      await retryFailedItem(item);
     }
   };
 
@@ -560,7 +579,9 @@ export function useAssetActions({
     handleDownloadItem,
     handleResetLocalData,
     handleSavePanoramaScreenshots,
+    isRetryableFailedItem,
     retryFailedItem,
+    retryFailedItems,
     toggleCompare,
     toggleSelectItem,
   };

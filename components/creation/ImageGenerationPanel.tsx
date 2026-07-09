@@ -21,7 +21,7 @@ import {
 import type { ImageModelCapabilities } from "@/lib/providers/model-catalog";
 import type { ModelParameterValues } from "@/lib/providers/model-capabilities";
 import { buildGenerationModelPriceOptions } from "@/lib/providers/pricing";
-import type { CinematicProfile } from "@/lib/cinematic-controls";
+import { hasActiveCinematicProfile, type CinematicProfile } from "@/lib/cinematic-controls";
 
 type ImageSizeMode = "preset" | "custom";
 
@@ -139,6 +139,18 @@ export default function ImageGenerationPanel({
     ? `${Math.min(referenceImages.length, imageReferenceLimit)}/${imageReferenceLimit}`
     : String(referenceImages.length);
   const generateDisabled = promptRequired && !prompt.trim();
+  const advancedActiveCount = [
+    hasActiveCinematicProfile(cinematicProfile, "image"),
+    negativePrompt.trim().length > 0,
+    isCustomImageSize,
+    capabilities.qualities.length > 0
+      && imageQuality.length > 0
+      && imageQuality !== capabilities.qualities[0]?.value,
+    capabilities.thinkingLevels.length > 0
+      && imageThinkingLevel.length > 0
+      && imageThinkingLevel !== capabilities.thinkingLevels[0]?.value,
+    Object.keys(parameterValues).length > 0,
+  ].filter(Boolean).length;
 
   const handleApplyPromptTemplate = (template: PromptTemplate, mode: PromptTemplateApplyMode): void => {
     if (slashCommand && mode === "insert") {
@@ -255,7 +267,14 @@ export default function ImageGenerationPanel({
       </div>
 
       <details className="imagine-panel-disclosure">
-        <summary className="imagine-panel-disclosure-summary">{t("advanced.summary")}</summary>
+        <summary className="imagine-panel-disclosure-summary">
+          <span>{t("advanced.summary")}</span>
+          {advancedActiveCount > 0 ? (
+            <span className="imagine-meta-chip ml-2 font-mono text-[10px]">
+              {t("advanced.activeCount", { count: advancedActiveCount })}
+            </span>
+          ) : null}
+        </summary>
         <div className="imagine-panel-disclosure-body">
           <CinematicProfileControls
             accent="neutral"

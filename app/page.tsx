@@ -942,7 +942,9 @@ export default function Home() {
     handleClearSelection,
     handleDownloadItem,
     handleSavePanoramaScreenshots,
+    isRetryableFailedItem,
     retryFailedItem,
+    retryFailedItems,
     toggleCompare,
     toggleSelectItem,
   } = useAssetActions({
@@ -1288,6 +1290,20 @@ export default function Home() {
     }
     void retryGenerationTask(task);
   }, [generationTasks, retryFailedItem, retryGenerationTask]);
+
+  const retryableFailedCount = useMemo(
+    () => workspaceGalleryItems.filter(isRetryableFailedItem).length,
+    [isRetryableFailedItem, workspaceGalleryItems],
+  );
+
+  const retryGalleryFailedItems = useCallback(() => {
+    void retryFailedItems(workspaceGalleryItems);
+  }, [retryFailedItems, workspaceGalleryItems]);
+
+  const globalInFlightCount = useMemo(
+    () => workspaceGalleryItems.filter(item => item.status === "processing" || item.status === "pending").length,
+    [workspaceGalleryItems],
+  );
 
   useEffect(() => {
     const readyTimer = window.setTimeout(() => {
@@ -1944,16 +1960,19 @@ export default function Home() {
       compareViewType={compareViewType}
       filterType={filterType}
       filteredItems={filteredItems}
-      inFlightCount={assetStats.statusCounts.processing + assetStats.statusCounts.pending}
+      inFlightCount={globalInFlightCount}
       itemsCount={workspaceGalleryItems.length}
       dateOptions={assetStats.dateOptions}
       modelOptions={assetStats.modelOptions}
+      retryableFailedCount={retryableFailedCount}
       searchQuery={searchQuery}
       selectedCount={selectedItemIds.length}
       selectedItemIdSet={selectedItemIdSet}
       selectedProvider={selectedProvider}
       statusCounts={assetStats.statusCounts}
+      statusUniverseCount={assetStats.statusUniverseCount}
       typeCounts={assetStats.typeCounts}
+      typeUniverseCount={assetStats.typeUniverseCount}
       isCompareMode={isCompareMode}
       initialVisibleItems={isMobileLayout ? 18 : 48}
       onApplyVideoReference={applyAsVideoReference}
@@ -1970,11 +1989,16 @@ export default function Home() {
       onAddToLibrary={handleAddItemToLibrary}
       onOpenFullscreen={handleOpenFullscreen}
       onOpenPanorama={handleOpenPanorama}
+      onOpenSettings={() => {
+        setIsAssetLibraryOpen(false);
+        setShowSettings(true);
+      }}
       onPromoteOriginal={promoteItemToOriginal}
       onResetCompare={() => {
         setIsCompareMode(false);
         setCompareItemIds([]);
       }}
+      onRetryFailed={retryGalleryFailedItems}
       onRetryItem={retryGalleryItem}
       onReuseTask={reuseTaskInComposer}
       onSaveVoiceProfile={handleSaveVoiceProfileSource}
@@ -2197,7 +2221,7 @@ export default function Home() {
               <MobileWorkbenchTabs
                 activePanel={mobileWorkbenchPanel}
                 galleryCount={items.length}
-                inFlightCount={assetStats.statusCounts.processing + assetStats.statusCounts.pending}
+                inFlightCount={globalInFlightCount}
                 onChange={setMobileWorkbenchPanel}
               />
 

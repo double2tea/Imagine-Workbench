@@ -29,12 +29,15 @@ interface AssetGalleryWorkspaceProps {
   itemsCount: number;
   dateOptions: Array<{ value: string; label: string; count: number }>;
   modelOptions: string[];
+  retryableFailedCount: number;
   searchQuery: string;
   selectedCount: number;
   selectedItemIdSet: ReadonlySet<string>;
   selectedProvider: AiProvider;
   statusCounts: Record<StorageItem["status"], number>;
+  statusUniverseCount: number;
   typeCounts: Record<StorageItem["type"], number>;
+  typeUniverseCount: number;
   isCompareMode: boolean;
   initialVisibleItems?: number;
   onApplyVideoReference: (item: StorageItem) => void;
@@ -51,8 +54,10 @@ interface AssetGalleryWorkspaceProps {
   onAddToLibrary: (item: StorageItem) => void;
   onOpenFullscreen: (item: StorageItem) => void;
   onOpenPanorama: (item: StorageItem) => void;
+  onOpenSettings?: () => void;
   onPromoteOriginal: (item: StorageItem) => void;
   onResetCompare: () => void;
+  onRetryFailed: () => void;
   onRetryItem: (item: StorageItem) => void;
   onReuseTask: (item: StorageItem) => void;
   onSaveVoiceProfile: (item: StorageItem) => void;
@@ -93,12 +98,15 @@ export default function AssetGalleryWorkspace({
   itemsCount,
   dateOptions,
   modelOptions,
+  retryableFailedCount,
   searchQuery,
   selectedCount,
   selectedItemIdSet,
   selectedProvider,
   statusCounts,
+  statusUniverseCount,
   typeCounts,
+  typeUniverseCount,
   isCompareMode,
   initialVisibleItems = DEFAULT_VISIBLE_ITEMS,
   onApplyVideoReference,
@@ -115,8 +123,10 @@ export default function AssetGalleryWorkspace({
   onAddToLibrary,
   onOpenFullscreen,
   onOpenPanorama,
+  onOpenSettings,
   onPromoteOriginal,
   onResetCompare,
+  onRetryFailed,
   onRetryItem,
   onReuseTask,
   onSaveVoiceProfile,
@@ -228,13 +238,17 @@ export default function AssetGalleryWorkspace({
         filterType={filterType}
         itemsCount={itemsCount}
         modelOptions={modelOptions}
+        retryableFailedCount={retryableFailedCount}
         searchQuery={searchQuery}
         selectedProvider={selectedProvider}
         statusCounts={statusCounts}
+        statusUniverseCount={statusUniverseCount}
         typeCounts={typeCounts}
+        typeUniverseCount={typeUniverseCount}
         deleteItemsByStatus={onDeleteItemsByStatus}
         exportMetadataJson={onExportMetadata}
         formatModelLabel={formatModelLabel}
+        onRetryFailed={onRetryFailed}
         setAssetDateEnd={onSetAssetDateEnd}
         setAssetDatePreset={onSetAssetDatePreset}
         setAssetDateStart={onSetAssetDateStart}
@@ -319,6 +333,7 @@ export default function AssetGalleryWorkspace({
                         onAddToLibrary={onAddToLibrary}
                         onOpenFullscreen={onOpenFullscreen}
                         onOpenPanorama={onOpenPanorama}
+                        onOpenSettings={onOpenSettings}
                         onPromoteOriginal={onPromoteOriginal}
                         onOpenReferencePreview={(previewItem, index) => setReferencePreview({ itemId: previewItem.id, index })}
                         onRetry={onRetryItem}

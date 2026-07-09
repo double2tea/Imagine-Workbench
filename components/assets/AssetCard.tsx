@@ -27,7 +27,11 @@ import { transcriptFromDataUrl } from "@/lib/transcripts";
 import type { CapturedVideoFrame, VideoFrameCaptureMode } from "@/lib/video-frame";
 import type { ImageEditFeature } from "@/hooks/useImageEditFeatureModels";
 import { useTranslations } from "@/lib/i18n";
-import { getUserFacingErrorDetail, getUserFacingErrorSummary } from "@/lib/user-facing-errors";
+import {
+  getUserFacingErrorDetail,
+  getUserFacingErrorSummary,
+  isApiKeyMissingError,
+} from "@/lib/user-facing-errors";
 import {
   IMAGE_EDIT_OPERATION_ORDER,
   WORKBENCH_OPERATION_META,
@@ -103,6 +107,7 @@ interface AssetCardProps {
   onAddToLibrary: (item: StorageItem) => void;
   onOpenFullscreen: (item: StorageItem) => void;
   onOpenPanorama: (item: StorageItem) => void;
+  onOpenSettings?: () => void;
   onPromoteOriginal: (item: StorageItem) => void;
   onOpenReferencePreview: (item: StorageItem, index: number) => void;
   onRetry: (item: StorageItem) => void;
@@ -184,6 +189,7 @@ export default function AssetCard({
   onAddToLibrary,
   onOpenFullscreen,
   onOpenPanorama,
+  onOpenSettings,
   onPromoteOriginal,
   onOpenReferencePreview,
   onRetry,
@@ -207,6 +213,17 @@ export default function AssetCard({
   const providerLabel = providerLabelsByKey?.[provider] ?? getProviderMeta(provider).label;
   const isDraggableReference = item.status === "complete" && item.type !== "transcript";
   const failedTitle = isContentSafetyError(item.errorMessage) ? t("failedTitles.contentSafety") : t("failedTitles.default");
+  const showOpenSettings = isApiKeyMissingError(item.errorMessage) && typeof onOpenSettings === "function";
+  const errorDetail = getUserFacingErrorDetail(item.errorMessage);
+
+  const handleCopyError = async () => {
+    if (!errorDetail || typeof navigator === "undefined" || !navigator.clipboard?.writeText) return;
+    try {
+      await navigator.clipboard.writeText(errorDetail);
+    } catch {
+      /* clipboard unavailable */
+    }
+  };
   const referenceMedia = getGenerationReferenceMedia(item.generationRequest);
   const transcriptText = item.type === "transcript" ? transcriptFromDataUrl(item.url) : "";
   const canAddToLibrary = item.status === "complete" && (item.type === "image" || item.type === "video" || item.type === "audio");
@@ -546,11 +563,34 @@ export default function AssetCard({
                 type="button"
                 onClick={() => onReuseTask(item)}
                 data-size="compact"
+                title={item.prompt}
                 className="imagine-secondary-action flex items-center gap-1.5 rounded-lg px-2.5 py-1 text-[10px] font-semibold"
               >
                 <WorkbenchOperationIcon operation="reuse" className="h-3 w-3" />
                 {t("assetCard.reuseParams")}
               </button>
+              {showOpenSettings ? (
+                <button
+                  type="button"
+                  onClick={() => onOpenSettings?.()}
+                  data-size="compact"
+                  className="imagine-secondary-action flex items-center gap-1.5 rounded-lg px-2.5 py-1 text-[10px] font-semibold"
+                >
+                  {t("assetCard.openSettings")}
+                </button>
+              ) : null}
+              {errorDetail ? (
+                <button
+                  type="button"
+                  onClick={() => {
+                    void handleCopyError();
+                  }}
+                  data-size="compact"
+                  className="imagine-secondary-action flex items-center gap-1.5 rounded-lg px-2.5 py-1 text-[10px] font-semibold"
+                >
+                  {t("assetCard.copyError")}
+                </button>
+              ) : null}
             </div>
           </div>
         ) : (

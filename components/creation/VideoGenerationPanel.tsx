@@ -20,7 +20,7 @@ import {
 import type { ParameterOption, VideoModelCapabilities, VideoReferenceMode } from "@/lib/providers/model-catalog";
 import { buildGenerationModelPriceOptions } from "@/lib/providers/pricing";
 import { selectVideoReferenceTypesForMode } from "@/lib/video-reference-selection";
-import type { CinematicProfile } from "@/lib/cinematic-controls";
+import { hasActiveCinematicProfile, type CinematicProfile } from "@/lib/cinematic-controls";
 
 interface VideoGenerationPanelProps {
   atDropdownNode: ReactNode;
@@ -304,7 +304,14 @@ export default function VideoGenerationPanel({
       )}
 
       <details className="imagine-panel-disclosure">
-        <summary className="imagine-panel-disclosure-summary">{t("advanced.summary")}</summary>
+        <summary className="imagine-panel-disclosure-summary">
+          <span>{t("advanced.summary")}</span>
+          {hasActiveCinematicProfile(cinematicProfile, "video") ? (
+            <span className="imagine-meta-chip ml-2 font-mono text-[10px]">
+              {t("advanced.activeCount", { count: 1 })}
+            </span>
+          ) : null}
+        </summary>
         <div className="imagine-panel-disclosure-body">
           <CinematicProfileControls
             accent="neutral"

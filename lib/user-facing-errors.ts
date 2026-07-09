@@ -13,7 +13,7 @@ function normalizeMessage(message: string | undefined): string {
   return message?.trim().toLowerCase() ?? "";
 }
 
-function classifyUserFacingError(message: string | undefined): UserFacingErrorKind {
+export function classifyUserFacingError(message: string | undefined): UserFacingErrorKind {
   const normalized = normalizeMessage(message);
   if (!normalized) return "unknown";
 
@@ -93,4 +93,8 @@ export function getUserFacingErrorSummary(message: string | undefined): string {
 export function getUserFacingErrorDetail(message: string | undefined): string | undefined {
   const trimmed = message?.trim();
   return trimmed || undefined;
+}
+
+export function isApiKeyMissingError(message: string | undefined): boolean {
+  return classifyUserFacingError(message) === "apiKeyMissing";
 }

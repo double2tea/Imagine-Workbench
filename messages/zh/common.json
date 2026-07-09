@@ -124,6 +124,7 @@
     "boardNodeUpdateContentRequired": "请先填写要更新的节点内容",
     "noteContentRequired": "请先填写笔记内容",
     "taskRetryFailed": "任务重试失败",
+    "retryFailedBatchStarted": "正在重试 {count} 个失败任务…",
     "audioModelRequestFailed": "{providerLabel}（{model}）音频生成请求失败：{error}",
     "originalMediaReadFailed": "原始媒体读取失败",
     "originalImageReadFailed": "原始图片读取失败",
@@ -445,6 +446,7 @@
     "deleteSelectedItems": "确定要彻底删除已选中的 {count} 项创意资产或任务吗？",
     "deleteSingleItem": "确定要删除此创意项或任务吗？",
     "deleteTasksByStatus": "确定要删除 {count} 个 {statuses} 任务吗？",
+    "retryFailedItems": "重试 {count} 个失败的图片/视频任务？音频与转写失败不支持重试。",
     "cancelVideoTask": "确定要取消这个视频生成任务吗？",
     "cancelLocalTask": "确定要本地取消这个任务吗？远端生成可能仍会继续。",
     "resetAllHistory": "这会清空所有生成的历史卡片，无法恢复！",
@@ -562,6 +564,8 @@
     "allModels": "全部模型",
     "export": "导出",
     "clearFailed": "清失败",
+    "retryFailed": "重试失败 ({count})",
+    "retryFailedConfirm": "重试",
     "filterStatus": "状态",
     "filterType": "类型",
     "filterTime": "时间",
@@ -669,7 +673,9 @@
     "generating": "正在生成",
     "canceling": "取消中",
     "retry": "重试",
-    "reuseParams": "复用参数"
+    "reuseParams": "复用参数",
+    "openSettings": "打开设置",
+    "copyError": "复制错误"
   },
   "references": {
     "imageToken": "@图片{n}",

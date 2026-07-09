@@ -19,14 +19,18 @@ interface AssetToolbarProps {
   inFlightCount?: number;
   itemsCount: number;
   modelOptions: string[];
+  retryableFailedCount: number;
   searchQuery: string;
   selectedProvider: AiProvider;
   showGalleryHeader?: boolean;
   statusCounts: Record<StorageItem["status"], number>;
+  statusUniverseCount: number;
   typeCounts: Record<StorageItem["type"], number>;
+  typeUniverseCount: number;
   deleteItemsByStatus: (statuses: StorageItem["status"][]) => void;
   exportMetadataJson: () => void;
   formatModelLabel: (value: string, fallbackProvider: AiProvider) => string;
+  onRetryFailed: () => void;
   setAssetDateEnd: (value: string) => void;
   setAssetDatePreset: (value: AssetDatePreset) => void;
   setAssetDateStart: (value: string) => void;
@@ -70,14 +74,18 @@ export default function AssetToolbar({
   inFlightCount = 0,
   itemsCount,
   modelOptions,
+  retryableFailedCount,
   searchQuery,
   selectedProvider,
   showGalleryHeader = false,
   statusCounts,
+  statusUniverseCount,
   typeCounts,
+  typeUniverseCount,
   deleteItemsByStatus,
   exportMetadataJson,
   formatModelLabel,
+  onRetryFailed,
   setAssetDateEnd,
   setAssetDatePreset,
   setAssetDateStart,
@@ -117,13 +125,17 @@ export default function AssetToolbar({
     if (value === "videos") return typeCounts.video;
     if (value === "audios") return typeCounts.audio;
     if (value === "transcripts") return typeCounts.transcript;
-    return itemsCount;
+    return typeUniverseCount;
   };
 
   const getStatusCount = (value: AssetStatusFilter): number => {
-    if (value === "all") return itemsCount;
+    if (value === "all") return statusUniverseCount;
     return statusCounts[value];
   };
+
+  const failedCount = statusCounts.failed;
+  const canClearFailed = failedCount > 0;
+  const canRetryFailed = retryableFailedCount > 0;
 
   const showCustomDateRange =
     assetDatePreset === "custom" || assetDateStart.length > 0 || assetDateEnd.length > 0;
@@ -200,10 +212,20 @@ export default function AssetToolbar({
         >
           {t("gallery.export")}
         </button>
+        {canRetryFailed ? (
+          <button
+            type="button"
+            onClick={onRetryFailed}
+            className="imagine-secondary-action iw-type-caption h-9 shrink-0 px-3 font-semibold"
+          >
+            {t("gallery.retryFailed", { count: retryableFailedCount })}
+          </button>
+        ) : null}
         <button
           type="button"
-          onClick={() => deleteItemsByStatus(["failed", "pending"])}
-          className="imagine-danger-action iw-type-caption h-9 shrink-0 rounded-lg px-3 font-semibold transition-colors duration-150"
+          onClick={() => deleteItemsByStatus(["failed"])}
+          disabled={!canClearFailed}
+          className="imagine-danger-action iw-type-caption h-9 shrink-0 rounded-lg px-3 font-semibold transition-colors duration-150 disabled:cursor-not-allowed disabled:opacity-45"
         >
           {t("gallery.clearFailed")}
         </button>
@@ -229,10 +251,20 @@ export default function AssetToolbar({
         >
           {t("gallery.export")}
         </button>
+        {canRetryFailed ? (
+          <button
+            type="button"
+            onClick={onRetryFailed}
+            className="imagine-secondary-action iw-type-caption h-9 shrink-0 px-2.5 font-semibold"
+          >
+            {t("gallery.retryFailed", { count: retryableFailedCount })}
+          </button>
+        ) : null}
         <button
           type="button"
-          onClick={() => deleteItemsByStatus(["failed", "pending"])}
-          className="imagine-danger-action iw-type-caption h-9 shrink-0 rounded-lg px-2.5 font-semibold transition-colors duration-150"
+          onClick={() => deleteItemsByStatus(["failed"])}
+          disabled={!canClearFailed}
+          className="imagine-danger-action iw-type-caption h-9 shrink-0 rounded-lg px-2.5 font-semibold transition-colors duration-150 disabled:cursor-not-allowed disabled:opacity-45"
         >
           {t("gallery.clearFailed")}
         </button>
