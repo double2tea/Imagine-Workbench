@@ -191,6 +191,8 @@ results.check.mobileIds = mobileIds
 
 await click('.imagine-mobile-workbench-tab:nth-child(2)', { label: 'mobile gallery tab' })
 await waitForVisibleSelector('.imagine-mobile-asset-stream', 'mobile gallery panel')
+await waitForVisibleSelector('.imagine-gallery-filters-toggle', 'mobile gallery filters toggle')
+await click('.imagine-gallery-filters-toggle', { label: 'expand mobile gallery filters' })
 await waitForVisibleSelector('.imagine-mobile-asset-stream .imagine-gallery-filters', 'mobile gallery filters')
 
 const mobile = await js(String.raw`(() => {
@@ -219,7 +221,8 @@ pass.mobileTabIdPrefix = (mobileIds?.mobileTabIds?.length ?? 0) === 3
 pass.mobileGalleryMounted = mobile?.galleryMounted === true
 pass.mobileFiltersVisible = mobile?.filters?.visible === true
 pass.mobileWrap = mobile?.filters?.visible === true && mobile?.filters?.flexWrap === 'wrap' && mobile?.filters?.segmentRows >= 2
-pass.mobileChipLe30 = Array.isArray(mobile?.chipH) && mobile.chipH.length > 0 && mobile.chipH.every((h) => h <= 30)
+pass.mobileChipLe34 = Array.isArray(mobile?.chipH) && mobile.chipH.length > 0 && mobile.chipH.every((h) => h <= 34)
+pass.mobileChipGe32 = Array.isArray(mobile?.chipH) && mobile.chipH.length > 0 && mobile.chipH.every((h) => h >= 32)
 
 const interaction = {
   darkImageClick: results.interaction['dark-image'] === true,

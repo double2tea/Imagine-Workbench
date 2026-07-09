@@ -13,6 +13,8 @@ import FullscreenPreview from "@/components/assets/FullscreenPreview";
 import AssetLibraryModal from "@/components/library/AssetLibraryModal";
 import PanoramaOverlay from "@/components/panorama/PanoramaOverlay";
 import CreationModeTabs, { type CreationMode } from "@/components/creation/CreationModeTabs";
+
+const CREATION_PANEL_MODES: CreationMode[] = ["image", "video", "audio"];
 import AudioGenerationPanel from "@/components/creation/AudioGenerationPanel";
 import CreatorGenerateButton from "@/components/creation/CreatorGenerateButton";
 import ImageGenerationPanel from "@/components/creation/ImageGenerationPanel";
@@ -2207,7 +2209,18 @@ export default function Home() {
                     onChange={setTraditionalSubTab}
                   />
                   <div className="imagine-mobile-creator-scroll flex min-h-0 flex-1 flex-col gap-3">
-                    {renderCreationPanel(false)}
+                    {CREATION_PANEL_MODES.map(mode => (
+                      <div
+                        key={mode}
+                        id={`creation-panel-mobile-${mode}`}
+                        role="tabpanel"
+                        aria-labelledby={`creation-tab-mobile-${mode}`}
+                        hidden={traditionalSubTab !== mode}
+                        className={traditionalSubTab === mode ? "flex min-h-0 flex-1 flex-col gap-3" : undefined}
+                      >
+                        {traditionalSubTab === mode ? renderCreationPanel(false) : null}
+                      </div>
+                    ))}
                   </div>
                   <div className="imagine-mobile-generate-footer shrink-0">
                     <CreatorGenerateButton
@@ -2250,7 +2263,18 @@ export default function Home() {
                   onChange={setTraditionalSubTab}
                 />
 
-                {renderCreationPanel(false)}
+                {CREATION_PANEL_MODES.map(mode => (
+                  <div
+                    key={mode}
+                    id={`creation-panel-desktop-${mode}`}
+                    role="tabpanel"
+                    aria-labelledby={`creation-tab-desktop-${mode}`}
+                    hidden={traditionalSubTab !== mode}
+                    className={traditionalSubTab === mode ? "flex min-h-0 flex-1 flex-col gap-3" : undefined}
+                  >
+                    {traditionalSubTab === mode ? renderCreationPanel(false) : null}
+                  </div>
+                ))}
 
               </div>
 

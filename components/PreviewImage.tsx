@@ -1,5 +1,7 @@
+"use client";
 /* eslint-disable @next/next/no-img-element */
-import type {ImgHTMLAttributes} from "react";
+import { ImageIcon } from "lucide-react";
+import { useState, type ImgHTMLAttributes } from "react";
 
 type PreviewImageProps = Pick<
   ImgHTMLAttributes<HTMLImageElement>,
@@ -8,6 +10,25 @@ type PreviewImageProps = Pick<
 
 function previewImageSrc(src: PreviewImageProps["src"]): PreviewImageProps["src"] {
   return src;
+}
+
+function PreviewImagePlaceholder({
+  alt,
+  className,
+  style,
+  ...props
+}: Pick<PreviewImageProps, "alt" | "className" | "onClick" | "style">) {
+  return (
+    <div
+      {...props}
+      className={`flex items-center justify-center bg-[var(--iw-panel-soft)] ${className ?? ""}`}
+      aria-label={alt}
+      role="img"
+      style={style}
+    >
+      <ImageIcon className="h-6 w-6 text-[var(--iw-faint)]" aria-hidden />
+    </div>
+  );
 }
 
 export default function PreviewImage({
@@ -19,9 +40,21 @@ export default function PreviewImage({
   src,
   ...props
 }: PreviewImageProps) {
+  const [failed, setFailed] = useState(false);
   const srcValue = typeof src === "string" ? src : undefined;
-  if (!srcValue?.trim()) {
-    return <div {...props} aria-label={alt} role="img" />;
+  if (!srcValue?.trim() || failed) {
+    return <PreviewImagePlaceholder alt={alt} {...props} />;
   }
-  return <img {...props} alt={alt} decoding={decoding} fetchPriority={fetchPriority} loading={loading} referrerPolicy={referrerPolicy} src={previewImageSrc(srcValue)} />;
+  return (
+    <img
+      {...props}
+      alt={alt}
+      decoding={decoding}
+      fetchPriority={fetchPriority}
+      loading={loading}
+      onError={() => setFailed(true)}
+      referrerPolicy={referrerPolicy}
+      src={previewImageSrc(srcValue)}
+    />
+  );
 }

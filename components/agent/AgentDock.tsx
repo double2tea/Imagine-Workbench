@@ -767,8 +767,8 @@ const AgentDock = forwardRef<HTMLElement, AgentDockProps>(function AgentDock(
     : undefined;
 
   const dockShellClass = isIdleOrb
-    ? "imagine-agent-dock imagine-agent-dock-idle-orb imagine-theme-dark pointer-events-none fixed bottom-12 right-4 z-40 flex sm:bottom-16 sm:right-10"
-    : "imagine-agent-dock imagine-agent-dock-panel imagine-theme-dark pointer-events-auto fixed inset-x-4 bottom-12 z-50 mx-auto w-[calc(100vw-32px)] max-w-5xl rounded-2xl p-3 sm:bottom-16 sm:w-[min(1040px,calc(100vw-40px))]";
+    ? "imagine-agent-dock imagine-agent-dock-idle-orb imagine-theme-dark pointer-events-none fixed bottom-[5.5rem] right-4 z-40 flex sm:bottom-16 sm:right-10"
+    : "imagine-agent-dock imagine-agent-dock-panel imagine-theme-dark pointer-events-auto fixed right-4 bottom-12 z-50 w-[min(420px,calc(100vw-2rem))] rounded-2xl p-3 sm:bottom-16 sm:right-10";
   const dockStateClass = [
     isIdleOrb && isOrbDragging ? "is-dragging" : "",
   ].filter(Boolean).join(" ");

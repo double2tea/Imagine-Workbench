@@ -27,6 +27,7 @@ import { transcriptFromDataUrl } from "@/lib/transcripts";
 import type { CapturedVideoFrame, VideoFrameCaptureMode } from "@/lib/video-frame";
 import type { ImageEditFeature } from "@/hooks/useImageEditFeatureModels";
 import { useTranslations } from "@/lib/i18n";
+import { getUserFacingErrorDetail, getUserFacingErrorSummary } from "@/lib/user-facing-errors";
 import {
   IMAGE_EDIT_OPERATION_ORDER,
   WORKBENCH_OPERATION_META,
@@ -43,19 +44,21 @@ import {
 
 function AssetMetaErrorChip({ message }: { message: string }) {
   const [expanded, setExpanded] = useState(false);
+  const summary = getUserFacingErrorSummary(message);
+  const detail = getUserFacingErrorDetail(message);
   return (
     <button
       type="button"
-      className={`imagine-tone-chip max-w-[160px] text-[10px] ${expanded ? "" : "truncate"}`}
+      className={`imagine-tone-chip min-w-0 max-w-[min(100%,12rem)] text-[10px] ${expanded ? "" : "truncate"}`}
       data-expanded={expanded ? "true" : "false"}
       data-tone="danger"
-      title={expanded ? undefined : message}
+      title={expanded ? undefined : detail}
       onClick={event => {
         event.stopPropagation();
         setExpanded(current => !current);
       }}
     >
-      last error: {message}
+      {summary}
     </button>
   );
 }
@@ -506,8 +509,11 @@ export default function AssetCard({
           <div className="imagine-asset-failed-stage select-none text-[var(--iw-tone-danger-text)]">
             <X className="mb-2 h-6 w-6 shrink-0 text-[var(--iw-tone-danger-text)]" />
             <p className="text-xs font-semibold leading-5 text-[var(--iw-text)]">{failedTitle}</p>
-            <p className="mt-1 line-clamp-2 max-w-full break-words text-[10px] leading-4 text-[var(--iw-muted)]">
-              {item.errorMessage ?? t("failedTitles.checkApiKey")}
+            <p
+              className="mt-1 line-clamp-2 max-w-full break-words text-[10px] leading-4 text-[var(--iw-muted)]"
+              title={getUserFacingErrorDetail(item.errorMessage)}
+            >
+              {getUserFacingErrorSummary(item.errorMessage)}
             </p>
             <div className="mt-3 flex flex-wrap items-center justify-center gap-2">
               <button
@@ -693,9 +699,12 @@ export default function AssetCard({
           )}
         </div>
 
-        <div className="imagine-asset-meta-chips flex flex-wrap items-center gap-1 border-t border-[var(--iw-border)] pt-1.5 font-mono text-[10px] text-[var(--iw-faint)]">
+        <div className="imagine-asset-meta-chips flex !flex-wrap items-center gap-1 overflow-visible border-t border-[var(--iw-border)] pt-1.5 font-mono text-[10px] text-[var(--iw-faint)]">
           <span className="imagine-meta-chip">{providerLabel}</span>
-          <span className="imagine-meta-chip max-w-[140px] truncate" title={item.model}>
+          <span
+            className="imagine-meta-chip min-w-0 max-w-[min(100%,12rem)] line-clamp-2 break-words xl:max-w-[140px] xl:line-clamp-none xl:truncate"
+            title={item.model}
+          >
             {formatModelName(item.model)}
           </span>
           <span className="imagine-meta-chip">{formatDisplayedAspectRatio(item)}</span>

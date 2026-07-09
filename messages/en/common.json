@@ -367,6 +367,15 @@
     "default": "Generation failed / connection lost",
     "checkApiKey": "Please verify your API Key or rework the parameters."
   },
+  "userFacingErrors": {
+    "apiKeyMissing": "API key missing or invalid",
+    "timeout": "Request timed out",
+    "unauthorized": "Authentication failed",
+    "rateLimited": "Rate limit exceeded",
+    "contentSafety": "Content blocked by safety filters",
+    "providerError": "Provider returned an error",
+    "unknown": "Something went wrong"
+  },
   "videoReference": {
     "label": "Video reference image",
     "firstLastLabel": "First / Last frame",
@@ -535,6 +544,9 @@
     "filterStatus": "Status",
     "filterType": "Type",
     "filterTime": "Time",
+    "filtersToggle": "Filters",
+    "filtersToggleExpand": "Expand filters",
+    "filtersToggleCollapse": "Collapse filters",
     "dayCount": "{count} days",
     "customDate": "Custom",
     "dateFrom": "Start date",

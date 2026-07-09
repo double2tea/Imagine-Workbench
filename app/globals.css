@@ -1078,7 +1078,7 @@ html::-webkit-scrollbar-thumb:hover {
   display: inline-flex !important;
   align-items: center;
   gap: 4px;
-  min-height: 24px !important;
+  min-height: 32px !important;
   padding: 0 8px !important;
   border: 1px solid transparent !important;
   border-radius: calc(var(--iw-radius-sm) - 1px) !important;
@@ -1470,7 +1470,7 @@ html::-webkit-scrollbar-thumb:hover {
   justify-content: center;
   padding: 16px;
   text-align: center;
-  background: rgba(2, 6, 23, 0.92);
+  background: color-mix(in srgb, var(--iw-panel-solid) 92%, var(--iw-tone-danger-bg));
 }
 
 .imagine-gallery-empty {
@@ -3122,6 +3122,13 @@ html[data-imagine-theme="light"] .imagine-root-body {
   flex: 1 1 auto;
   overflow-y: auto;
   scrollbar-width: thin;
+  background:
+    linear-gradient(
+      to top,
+      color-mix(in srgb, var(--iw-panel) 92%, var(--iw-border)),
+      transparent
+    )
+    center bottom / 100% 1.25rem no-repeat local;
 }
 
 .imagine-creator-generate-footer {
@@ -5198,6 +5205,14 @@ html[data-imagine-theme="light"] .imagine-required-chip,
 
 .imagine-tab-button {
   border-radius: 8px !important;
+}
+
+.imagine-creation-mode-tabs .imagine-tab-button {
+  min-height: 36px;
+}
+
+.imagine-prompt-toolbar button {
+  min-height: 32px;
 }
 
 html[data-imagine-theme="dark"] .imagine-workbench-shell .imagine-creation-mode-tabs.imagine-tabbar {
@@ -7450,6 +7465,13 @@ html[data-imagine-theme="light"] .imagine-mark-xs,
     contain: paint;
   }
 
+  .imagine-agent-dock.imagine-agent-dock-idle-orb:not(.is-dragging) {
+    top: auto !important;
+    bottom: calc(5.5rem + env(safe-area-inset-bottom, 0px)) !important;
+    left: auto !important;
+    right: 1rem !important;
+  }
+
   .imagine-agent-orb-aura {
     inset: -4px;
     opacity: 0.42;
@@ -7828,7 +7850,7 @@ html[data-imagine-theme="light"] .imagine-mark-xs,
   }
 
   .imagine-filter-chip {
-    min-height: 28px;
+    min-height: 32px;
     padding-inline: 8px !important;
     flex: 0 0 auto;
   }

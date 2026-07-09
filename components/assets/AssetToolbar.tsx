@@ -1,4 +1,5 @@
-import { Search } from "lucide-react";
+import { useState } from "react";
+import { Search, SlidersHorizontal } from "lucide-react";
 import type { StorageItem } from "@/lib/db";
 import { useTranslations } from "@/lib/i18n";
 import type { AiProvider } from "@/lib/providers/model-catalog";
@@ -86,6 +87,7 @@ export default function AssetToolbar({
   setSearchQuery,
 }: AssetToolbarProps) {
   const { t } = useTranslations("common");
+  const [mobileFiltersExpanded, setMobileFiltersExpanded] = useState(false);
 
   const TYPE_FILTER_OPTIONS = [
     { value: "all", label: t("library.all") },
@@ -230,7 +232,24 @@ export default function AssetToolbar({
         </button>
       </div>
 
-      <div className="imagine-gallery-filters">
+      <button
+        type="button"
+        className="imagine-gallery-filters-toggle imagine-secondary-action iw-type-caption mt-2 flex h-9 w-full items-center justify-center gap-1.5 font-semibold lg:hidden"
+        aria-expanded={mobileFiltersExpanded}
+        aria-controls="imagine-gallery-filters-panel"
+        onClick={() => setMobileFiltersExpanded((expanded) => !expanded)}
+      >
+        <SlidersHorizontal className="h-3.5 w-3.5" aria-hidden="true" />
+        <span>{t("gallery.filtersToggle")}</span>
+        <span className="sr-only">
+          {mobileFiltersExpanded ? t("gallery.filtersToggleCollapse") : t("gallery.filtersToggleExpand")}
+        </span>
+      </button>
+
+      <div
+        id="imagine-gallery-filters-panel"
+        className={`imagine-gallery-filters ${mobileFiltersExpanded ? "flex" : "hidden"} lg:flex`}
+      >
         <div className="imagine-filter-segment" role="group" aria-label={t("gallery.filterStatus")}>
           {STATUS_FILTER_OPTIONS.map(option => {
             const count = getStatusCount(option.value);

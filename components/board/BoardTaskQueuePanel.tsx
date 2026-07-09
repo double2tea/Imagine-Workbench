@@ -8,6 +8,7 @@ import type { StorageItem } from "@/lib/db";
 import type { GenerationTask } from "@/lib/generation-tasks";
 import TruncatableErrorText from "@/components/workbench/TruncatableErrorText";
 import { useTranslations } from "@/lib/i18n";
+import { getUserFacingErrorDetail, getUserFacingErrorSummary } from "@/lib/user-facing-errors";
 
 interface BoardTaskQueuePanelProps {
   cancelingTaskIds?: readonly string[];
@@ -121,7 +122,8 @@ function TaskRow({
             <TruncatableErrorText
               className="board-task-error imagine-tone-surface truncate rounded-md border px-2 py-1 text-[10px] leading-4"
               data-tone="danger"
-              message={task.errorMessage}
+              detail={getUserFacingErrorDetail(task.errorMessage)}
+              message={getUserFacingErrorSummary(task.errorMessage)}
             />
           ) : null}
         </div>

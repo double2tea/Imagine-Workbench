@@ -487,6 +487,15 @@
     "default": "生成失败 / 链接中断",
     "checkApiKey": "请核查 API Key 或重构参数。"
   },
+  "userFacingErrors": {
+    "apiKeyMissing": "API Key 缺失或无效",
+    "timeout": "请求超时",
+    "unauthorized": "认证失败",
+    "rateLimited": "触发频率限制",
+    "contentSafety": "内容被安全策略拦截",
+    "providerError": "服务商返回错误",
+    "unknown": "发生未知错误"
+  },
   "videoReference": {
     "label": "视频参考图",
     "firstLastLabel": "首帧 / 尾帧",
@@ -556,6 +565,9 @@
     "filterStatus": "状态",
     "filterType": "类型",
     "filterTime": "时间",
+    "filtersToggle": "筛选",
+    "filtersToggleExpand": "展开筛选",
+    "filtersToggleCollapse": "收起筛选",
     "dayCount": "{count} 天",
     "customDate": "自定义",
     "dateFrom": "开始日期",

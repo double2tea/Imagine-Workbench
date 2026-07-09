@@ -36,6 +36,7 @@ export default function CreationModeTabs({
           type="button"
           role="tab"
           id={`creation-tab-${instance}-${tabValue}`}
+          aria-controls={`creation-panel-${instance}-${tabValue}`}
           aria-selected={value === tabValue}
           onClick={() => onChange(tabValue)}
           data-active={value === tabValue}
