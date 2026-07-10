@@ -8,7 +8,7 @@
 
 <!-- @@@auto:current-status -->
 - **Active File**: `journal-4.md`
-- **Total Sessions**: 187
+- **Total Sessions**: 188
 - **Last Active**: 2026-07-10
 <!-- @@@/auto:current-status -->
 
@@ -19,7 +19,7 @@
 <!-- @@@auto:active-documents -->
 | File | Lines | Status |
 |------|-------|--------|
-| `journal-4.md` | ~381 | Active |
+| `journal-4.md` | ~415 | Active |
 | `journal-3.md` | ~1985 | Archived |
 | `journal-2.md` | ~1973 | Archived |
 | `journal-1.md` | ~1988 | Archived |
@@ -32,6 +32,7 @@
 <!-- @@@auto:session-history -->
 | # | Date | Title | Commits | Branch |
 |---|------|-------|---------|--------|
+| 188 | 2026-07-10 | Integrate pending dependency updates | `be108093`, `794ade59` | `codex/integrate-dependency-updates` |
 | 187 | 2026-07-10 | Eliminate ESLint warnings | `e256b91c` | `codex/refactor-architecture-fixes` |
 | 186 | 2026-07-10 | Architecture refactor and audited issue fixes | `abc10eea`, `4ea22529`, `3d8b82b2` | `codex/refactor-architecture-fixes` |
 | 185 | 2026-07-09 | Fix submit queue lock after generation | `442091f4` | `main` |
