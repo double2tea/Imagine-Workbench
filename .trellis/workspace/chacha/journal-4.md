@@ -259,7 +259,10 @@ Added a Seed Audio-only Edge route for hosted Browser BYOK, routed legacy Seed A
 
 ### Main Changes
 
-(Add details)
+- Modeled Seed Audio as one `generate` operation and removed fake Seed-specific TTS, music, SFX, and clone modes.
+- Preserved official prompt, reference media, speaker, audio config, watermark, and audio-scoped credential behavior.
+- Hid single-option audio Function selectors while keeping MiMo and RunningHub multi-function workflows intact.
+- Updated Agent guidance, shared mode schemas, saved voice-profile compatibility, and regression coverage.
 
 ### Git Commits
 
@@ -439,6 +442,43 @@ Scoped Next 15.5.18 to PostCSS 8.5.16, cleared the production audit, repaired Ty
 ### Testing
 
 - [OK] (Add test results)
+
+### Status
+
+[OK] **Completed**
+
+### Next Steps
+
+- None - task complete
+
+
+## Session 190: Align Seed Audio operation modeling
+
+**Date**: 2026-07-10
+**Task**: Align Seed Audio operation modeling
+**Branch**: `main`
+
+### Summary
+
+Aligned Seed Audio with the official single generate operation, removed fake function semantics, preserved references and parameters, updated UI and Agent behavior, and verified checks, 618 provider tests, production build, OCR review, and browser UI.
+
+### Main Changes
+
+(Add details)
+
+### Git Commits
+
+| Hash | Message |
+|------|---------|
+| `1d4e7529` | fix(audio): model Seed Audio as generic generation |
+
+### Testing
+
+- [OK] `pnpm run check`
+- [OK] `pnpm run test:providers` (618 tests)
+- [OK] `pnpm run build`
+- [OK] OCR review (0 comments)
+- [OK] Browser UI verification for MiMo and Volcengine audio controls
 
 ### Status
 
