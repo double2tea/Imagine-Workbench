@@ -78,7 +78,7 @@
     "@tailwindcss/postcss": "4.3.2",
     "@tailwindcss/typography": "^0.5.20",
     "@types/jszip": "^3.4.0",
-    "@types/node": "^24",
+    "@types/node": "^26",
     "@types/pannellum": "^2.5.0",
     "@types/pg": "^8.20.0",
     "@types/react": "^19.2.17",
