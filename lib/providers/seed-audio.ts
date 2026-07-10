@@ -72,6 +72,9 @@ export async function generateSeedAudio(
   if (input.model !== SEED_AUDIO_MODEL) {
     throw new Error(`Seed Audio model is not supported: ${input.model}`);
   }
+  if (input.mode !== "generate") {
+    throw new Error("Seed Audio only supports generic audio generation");
+  }
 
   const format = readSeedAudioFormat(input.format);
   const request: SeedAudioRequest = {
@@ -108,9 +111,6 @@ function seedAudioReferences(input: GenerateAudioOperationInput): SeedAudioRefer
   }
   if (imageReferences.length > 1) {
     throw new Error("Seed Audio supports at most one image reference");
-  }
-  if (input.mode === "voice_clone" && audioReferences.length === 0 && !speaker) {
-    throw new Error("Seed Audio voice clone requires an audio reference or speaker ID");
   }
   if (imageReferences.length === 1) {
     return [{ image_data: referenceBase64(imageReferences[0]) }];

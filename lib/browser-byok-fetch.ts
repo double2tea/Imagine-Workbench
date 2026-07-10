@@ -23,6 +23,7 @@ import {
 } from "@/lib/media-references";
 import { validateCapabilityParameterValues, validateInputModalityReferences, ModelCapabilityValidationError } from "@/lib/providers/model-capabilities";
 import {
+  AUDIO_OPERATION_MODES,
   DEFAULT_CHAT_MODEL,
   DEFAULT_IMAGE_MODEL,
   DEFAULT_VIDEO_MODEL,
@@ -81,7 +82,7 @@ const audioGenerateBodySchema = z.object({
   asrLanguage: z.enum(["auto", "zh", "en"]).optional(),
   model: z.string().trim().min(1),
   prompt: z.string().optional(),
-  mode: z.enum(["tts", "voice_design", "voice_clone", "music", "sfx", "asr"]),
+  mode: z.enum(AUDIO_OPERATION_MODES),
   format: z.string().transform(readOptionalAudioFormat).optional(),
   stylePrompt: z.string().trim().min(1).optional(),
   voice: z.string().trim().min(1).optional(),
@@ -119,7 +120,7 @@ const boardPortRefSchema = z.object({
   portKind: z.enum(["asset", "prompt", "result", "agent"]),
 });
 
-const audioOperationModeSchema = z.enum(["tts", "voice_design", "voice_clone", "music", "sfx", "asr"]);
+const audioOperationModeSchema = z.enum(AUDIO_OPERATION_MODES);
 const asrLanguageSchema = z.enum(["auto", "zh", "en"]);
 
 const boardNodeParamsSchema = z.object({
@@ -498,9 +499,6 @@ async function generateVideoForBrowser(headers: Headers, body: unknown, signal: 
 
 async function generateAudioOperationForBrowser(headers: Headers, body: unknown, signal: AbortSignal | undefined): Promise<unknown> {
   const parsedBody = audioGenerateBodySchema.parse(body);
-  if (parsedBody.mode === "voice_clone" && parsedBody.voiceCloneConsentAccepted !== true) {
-    throw badRequest("Voice cloning requires confirming reference audio authorization first", "voice_clone_consent_required");
-  }
   if (parsedBody.voiceProfileId) {
     throw badRequest("Voice profile IDs must be resolved before calling audio generation", "unresolved_voice_profile");
   }
@@ -513,6 +511,9 @@ async function generateAudioOperationForBrowser(headers: Headers, body: unknown,
   const capability = getOptionalModelCapability(parsedBody.model, "audio");
   if (!capability) throw badRequest("Unknown audio model capability", "invalid_audio_model");
   if (!capability.audioModes.includes(parsedBody.mode)) throw badRequest("Selected audio model does not support this operation mode", "unsupported_audio_mode");
+  if (parsedBody.mode === "voice_clone" && parsedBody.voiceCloneConsentAccepted !== true) {
+    throw badRequest("Voice cloning requires confirming reference audio authorization first", "voice_clone_consent_required");
+  }
   const formatError = getReferenceMediaFormatError(referenceMedia);
   if (formatError) throw badRequest(formatError, "invalid_reference_media");
   validateInputModalityReferences(capability.inputModalities, referenceMedia);
@@ -706,7 +707,7 @@ async function respondAgentForBrowser(headers: Headers, body: unknown, signal: A
       "Allowed boardAction.type values: none, create_board_image_flow, create_board_video_flow, create_board_audio_flow, create_board_note, update_board_node, apply_board_patch, continue_image_to_video.\n" +
       "When selectedNodeIds/selectedNodes are present, treat them as the current board context and default target. The Runtime Summary includes lightweight selected node params. Call get_board_context({scope:\"selected_full\"}) only when exact advanced selected-node settings are needed. Do not pull connected nodes into scope unless the user asks or a tool result explicitly shows them.\n" +
       "create_board_image_flow/create_board_video_flow/create_board_audio_flow should include params.prompt except ASR transcription, and may include params.model, params.aspectRatio, params.referenceImageId, params.run. Audio actions may include params.audioMode, params.audioFormat, params.audioStylePrompt, params.voiceProfileId, params.voiceCloneConsentAccepted, params.asrLanguage.\n" +
-      "For audio board planning, only use audio-operation functions returned by query_models({kind:\"audio\"}). MiMo currently supports tts, voice_design, voice_clone, and asr; RunningHub audio belongs to RunningHub AI App / Workflow nodes, not audio-operation nodes.\n" +
+      "For audio board planning, only use audio-operation functions returned by query_models({kind:\"audio\"}). Seed Audio uses one generate mode for speech, music, sound effects, ambience, and mixtures; describe the content in prompt and attach optional supported audio/image references. MiMo uses tts, voice_design, voice_clone, and asr. RunningHub audio belongs to RunningHub AI App / Workflow nodes, not audio-operation nodes.\n" +
       "Use update_board_node when the user asks to revise the selected/current board node or a specific node. Include params.nodeId when known; otherwise omit it to target the current selection. Use params.prompt for Prompt and generation nodes, params.body for Note nodes, and params.instruction for Agent nodes. If no target can be resolved, return boardAction.type none and ask the user to select a node.\n" +
       "Use apply_board_patch for multi-shot storyboard plans. Put the plan in params.boardPatch.operations. Allowed operations are create_node, update_node, connect_ports. Use tempId for created nodes and refer to it from later connect_ports operations. Keep patches to 36 operations or fewer; split larger scripts into follow-ups. Default params.boardPatch.run to false unless the user explicitly asks to run generation.\n" +
       "Use continue_image_to_video only when the target is an existing image asset or completed image generation result. Include params.nodeId when known, plus params.prompt and a video params.model.\n"
@@ -726,7 +727,7 @@ async function respondAgentForBrowser(headers: Headers, body: unknown, signal: A
     "- Call query_models before recommending a generation model.\n" +
     "- Call get_gallery_assets when the user references previous assets.\n\n" +
     "## Audio Planning\n" +
-    "For script or video-production requests, plan audio as first-class media only through supported audio functions returned by query_models({kind:\"audio\"}). Narration/dialogue uses audioMode tts, described custom voices use voice_design with audioStylePrompt, authorized reference-voice work uses voice_clone with an audio reference, and transcription uses asr with an audio reference. Do not invent music/SFX/RunningHub audio-operation capabilities.\n\n" +
+    "For script or video-production requests, plan audio as first-class media only through supported audio functions returned by query_models({kind:\"audio\"}). Seed Audio uses audioMode generate for all supported audio content; express speech, music, sound effects, ambience, or mixtures in prompt and use optional supported references. MiMo narration/dialogue uses tts, described custom voices use voice_design with audioStylePrompt, authorized reference-voice work uses voice_clone with an audio reference, and transcription uses asr with an audio reference. Do not split Seed Audio into TTS/music/SFX/clone modes or invent RunningHub audio-operation capabilities.\n\n" +
     "- On board surface, call get_board_context or get_connected_context before returning boardAction.\n" +
     "- Call get_prompt_blueprint with screenplay-draft, script-analysis, shot-breakdown, or storyboard-board-patch when the user asks for script/storyboard workflow planning.\n" +
     "- Call get_prompt_templates when the user asks for reusable prompt templates.\n\n" +
@@ -740,7 +741,7 @@ async function respondAgentForBrowser(headers: Headers, body: unknown, signal: A
     `${contextSummary}\n\n` +
     "## Output\n" +
     "Return ONLY valid JSON:\n" +
-    '{"thought":"...","text":"User-facing reply","activeSkills":["..."],"recommendedAction":{"type":"none|optimize_prompt|generate_image|edit_image|generate_video|generate_audio","params":{"prompt":"...","model":"...","aspectRatio":"...","referenceImageId":"...","imageResolution":"...","imageQuality":"...","thinkingLevel":"...","videoResolution":"...","videoDuration":"...","videoPreset":"...","videoReferenceMode":"reference|firstLast","audioMode":"tts|voice_design|voice_clone|music|sfx|asr","audioFormat":"wav","audioStylePrompt":"...","voiceProfileId":"...","voiceCloneConsentAccepted":true}},"boardAction":{"type":"none|create_board_image_flow|create_board_video_flow|create_board_audio_flow|create_board_note|update_board_node|apply_board_patch|continue_image_to_video","params":{"nodeId":"...","prompt":"...","model":"...","aspectRatio":"...","referenceImageId":"...","imageResolution":"...","imageQuality":"...","thinkingLevel":"...","videoResolution":"...","videoDuration":"...","videoPreset":"...","videoReferenceMode":"reference|firstLast","audioMode":"tts|voice_design|voice_clone|music|sfx|asr","audioFormat":"wav","audioStylePrompt":"...","voiceProfileId":"...","voiceCloneConsentAccepted":true,"title":"...","body":"...","instruction":"...","boardPatch":{"title":"...","run":false,"shots":[{"id":"S1","scene":"...","shot":"...","beat":"...","imagePrompt":"...","videoPrompt":"...","run":false}],"operations":[{"op":"create_node","tempId":"shot1_prompt","kind":"prompt","title":"S1 Prompt","prompt":"...","position":{"x":120,"y":160}},{"op":"create_node","tempId":"shot1_audio","kind":"audio-operation","title":"S1 Audio","prompt":"...","model":"...","audioMode":"tts","audioFormat":"wav","run":false,"position":{"x":520,"y":160}},{"op":"connect_ports","from":{"nodeId":"shot1_prompt","portId":"prompt-out","portKind":"prompt"},"to":{"nodeId":"shot1_audio","portId":"prompt-in","portKind":"prompt"}}]},"run":true}},"suggestedFollowUps":["...","..."]}\n\n' +
+    '{"thought":"...","text":"User-facing reply","activeSkills":["..."],"recommendedAction":{"type":"none|optimize_prompt|generate_image|edit_image|generate_video|generate_audio","params":{"prompt":"...","model":"...","aspectRatio":"...","referenceImageId":"...","imageResolution":"...","imageQuality":"...","thinkingLevel":"...","videoResolution":"...","videoDuration":"...","videoPreset":"...","videoReferenceMode":"reference|firstLast","audioMode":"generate|tts|voice_design|voice_clone|music|asr","audioFormat":"wav","audioStylePrompt":"...","voiceProfileId":"...","voiceCloneConsentAccepted":true}},"boardAction":{"type":"none|create_board_image_flow|create_board_video_flow|create_board_audio_flow|create_board_note|update_board_node|apply_board_patch|continue_image_to_video","params":{"nodeId":"...","prompt":"...","model":"...","aspectRatio":"...","referenceImageId":"...","imageResolution":"...","imageQuality":"...","thinkingLevel":"...","videoResolution":"...","videoDuration":"...","videoPreset":"...","videoReferenceMode":"reference|firstLast","audioMode":"generate|tts|voice_design|voice_clone|music|asr","audioFormat":"wav","audioStylePrompt":"...","voiceProfileId":"...","voiceCloneConsentAccepted":true,"title":"...","body":"...","instruction":"...","boardPatch":{"title":"...","run":false,"shots":[{"id":"S1","scene":"...","shot":"...","beat":"...","imagePrompt":"...","videoPrompt":"...","run":false}],"operations":[{"op":"create_node","tempId":"shot1_prompt","kind":"prompt","title":"S1 Prompt","prompt":"...","position":{"x":120,"y":160}},{"op":"create_node","tempId":"shot1_audio","kind":"audio-operation","title":"S1 Audio","prompt":"...","model":"...","audioMode":"tts","audioFormat":"wav","run":false,"position":{"x":520,"y":160}},{"op":"connect_ports","from":{"nodeId":"shot1_prompt","portId":"prompt-out","portKind":"prompt"},"to":{"nodeId":"shot1_audio","portId":"prompt-in","portKind":"prompt"}}]},"run":true}},"suggestedFollowUps":["...","..."]}\n\n' +
     referenceMsg;
   try {
     const config = resolveBrowserProviderConfig(headers, parsed.provider, signal);

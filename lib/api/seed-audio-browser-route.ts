@@ -7,7 +7,7 @@ import { readOptionalAudioFormat } from "@/lib/audio-operation-rules";
 import { mediaReferenceTypeFromBase64DataUri } from "@/lib/media-references";
 import { ModelCapabilityValidationError, validateCapabilityParameterValues, validateInputModalityReferences } from "@/lib/providers/model-capabilities";
 import { generateAudioOperation } from "@/lib/providers/audio";
-import { getOptionalModelCapability, parseProviderModel, ProviderModelParseError } from "@/lib/providers/model-catalog";
+import { AUDIO_OPERATION_MODES, getOptionalModelCapability, parseProviderModel, ProviderModelParseError } from "@/lib/providers/model-catalog";
 import { readModelParameterValues } from "@/lib/providers/parameter-values";
 import { readRunningHubNodeInfoList } from "@/lib/providers/runninghub-node-info";
 import { isSeedAudioProviderModel } from "@/lib/providers/seed-audio";
@@ -19,7 +19,7 @@ const seedAudioGenerateBodySchema = z.object({
   asrLanguage: z.enum(["auto", "zh", "en"]).optional(),
   model: z.string().trim().min(1),
   prompt: z.string().optional(),
-  mode: z.enum(["tts", "voice_design", "voice_clone", "music", "sfx", "asr"]),
+  mode: z.enum(AUDIO_OPERATION_MODES),
   format: z.string().transform(readOptionalAudioFormat).optional(),
   stylePrompt: z.string().trim().min(1).optional(),
   voice: z.string().trim().min(1).optional(),
@@ -35,9 +35,6 @@ const seedAudioGenerateBodySchema = z.object({
 export async function postBrowserSeedAudioOperation(req: Request): Promise<Response> {
   try {
     const body = seedAudioGenerateBodySchema.parse(await readBoundedJsonRequest(req, REFERENCE_IMAGE_REQUEST_BODY_MAX_BYTES));
-    if (body.mode === "voice_clone" && body.voiceCloneConsentAccepted !== true) {
-      throw badRequest("Voice cloning requires confirming reference audio authorization first", "voice_clone_consent_required");
-    }
     if (body.voiceProfileId) {
       throw badRequest("Voice profile IDs must be resolved before calling audio generation", "unresolved_voice_profile");
     }

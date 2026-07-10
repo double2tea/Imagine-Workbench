@@ -391,7 +391,7 @@ export function AgentPendingActionEditor({
         </label>
       )}
 
-      {isAudio && audioFunctionOptions.length > 0 && (
+      {isAudio && audioFunctionOptions.length > 1 && (
         <label className="imagine-agent-action-field">
           <span className="imagine-agent-action-field-label">{t("pendingActionEditor.functionLabel")}</span>
           <select

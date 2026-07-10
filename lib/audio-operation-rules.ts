@@ -4,6 +4,7 @@ import { ModelCapabilityValidationError, validateInputModalityReferenceCompatibi
 import {
   getAudioModelCapabilities,
   getModelCapabilities,
+  isAudioOperationMode,
   parseProviderModel,
   type AiProvider,
   type AudioModelCapabilities,
@@ -50,8 +51,8 @@ export interface AudioOperationReferenceValidationOptions {
 
 const AUDIO_MODE_LABELS_FALLBACK: Record<AudioOperationMode, string> = {
   asr: "Transcribe",
+  generate: "Audio Generation",
   music: "Music",
-  sfx: "SFX",
   tts: "Text-to-Speech",
   voice_clone: "Voice Clone",
   voice_design: "Voice Design",
@@ -224,6 +225,5 @@ function audioFunctionLabel(modelLabel: string, mode: AudioOperationMode, modeCo
 }
 
 function readAudioOperationModeValue(value: string): AudioOperationMode | null {
-  if (value === "tts" || value === "voice_design" || value === "voice_clone" || value === "music" || value === "sfx" || value === "asr") return value;
-  return null;
+  return isAudioOperationMode(value) ? value : null;
 }

@@ -22,8 +22,9 @@ export function audioOperationApiError(error: unknown): ApiError | null {
     case "MiMo ASR requires exactly one audio reference":
     case "Seed Audio supports at most one image reference":
     case "Seed Audio supports at most three audio references including speaker IDs":
-    case "Seed Audio voice clone requires an audio reference or speaker ID":
       return badRequest(error.message, "invalid_reference_media_count");
+    case "Seed Audio only supports generic audio generation":
+      return badRequest(error.message, "unsupported_audio_operation");
     default:
       if (
         error.message.startsWith("Seed Audio sample_rate must be") ||

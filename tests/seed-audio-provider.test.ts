@@ -7,6 +7,7 @@ import { generateSeedAudio } from "../lib/providers/seed-audio";
 import { listProviderModels } from "../lib/providers/models";
 import { GET as listModelsRoute } from "../app/api/models/route";
 import { postBrowserSeedAudioOperation } from "../lib/api/seed-audio-browser-route";
+import { getVisibleVoiceProfilesForAudioModel, type VoiceProfile } from "../lib/voice-profiles";
 import type { ProviderConfig } from "../lib/providers/types";
 
 const seedAudioConfig: ProviderConfig = {
@@ -14,6 +15,19 @@ const seedAudioConfig: ProviderConfig = {
   apiKey: "seed_audio_test_key",
   baseUrl: "https://openspeech.bytedance.com",
   videoBaseUrl: "https://openspeech.bytedance.com",
+};
+
+const savedReferenceVoiceProfile: VoiceProfile = {
+  id: "seed_reference_voice",
+  name: "Seed reference voice",
+  provider: "volcengine",
+  source: "cloned",
+  tags: [],
+  referenceAudioAssetIds: ["audio_asset_1"],
+  sourceAssetIds: ["audio_asset_1"],
+  consentAcceptedAt: "2026-07-10T00:00:00.000Z",
+  createdAt: "2026-07-10T00:00:00.000Z",
+  updatedAt: "2026-07-10T00:00:00.000Z",
 };
 
 test("Seed Audio model listing uses static audio capabilities without fetching", async () => {
@@ -29,6 +43,17 @@ test("Seed Audio model listing uses static audio capabilities without fetching",
   } finally {
     globalThis.fetch = originalFetch;
   }
+});
+
+test("Seed Audio generic generation keeps saved reference-audio voice profiles available", () => {
+  assert.deepEqual(
+    getVisibleVoiceProfilesForAudioModel(
+      "volcengine:seed-audio-1.0",
+      "generate",
+      [savedReferenceVoiceProfile],
+    ).map(profile => profile.id),
+    [savedReferenceVoiceProfile.id],
+  );
 });
 
 test("Volcengine audio model route uses Seed Audio credential scope", async () => {
@@ -91,7 +116,7 @@ test("Seed Audio prompt generation sends OpenSpeech create request", async () =>
 
   try {
     const result = await generateAudioOperation(seedAudioConfig, {
-      mode: "tts",
+      mode: "generate",
       prompt: "生成一个清脆的金币音效。",
       model: "seed-audio-1.0",
       referenceMedia: [],
@@ -167,7 +192,7 @@ test("Seed Audio browser edge route uses audio-scoped request credentials", asyn
       },
       body: JSON.stringify({
         model: "volcengine:seed-audio-1.0",
-        mode: "music",
+        mode: "generate",
         prompt: "短促的电子提示音",
         format: "mp3",
       }),
@@ -227,6 +252,37 @@ test("Seed Audio browser edge route rejects non-Seed-Audio models", async () => 
   }
 });
 
+test("Seed Audio browser edge route rejects legacy fake operation modes", async () => {
+  const originalFetch = globalThis.fetch;
+  let fetchCount = 0;
+  globalThis.fetch = (async (): Promise<Response> => {
+    fetchCount += 1;
+    return Response.json({});
+  }) as typeof fetch;
+
+  try {
+    const response = await postBrowserSeedAudioOperation(new Request("http://local.test/api/media/generate-seed-audio", {
+      method: "POST",
+      headers: {
+        "Content-Type": "application/json",
+        "x-ai-audio-api-key": "browser_seed_audio_key",
+      },
+      body: JSON.stringify({
+        model: "volcengine:seed-audio-1.0",
+        mode: "tts",
+        prompt: "hello",
+      }),
+    }));
+
+    assert.equal(response.status, 400);
+    const body = await response.json() as { code?: unknown };
+    assert.equal(body.code, "unsupported_audio_mode");
+    assert.equal(fetchCount, 0);
+  } finally {
+    globalThis.fetch = originalFetch;
+  }
+});
+
 test("Seed Audio maps audio and image data URI references", async () => {
   const originalFetch = globalThis.fetch;
   const bodies: unknown[] = [];
@@ -237,12 +293,11 @@ test("Seed Audio maps audio and image data URI references", async () => {
 
   try {
     await generateSeedAudio(seedAudioConfig, {
-      mode: "voice_clone",
+      mode: "generate",
       prompt: "参考@音频1的音色，说：欢迎回家。",
       model: "seed-audio-1.0",
       referenceMedia: [{ dataUri: "data:audio/wav;base64,voice_audio", type: "audio" }],
       format: "wav",
-      voiceCloneConsentAccepted: true,
     });
     assert.deepEqual(bodies[0], {
       model: "seed-audio-1.0",
@@ -252,7 +307,7 @@ test("Seed Audio maps audio and image data URI references", async () => {
     });
 
     await generateSeedAudio(seedAudioConfig, {
-      mode: "sfx",
+      mode: "generate",
       prompt: "生成这张图对应的夏夜街区环境音。",
       model: "seed-audio-1.0",
       referenceMedia: [{ dataUri: "data:image/png;base64,scene_image", type: "image" }],
@@ -280,7 +335,7 @@ test("Seed Audio rejects mixed image and audio references before fetch", async (
   try {
     await assert.rejects(
       () => generateSeedAudio(seedAudioConfig, {
-        mode: "sfx",
+        mode: "generate",
         prompt: "Generate a scene.",
         model: "seed-audio-1.0",
         referenceMedia: [
@@ -308,7 +363,7 @@ test("Seed Audio rejects image and speaker references before fetch", async () =>
   try {
     await assert.rejects(
       () => generateSeedAudio(seedAudioConfig, {
-        mode: "tts",
+        mode: "generate",
         prompt: "Describe the scene.",
         model: "seed-audio-1.0",
         referenceMedia: [{ dataUri: "data:image/png;base64,scene_image", type: "image" }],
@@ -334,7 +389,7 @@ test("Seed Audio rejects multiple image references before fetch", async () => {
   try {
     await assert.rejects(
       () => generateSeedAudio(seedAudioConfig, {
-        mode: "sfx",
+        mode: "generate",
         prompt: "Generate a scene.",
         model: "seed-audio-1.0",
         referenceMedia: [
@@ -351,25 +406,24 @@ test("Seed Audio rejects multiple image references before fetch", async () => {
   }
 });
 
-test("Seed Audio rejects voice clone without audio reference or speaker before fetch", async () => {
+test("Seed Audio rejects fake operation modes before fetch", async () => {
   const originalFetch = globalThis.fetch;
   let fetchCount = 0;
   globalThis.fetch = async (): Promise<Response> => {
     fetchCount += 1;
-    throw new Error("Missing clone audio must be rejected before fetch");
+    throw new Error("Fake operation modes must be rejected before fetch");
   };
 
   try {
     await assert.rejects(
       () => generateSeedAudio(seedAudioConfig, {
         mode: "voice_clone",
-        prompt: "Clone this voice.",
+        prompt: "Generate audio.",
         model: "seed-audio-1.0",
-        referenceMedia: [{ dataUri: "data:image/png;base64,scene_image", type: "image" }],
+        referenceMedia: [],
         format: "wav",
-        voiceCloneConsentAccepted: true,
       }),
-      /voice clone requires an audio reference or speaker ID/,
+      /only supports generic audio generation/,
     );
     assert.equal(fetchCount, 0);
   } finally {
@@ -389,12 +443,11 @@ test("Seed Audio rejects reference payloads larger than 10MB before fetch", asyn
     const oversizedBase64 = "a".repeat(Math.ceil(((10 * 1024 * 1024) + 1) * 4 / 3));
     await assert.rejects(
       () => generateSeedAudio(seedAudioConfig, {
-        mode: "voice_clone",
+        mode: "generate",
         prompt: "Say hello.",
         model: "seed-audio-1.0",
         referenceMedia: [{ dataUri: `data:audio/wav;base64,${oversizedBase64}`, type: "audio" }],
         format: "wav",
-        voiceCloneConsentAccepted: true,
       }),
       /at most 10MB/,
     );

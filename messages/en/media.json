@@ -25,7 +25,7 @@
     "downBack": "Down Back"
   },
   "panoramaScreenshotLabel": "Panorama Screenshot",
-  "modeLabels": { "asr": "Transcribe", "music": "Music", "sfx": "SFX", "tts": "Text-to-Speech", "voice_clone": "Voice Clone", "voice_design": "Voice Design" },
+  "modeLabels": { "asr": "Transcribe", "generate": "Audio Generation", "music": "Music", "tts": "Text-to-Speech", "voice_clone": "Voice Clone", "voice_design": "Voice Design" },
   "asrLanguageOptions": { "auto": "Auto Detect", "zh": "Chinese", "en": "English" },
   "missingReferenceMessage": "Current audio mode requires at least {min} {referenceLabel}",
   "noSupportingModelError": "No audio model supports {mode}",

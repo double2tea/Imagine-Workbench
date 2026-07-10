@@ -117,7 +117,7 @@ test("browser BYOK routes Seed Audio generation through same-origin edge route",
       },
       body: JSON.stringify({
         model: "seedaudio:seed-audio-1.0",
-        mode: "music",
+        mode: "generate",
         prompt: "短促的电子提示音",
       }),
     });

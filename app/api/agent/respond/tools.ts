@@ -427,6 +427,7 @@ function formatAgentCapabilities(topic: "summary" | "actions" | "tools" | "conte
   };
   const audioPlanning = {
     modes: {
+      generate: "Generic prompt-driven audio generation. Seed Audio uses this single mode for speech, music, sound effects, ambience, and mixtures, with optional supported references.",
       tts: "Narration, dialogue, voiceover, spoken lines.",
       voice_design: "Create a described voice; put the voice description in audioStylePrompt.",
       voice_clone: "Use only when the user provides or requests an authorized audio reference.",

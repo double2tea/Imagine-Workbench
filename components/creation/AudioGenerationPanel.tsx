@@ -208,7 +208,7 @@ export default function AudioGenerationPanel({
     [referenceImages],
   );
   const canSaveVoiceProfile = mode === "voice_design" || mode === "voice_clone";
-  const canUseVoiceProfile = mode === "tts" || canSaveVoiceProfile;
+  const canUseVoiceProfile = mode === "generate" || mode === "tts" || canSaveVoiceProfile;
   const showVoiceProfileLibrary = canUseVoiceProfile && (canSaveVoiceProfile || visibleVoiceProfiles.length > 0 || selectedVoiceProfile !== undefined);
   const stylePromptLabel = mode === "voice_design" ? t("audio.stylePromptLabelVoiceDesign") : mode === "voice_clone" ? t("audio.stylePromptLabelVoiceClone") : t("audio.stylePromptLabelDefault");
   const textInputRequired = audioOperationRequiresTextInput(mode);
@@ -458,15 +458,17 @@ export default function AudioGenerationPanel({
             ))}
           </select>
         </div>
-        <div className="imagine-parameter-field">
-          <label className="imagine-parameter-label-row imagine-section-label">{t("audio.functionLabel")}</label>
-          <select value={functionOptions.some(option => option.value === selectedFunctionValue) ? selectedFunctionValue : ""} onChange={(event) => handleFunctionChange(event.target.value)} className="imagine-select py-2.5">
-            {!functionOptions.some(option => option.value === selectedFunctionValue) && <option value="" disabled>{t("audio.functionUnavailable")}</option>}
-            {functionOptions.map(option => (
-              <option key={option.value} value={option.value}>{option.label}</option>
-            ))}
-          </select>
-        </div>
+        {functionOptions.length > 1 && (
+          <div className="imagine-parameter-field">
+            <label className="imagine-parameter-label-row imagine-section-label">{t("audio.functionLabel")}</label>
+            <select value={functionOptions.some(option => option.value === selectedFunctionValue) ? selectedFunctionValue : ""} onChange={(event) => handleFunctionChange(event.target.value)} className="imagine-select py-2.5">
+              {!functionOptions.some(option => option.value === selectedFunctionValue) && <option value="" disabled>{t("audio.functionUnavailable")}</option>}
+              {functionOptions.map(option => (
+                <option key={option.value} value={option.value}>{option.label}</option>
+              ))}
+            </select>
+          </div>
+        )}
         {formatOptions.length > 0 && (
           <div className="imagine-parameter-field">
             <label className="imagine-parameter-label-row imagine-section-label">{t("audio.formatLabel")}</label>

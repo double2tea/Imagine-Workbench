@@ -54,9 +54,6 @@ export async function generateAudioOperation(
   config: ProviderConfig,
   input: GenerateAudioOperationInput,
 ): Promise<GenerateAudioOperationResult> {
-  if (input.mode === "voice_clone" && input.voiceCloneConsentAccepted !== true) {
-    throw new Error(t("common.notices.voiceCloneNeedsConsent"));
-  }
   if (input.voiceProfileId) {
     throw new Error("Voice profile IDs must be resolved before audio operation");
   }
@@ -69,6 +66,10 @@ export async function generateAudioOperation(
       source: config.provider,
       ...result,
     };
+  }
+
+  if (input.mode === "voice_clone" && input.voiceCloneConsentAccepted !== true) {
+    throw new Error(t("common.notices.voiceCloneNeedsConsent"));
   }
 
   if (config.provider === "runninghub" && getRunningHubStandardModel(input.model, "audio")) {

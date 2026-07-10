@@ -73,9 +73,14 @@ export interface AudioModelCapabilities {
 }
 
 export type ModelKind = "chat" | "image" | "video" | "audio";
-export type AudioOperationMode = "tts" | "voice_design" | "voice_clone" | "music" | "sfx" | "asr";
+export const AUDIO_OPERATION_MODES = ["generate", "tts", "voice_design", "voice_clone", "music", "asr"] as const;
+export type AudioOperationMode = (typeof AUDIO_OPERATION_MODES)[number];
 export type AudioOutputKind = "audio" | "voice_profile" | "transcript";
 export type VideoReferenceMode = "none" | "reference" | "firstLast";
+
+export function isAudioOperationMode(value: unknown): value is AudioOperationMode {
+  return typeof value === "string" && AUDIO_OPERATION_MODES.some(mode => mode === value);
+}
 
 export interface ProviderModelCapability {
   value: string;

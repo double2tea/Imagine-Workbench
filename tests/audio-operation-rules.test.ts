@@ -40,6 +40,7 @@ test("audio operation rules separate text and transcript output contracts", () =
   };
 
   assert.equal(audioOperationRequiresTextInput("asr"), false);
+  assert.equal(audioOperationRequiresTextInput("generate"), true);
   assert.equal(audioOperationRequiresTextInput("tts"), true);
   assert.equal(audioOperationRequiresStylePrompt("voice_design"), true);
   assert.equal(audioOperationRequiresStylePrompt("voice_clone"), false);
@@ -99,6 +100,23 @@ test("audio function options derive provider functions from model groups", () =>
   );
 });
 
+test("Seed Audio exposes one generic generation function", () => {
+  const groups = [{
+    provider: "volcengine",
+    label: "Volcengine Ark",
+    options: [{ value: "volcengine:seed-audio-1.0", label: "Seed Audio 1.0" }],
+  }];
+
+  assert.deepEqual(
+    audioFunctionOptionsForProvider(groups, "volcengine", getAudioModelCapabilities).map(option => ({
+      label: option.label,
+      mode: option.mode,
+      model: option.model,
+    })),
+    [{ label: "音频生成", mode: "generate", model: "volcengine:seed-audio-1.0" }],
+  );
+});
+
 test("audio function value round trips model and mode", () => {
   const value = audioFunctionValue("mimo:mimo-v2.5-asr", "asr");
   assert.deepEqual(parseAudioFunctionValue(value), {
@@ -106,6 +124,10 @@ test("audio function value round trips model and mode", () => {
     mode: "asr",
   });
   assert.equal(parseAudioFunctionValue("mimo:mimo-v2.5-asr"), null);
+  assert.deepEqual(parseAudioFunctionValue("volcengine:seed-audio-1.0::generate"), {
+    model: "volcengine:seed-audio-1.0",
+    mode: "generate",
+  });
 });
 
 test("audio function selection resolves mode-specific MiMo models", () => {

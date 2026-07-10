@@ -142,9 +142,11 @@ export function isVoiceProfileUsableForAudioModel(
   const capabilities = getAudioModelCapabilities(model);
   if (!capabilities.modes.includes(mode)) return false;
   if (profile.source === "cloned") {
-    const withinMin = profile.referenceAudioAssetIds.length >= capabilities.minReferenceMedia;
-    const withinMax = capabilities.maxReferenceMedia === 0 || profile.referenceAudioAssetIds.length <= capabilities.maxReferenceMedia;
-    return mode === "voice_clone" && capabilities.referenceMediaTypes.includes("audio") && withinMin && withinMax;
+    const providerVoiceCount = profile.provider === parsedModel.provider && profile.providerVoiceId ? 1 : 0;
+    const referenceCount = profile.referenceAudioAssetIds.length + providerVoiceCount;
+    const withinMin = referenceCount >= Math.max(1, capabilities.minReferenceMedia);
+    const withinMax = capabilities.maxReferenceMedia === 0 || referenceCount <= capabilities.maxReferenceMedia;
+    return (mode === "generate" || mode === "voice_clone") && capabilities.referenceMediaTypes.includes("audio") && withinMin && withinMax;
   }
   return profile.provider === parsedModel.provider;
 }

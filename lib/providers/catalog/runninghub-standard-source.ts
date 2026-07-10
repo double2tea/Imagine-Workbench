@@ -1,5 +1,6 @@
 import type { MediaReferenceType } from "@/lib/media-references";
 import type { JsonValue, ProviderPayloadFieldMappingDescriptor, ProviderPayloadMappingDescriptor } from "../model-capabilities";
+import type { AudioOperationMode } from "../model-catalog";
 
 export type RunningHubStandardModelKind = "image" | "video" | "audio";
 
@@ -22,7 +23,7 @@ export interface RunningHubStandardModelSource {
   sizeOptions?: readonly string[];
   durationOptions?: readonly string[];
   resolutionOptions?: readonly string[];
-  audioModes?: readonly ("tts" | "voice_design" | "voice_clone" | "music" | "sfx" | "asr")[];
+  audioModes?: readonly AudioOperationMode[];
   audioFormatOptions?: readonly string[];
   referenceRoutes?: {
     imageToImage?: string;

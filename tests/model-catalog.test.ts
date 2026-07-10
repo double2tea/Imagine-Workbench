@@ -137,7 +137,9 @@ test("Volcengine providers expose scoped capabilities", () => {
   const capability = getModelCapability("volcengine:seed-audio-1.0", "audio");
   assert.equal(capability.provider, "volcengine");
   assert.equal(getModelCapability("seedaudio:seed-audio-1.0", "audio").provider, "volcengine");
-  assert.deepEqual(capability.audioModes, ["tts", "sfx", "music", "voice_clone"]);
+  assert.deepEqual(capability.audioModes, ["generate"]);
+  assert.equal(capability.audioDefaultMode, "generate");
+  assert.equal(capability.inputModalities.text?.maxLength, 3000);
   assert.deepEqual(capability.referenceMediaTypes, ["image", "audio"]);
   assert.equal(capability.maxReferenceImages, 3);
   assert.equal(capability.parameterDescriptors.some(descriptor => descriptor.key === "sample_rate"), true);

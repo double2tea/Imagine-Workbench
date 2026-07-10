@@ -288,7 +288,7 @@ function audioFunctionPatch(model: string, audioMode: BoardAudioOperationNode["a
     ...basePatch,
     audioMode,
     ...(audioMode !== "voice_clone" ? { voiceCloneConsentAccepted: false } : {}),
-    ...(audioMode !== "tts" && audioMode !== "voice_design" && audioMode !== "voice_clone" ? { voiceProfileId: undefined } : {}),
+    ...(audioMode !== "generate" && audioMode !== "tts" && audioMode !== "voice_design" && audioMode !== "voice_clone" ? { voiceProfileId: undefined } : {}),
   };
 }
 
@@ -823,7 +823,7 @@ function AudioOperationInspector({
     profile => profile.source === "builtin" && profile.providerVoiceId === "mimo_default",
   ) ?? visibleVoiceProfiles.find(profile => profile.source === "builtin");
   const showAudioFormat = formatOptions.length > 0;
-  const showVoiceProfile = node.audioMode === "tts" || node.audioMode === "voice_design" || node.audioMode === "voice_clone";
+  const showVoiceProfile = node.audioMode === "generate" || node.audioMode === "tts" || node.audioMode === "voice_design" || node.audioMode === "voice_clone";
   const stylePromptLabel = node.audioMode === "voice_design" ? t('inspector.stylePrompt.voiceDesign') : t('inspector.stylePrompt.default');
   const [voiceProfilePreviewUrl, setVoiceProfilePreviewUrl] = useState("");
 
@@ -907,17 +907,19 @@ function AudioOperationInspector({
           {providerOptions.map(option => <option key={option.value} value={option.value}>{option.label}</option>)}
         </select>
       </InspectorField>
-      <InspectorField title={t('inspector.function')}>
-        <select
-          name={`board-audio-function-${node.id}`}
-          value={functionOptions.some(option => option.value === selectedFunctionValue) ? selectedFunctionValue : ""}
-          onChange={event => handleFunctionChange(event.target.value)}
-          className={inputClass}
-        >
-          {!functionOptions.some(option => option.value === selectedFunctionValue) && <option value="" disabled>{t('inspector.functionUnavailable')}</option>}
-          {functionOptions.map(option => <option key={option.value} value={option.value}>{option.label}</option>)}
-        </select>
-      </InspectorField>
+      {functionOptions.length > 1 && (
+        <InspectorField title={t('inspector.function')}>
+          <select
+            name={`board-audio-function-${node.id}`}
+            value={functionOptions.some(option => option.value === selectedFunctionValue) ? selectedFunctionValue : ""}
+            onChange={event => handleFunctionChange(event.target.value)}
+            className={inputClass}
+          >
+            {!functionOptions.some(option => option.value === selectedFunctionValue) && <option value="" disabled>{t('inspector.functionUnavailable')}</option>}
+            {functionOptions.map(option => <option key={option.value} value={option.value}>{option.label}</option>)}
+          </select>
+        </InspectorField>
+      )}
       <div className={`grid gap-2 ${showAudioFormat ? "grid-cols-2" : "grid-cols-1"}`}>
         {showAudioFormat && (
           <InspectorField title={t('inspector.format')}>

@@ -23,7 +23,7 @@ import type {
   BoardSize,
   BoardViewport,
 } from "@/lib/board/types";
-import type { AudioOperationMode } from "@/lib/providers/model-catalog";
+import { isAudioOperationMode, type AudioOperationMode } from "@/lib/providers/model-catalog";
 import type { RunningHubYouchuanAdvancedSettings } from "@/lib/providers/types";
 import { collectBoardAssetIdsFromNodes } from "@/lib/assets/board-scope";
 import {
@@ -1424,8 +1424,7 @@ function readVideoReferenceMode(value: unknown): "reference" | "firstLast" | und
 }
 
 function readAudioOperationMode(value: unknown): AudioOperationMode {
-  if (value === "tts" || value === "voice_design" || value === "voice_clone" || value === "music" || value === "sfx" || value === "asr") return value;
-  return "tts";
+  return isAudioOperationMode(value) ? value : "tts";
 }
 
 function readOptionalAudioOperationMode(value: unknown): AudioOperationMode | undefined {

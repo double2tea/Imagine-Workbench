@@ -25,7 +25,7 @@
     "downBack": "下后"
   },
   "panoramaScreenshotLabel": "全景截图",
-  "modeLabels": { "asr": "转写", "music": "音乐", "sfx": "音效", "tts": "朗读", "voice_clone": "克隆", "voice_design": "设计音色" },
+  "modeLabels": { "asr": "转写", "generate": "音频生成", "music": "音乐", "tts": "朗读", "voice_clone": "克隆", "voice_design": "设计音色" },
   "asrLanguageOptions": { "auto": "自动识别", "zh": "中文", "en": "英文" },
   "missingReferenceMessage": "当前音频模式需要至少 {min} 个{referenceLabel}",
   "noSupportingModelError": "没有支持 {mode} 的音频模型",

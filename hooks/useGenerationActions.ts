@@ -883,7 +883,9 @@ export function useGenerationActions({
             throw new Error(t("common.notices.voiceProfileNotUsableForModel"));
           }
           profileStylePrompt = profile.designPrompt;
-          profileVoice = profile.providerVoiceId;
+          profileVoice = profile.provider === parseProviderModel(requestModel, "12ai").provider
+            ? profile.providerVoiceId
+            : undefined;
           profileCloneConsentAccepted = profile.source === "cloned" && Boolean(profile.consentAcceptedAt);
           profileReferences = await readVoiceProfileReferences(profile.referenceAudioAssetIds, t);
         } catch (error) {

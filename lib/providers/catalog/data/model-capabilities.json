@@ -2168,21 +2168,18 @@
         }
       ],
       "audioModes": [
-        "tts",
-        "sfx",
-        "music",
-        "voice_clone"
+        "generate"
       ],
       "audioOutputKinds": [
         "audio"
       ],
-      "audioDefaultMode": "tts",
+      "audioDefaultMode": "generate",
       "videoReferenceMode": "none",
       "videoReferenceModes": [],
       "inputModalities": {
         "text": {
           "required": true,
-          "maxLength": 2048
+          "maxLength": 3000
         },
         "images": {
           "minCount": 0,
