@@ -8,8 +8,8 @@
 
 <!-- @@@auto:current-status -->
 - **Active File**: `journal-4.md`
-- **Total Sessions**: 185
-- **Last Active**: 2026-07-09
+- **Total Sessions**: 186
+- **Last Active**: 2026-07-10
 <!-- @@@/auto:current-status -->
 
 ---
@@ -19,7 +19,7 @@
 <!-- @@@auto:active-documents -->
 | File | Lines | Status |
 |------|-------|--------|
-| `journal-4.md` | ~313 | Active |
+| `journal-4.md` | ~348 | Active |
 | `journal-3.md` | ~1985 | Archived |
 | `journal-2.md` | ~1973 | Archived |
 | `journal-1.md` | ~1988 | Archived |
@@ -32,6 +32,7 @@
 <!-- @@@auto:session-history -->
 | # | Date | Title | Commits | Branch |
 |---|------|-------|---------|--------|
+| 186 | 2026-07-10 | Architecture refactor and audited issue fixes | `abc10eea`, `4ea22529`, `3d8b82b2` | `codex/refactor-architecture-fixes` |
 | 185 | 2026-07-09 | Fix submit queue lock after generation | `442091f4` | `main` |
 | 184 | 2026-07-08 | Fix hosted Seed Audio BYOK CORS | `81b89d20` | `main` |
 | 183 | 2026-07-08 | Volcengine Seed Audio support fixes | `182a5f03` | `main` |

@@ -311,3 +311,38 @@ Kept generation submit controls usable while tasks are pending, resolved image c
 ### Next Steps
 
 - None - task complete
+
+
+## Session 186: Architecture refactor and audited issue fixes
+
+**Date**: 2026-07-10
+**Task**: Architecture refactor and audited issue fixes
+**Branch**: `codex/refactor-architecture-fixes`
+
+### Summary
+
+Hardened provider/media boundaries, made workspace and Board persistence race-safe, improved mobile accessibility and async scoping, split optional UI, added bundle budgets, standalone start, and independent CI quality gates.
+
+### Main Changes
+
+(Add details)
+
+### Git Commits
+
+| Hash | Message |
+|------|---------|
+| `abc10eea` | (see git log) |
+| `4ea22529` | (see git log) |
+| `3d8b82b2` | (see git log) |
+
+### Testing
+
+- [OK] (Add test results)
+
+### Status
+
+[OK] **Completed**
+
+### Next Steps
+
+- None - task complete
