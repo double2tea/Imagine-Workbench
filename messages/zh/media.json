@@ -10,6 +10,18 @@
     "seekFailed": "视频定位失败，无法截帧"
   },
   "referenceLabels": { "image": "图片", "video": "视频", "audio": "音频" },
+  "referenceConstraint": {
+    "limits": {
+      "image": "图片最多 {count} 张",
+      "video": "视频最多 {count} 个",
+      "audio": "音频最多 {count} 个"
+    },
+    "separator": "、",
+    "exclusiveSeparator": "，或",
+    "exclusiveSummary": "{limits}；不可混用",
+    "totalSummary": "{limits}；合计最多 {total} 个",
+    "none": "当前模型不支持参考媒体"
+  },
   "panoramaCameras": {
     "front": "正前",
     "right": "右",

@@ -1,4 +1,4 @@
-import { useEffect, useMemo, useRef, useState, type ChangeEvent, type DragEvent, type ReactNode } from "react";
+import { useEffect, useId, useMemo, useRef, useState, type ChangeEvent, type DragEvent, type ReactNode } from "react";
 import { AudioLines, Pencil, Trash2 } from "lucide-react";
 import { useTranslations } from "@/lib/i18n";
 import VoiceProfilePreviewPlayer from "@/components/audio/VoiceProfilePreviewPlayer";
@@ -13,6 +13,7 @@ import ReferenceImagePicker, { type ReferenceImageRef } from "@/components/refer
 import { type DraggedReferenceAsset } from "@/components/reference/referenceDrag";
 import {
   ASR_LANGUAGE_OPTIONS,
+  audioReferenceConstraintSummary,
   audioOperationRequiresTextInput,
   audioOperationRequiresStylePrompt,
   audioFunctionOptionsForProvider,
@@ -32,7 +33,7 @@ import {
 import { getMediaReferenceType, type MediaReferenceType } from "@/lib/media-references";
 import { getAssetMetasByIds, hydrateAssets } from "@/lib/db";
 import { getAudioModelCapabilities, parseProviderModel, type AudioModelCapabilities, type AudioOperationMode } from "@/lib/providers/model-catalog";
-import type { ModelParameterValues } from "@/lib/providers/model-capabilities";
+import type { ModelParameterDescriptor, ModelParameterValues } from "@/lib/providers/model-capabilities";
 import {
   VOICE_PROFILES_CHANGED_EVENT,
   VOICE_PROFILE_TAG_GROUPS,
@@ -119,6 +120,19 @@ function audioReferencePickerInput(
     : defaultInput;
 }
 
+function visibleProviderParameterDescriptors(
+  descriptors: readonly ModelParameterDescriptor[],
+  values: ModelParameterValues,
+): ModelParameterDescriptor[] {
+  const metadataToggle = descriptors.find(
+    descriptor => descriptor.kind === "boolean" && descriptor.providerField === "watermark.aigc_metadata.enable",
+  );
+  if (!metadataToggle || values[metadataToggle.key] === true) return [...descriptors];
+  return descriptors.filter(
+    descriptor => descriptor === metadataToggle || !descriptor.providerField?.startsWith("watermark.aigc_metadata."),
+  );
+}
+
 export default function AudioGenerationPanel({
   atDropdownNode,
   capabilities,
@@ -159,7 +173,9 @@ export default function AudioGenerationPanel({
 }: AudioGenerationPanelProps) {
   const { t } = useTranslations("creation");
   const { t: commonT } = useTranslations("common");
+  const { t: mediaT } = useTranslations("media");
   const confirmAction = useConfirm();
+  const fieldId = useId();
   const templatePickerRef = useRef<PromptTemplatePickerHandle | null>(null);
   const promptSelectionRef = useRef<PromptComposerSelectionRange | null>(null);
   const [slashCommand, setSlashCommand] = useState<PromptTemplateSlashCommand | null>(null);
@@ -176,6 +192,18 @@ export default function AudioGenerationPanel({
   const providerOptions = audioProviderOptions(modelGroups);
   const functionOptions = audioFunctionOptionsForProvider(modelGroups, selectedProvider, getAudioModelCapabilities);
   const selectedFunctionValue = audioFunctionValue(selectedModel, mode);
+  const selectedModelLabel = modelGroups
+    .flatMap(group => group.options)
+    .find(option => option.value === selectedModel)?.label ?? parseProviderModel(selectedModel, selectedProvider).model;
+  const audioParameterDescriptors = capabilities.parameterDescriptors.filter(descriptor => descriptor.group !== "provider");
+  const providerParameterDescriptors = visibleProviderParameterDescriptors(
+    capabilities.parameterDescriptors.filter(descriptor => descriptor.group === "provider"),
+    parameterValues,
+  );
+  const referenceConstraint = useMemo(
+    () => audioReferenceConstraintSummary(capabilities, mediaT),
+    [capabilities, mediaT],
+  );
   const referenceInput = useMemo(
     () => audioReferencePickerInput(capabilities, referenceImages),
     [capabilities, referenceImages],
@@ -451,17 +479,43 @@ export default function AudioGenerationPanel({
 
       <div className="imagine-parameter-grid grid grid-cols-1 gap-3">
         <div className="imagine-parameter-field">
-          <label className="imagine-parameter-label-row imagine-section-label">{t("audio.providerLabel")}</label>
-          <select value={selectedProvider} onChange={(event) => handleProviderChange(event.target.value)} className="imagine-select py-2.5">
+          <label htmlFor={`${fieldId}-provider`} className="imagine-parameter-label-row imagine-section-label">{t("audio.providerLabel")}</label>
+          <select
+            id={`${fieldId}-provider`}
+            name="audio-provider"
+            value={selectedProvider}
+            onChange={(event) => handleProviderChange(event.target.value)}
+            className="imagine-select py-2.5"
+          >
             {providerOptions.map(option => (
               <option key={option.value} value={option.value}>{option.label}</option>
             ))}
           </select>
         </div>
+        {functionOptions.length === 1 && (
+          <div
+            aria-label={t("audio.modelSummaryAriaLabel", { model: selectedModelLabel, function: functionOptions[0].label })}
+            aria-live="polite"
+            className="imagine-surface-panel imagine-surface-panel--soft flex items-center justify-between gap-3 px-3 py-2.5"
+          >
+            <span className="imagine-section-label">{t("audio.currentModelLabel")}</span>
+            <span className="min-w-0 text-right text-xs font-semibold text-[var(--iw-text)]">
+              <span>{selectedModelLabel}</span>
+              <span aria-hidden="true" className="mx-1 text-[var(--iw-faint)]">·</span>
+              <span className="text-[var(--iw-muted)]">{functionOptions[0].label}</span>
+            </span>
+          </div>
+        )}
         {functionOptions.length > 1 && (
           <div className="imagine-parameter-field">
-            <label className="imagine-parameter-label-row imagine-section-label">{t("audio.functionLabel")}</label>
-            <select value={functionOptions.some(option => option.value === selectedFunctionValue) ? selectedFunctionValue : ""} onChange={(event) => handleFunctionChange(event.target.value)} className="imagine-select py-2.5">
+            <label htmlFor={`${fieldId}-function`} className="imagine-parameter-label-row imagine-section-label">{t("audio.functionLabel")}</label>
+            <select
+              id={`${fieldId}-function`}
+              name="audio-function"
+              value={functionOptions.some(option => option.value === selectedFunctionValue) ? selectedFunctionValue : ""}
+              onChange={(event) => handleFunctionChange(event.target.value)}
+              className="imagine-select py-2.5"
+            >
               {!functionOptions.some(option => option.value === selectedFunctionValue) && <option value="" disabled>{t("audio.functionUnavailable")}</option>}
               {functionOptions.map(option => (
                 <option key={option.value} value={option.value}>{option.label}</option>
@@ -471,8 +525,14 @@ export default function AudioGenerationPanel({
         )}
         {formatOptions.length > 0 && (
           <div className="imagine-parameter-field">
-            <label className="imagine-parameter-label-row imagine-section-label">{t("audio.formatLabel")}</label>
-            <select value={selectedFormat} onChange={(event) => onSelectFormat(event.target.value)} className="imagine-select py-2.5">
+            <label htmlFor={`${fieldId}-format`} className="imagine-parameter-label-row imagine-section-label">{t("audio.formatLabel")}</label>
+            <select
+              id={`${fieldId}-format`}
+              name="audio-format"
+              value={selectedFormat}
+              onChange={(event) => onSelectFormat(event.target.value)}
+              className="imagine-select py-2.5"
+            >
               {formatOptions.map(option => (
                 <option key={option.value} value={option.value}>{option.label}</option>
               ))}
@@ -481,40 +541,77 @@ export default function AudioGenerationPanel({
         )}
       </div>
 
+      {capabilities.referenceMediaTypes.length > 0 && (
+        <ReferenceImagePicker
+          acceptedMediaTypes={acceptedMediaTypes}
+          addLabel={t("audio.addReferenceLabel")}
+          browseClassName="cursor-pointer font-semibold text-[var(--iw-muted)] underline-offset-2 hover:text-[var(--iw-text)] hover:underline"
+          clearLabel={t("audio.clearReferenceLabel")}
+          constraintText={referenceConstraint}
+          emptyHelp={t("audio.referenceDropHelp")}
+          emptyLabel={t("audio.referenceDropLabel")}
+          label={`${t("audio.referenceMediaLabel")} ${Math.min(referenceCount, referenceLimit)}/${referenceLimit}`}
+          libraryBrowseLabel={t("audio.libraryBrowseLabel")}
+          libraryTileLabel={t("audio.libraryTileLabel")}
+          maxCount={referenceLimit}
+          references={referenceImages}
+          uploadLabel={t("audio.referenceUploadLabel")}
+          onClear={onClearReferences}
+          onDropAsset={onReferenceDropAsset}
+          onDropFiles={onReferenceDropFiles}
+          onRemove={onReferenceRemove}
+          onOpenLibrary={onOpenAssetLibrary}
+          onUpload={onReferenceUpload}
+        />
+      )}
+
       {capabilities.parameterDescriptors.length > 0 && (
         <details className="imagine-panel-disclosure">
-          <summary className="imagine-panel-disclosure-summary">{t("advanced.summary")}</summary>
-          <div className="imagine-panel-disclosure-body">
-            <CapabilityParameterControls
-              hideTitle
-              descriptors={capabilities.parameterDescriptors}
-              value={parameterValues}
-              onChange={onParameterValuesChange}
-            />
+          <summary
+            aria-controls={`${fieldId}-advanced-parameters`}
+            className="imagine-panel-disclosure-summary"
+          >
+            {t("advanced.summary")}
+          </summary>
+          <div id={`${fieldId}-advanced-parameters`} className="imagine-panel-disclosure-body">
+            {providerParameterDescriptors.length > 0 ? (
+              <div className="grid gap-4">
+                {audioParameterDescriptors.length > 0 && (
+                  <section aria-labelledby={`${fieldId}-audio-controls-title`} className="grid gap-2">
+                    <h3 id={`${fieldId}-audio-controls-title`} className="imagine-section-label">
+                      {t("parameters.audioControlsTitle")}
+                    </h3>
+                    <CapabilityParameterControls
+                      hideTitle
+                      descriptors={audioParameterDescriptors}
+                      value={parameterValues}
+                      onChange={onParameterValuesChange}
+                    />
+                  </section>
+                )}
+                <section aria-labelledby={`${fieldId}-provenance-title`} className="grid gap-2 border-t border-[var(--iw-border)] pt-3">
+                  <h3 id={`${fieldId}-provenance-title`} className="imagine-section-label">
+                    {t("parameters.provenanceTitle")}
+                  </h3>
+                  <CapabilityParameterControls
+                    hideTitle
+                    descriptors={providerParameterDescriptors}
+                    value={parameterValues}
+                    onChange={onParameterValuesChange}
+                  />
+                </section>
+              </div>
+            ) : (
+              <CapabilityParameterControls
+                hideTitle
+                descriptors={audioParameterDescriptors}
+                value={parameterValues}
+                onChange={onParameterValuesChange}
+              />
+            )}
           </div>
         </details>
       )}
-
-      <ReferenceImagePicker
-        acceptedMediaTypes={acceptedMediaTypes}
-        addLabel={t("audio.addReferenceLabel")}
-        browseClassName={referenceLimit > 0 ? "cursor-pointer font-semibold text-[var(--iw-muted)] underline-offset-2 hover:text-[var(--iw-text)] hover:underline" : "text-[var(--iw-faint)]"}
-        clearLabel={t("audio.clearReferenceLabel")}
-        emptyHelp={referenceLimit > 0 ? t("audio.emptyHelpWithLimit") : t("audio.emptyHelpNoLimit")}
-        emptyLabel={referenceLimit > 0 ? t("audio.emptyLabelWithLimit") : t("audio.emptyLabelNoLimit")}
-        label={`${t("audio.referenceMediaLabel")} ${referenceLimit > 0 ? `${Math.min(referenceImages.length, referenceLimit)}/${referenceLimit}` : "0/0"}`}
-        libraryBrowseLabel={t("audio.libraryBrowseLabel")}
-        libraryTileLabel={t("audio.libraryTileLabel")}
-        maxCount={referenceLimit}
-        references={referenceImages}
-        uploadLabel={referenceLimit > 0 ? t("audio.uploadLabelWithLimit") : t("audio.uploadLabelNoLimit")}
-        onClear={onClearReferences}
-        onDropAsset={onReferenceDropAsset}
-        onDropFiles={onReferenceDropFiles}
-        onRemove={onReferenceRemove}
-        onOpenLibrary={onOpenAssetLibrary}
-        onUpload={onReferenceUpload}
-      />
 
       {(mode === "voice_design" || mode === "voice_clone") && (
         <div className="imagine-parameter-field">

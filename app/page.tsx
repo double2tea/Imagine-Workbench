@@ -1978,6 +1978,7 @@ export default function Home() {
       compareItems={compareItems}
       compareSliderPos={compareSliderPos}
       compareViewType={compareViewType}
+      creationMode={traditionalSubTab}
       filterType={filterType}
       filteredItems={filteredItems}
       inFlightCount={globalInFlightCount}

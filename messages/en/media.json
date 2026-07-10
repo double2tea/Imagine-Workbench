@@ -10,6 +10,18 @@
     "seekFailed": "Video seek failed, cannot capture frame"
   },
   "referenceLabels": { "image": "Image", "video": "Video", "audio": "Audio" },
+  "referenceConstraint": {
+    "limits": {
+      "image": "image references: up to {count}",
+      "video": "video references: up to {count}",
+      "audio": "audio references: up to {count}"
+    },
+    "separator": ", ",
+    "exclusiveSeparator": ", or ",
+    "exclusiveSummary": "{limits}; do not mix types",
+    "totalSummary": "{limits}; up to {total} references in total",
+    "none": "The current model does not support reference media"
+  },
   "panoramaCameras": {
     "front": "Front",
     "right": "Right",

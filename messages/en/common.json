@@ -562,8 +562,12 @@
     "loadMore": "Load more {current} / {total}",
     "unknownDate": "Unknown date",
     "emptyTitle": "Gallery is empty",
-    "emptyDescription": "Write a prompt on the left and generate; works will appear grouped by date here and be saved in this browser.",
-    "step1": "Choose image or video mode, then fill in prompt and model parameters",
+    "emptyDescription": "Complete the creation inputs on the left and generate; works will appear grouped by date here and be saved in this browser.",
+    "step1": {
+      "image": "Choose image mode, then fill in the prompt and model parameters",
+      "video": "Choose video mode, then fill in the prompt and model parameters",
+      "audio": "Choose audio mode, then fill in the content and model parameters"
+    },
     "step2": "After generation starts, progress updates live on the card",
     "step3": "After completion, compare, reuse parameters, or send to Agent for further editing",
     "closeReferencePreview": "Close reference preview",

@@ -1,6 +1,6 @@
 "use client";
 
-import type { ChangeEvent, CSSProperties } from "react";
+import { useId, type ChangeEvent, type CSSProperties } from "react";
 import { ImagePlus, X } from "lucide-react";
 import { useTranslations, type TFunction } from "@/lib/i18n";
 import {
@@ -179,6 +179,7 @@ function NumberParameterControl({
   onChange: (value: number) => void;
   value: number;
 }) {
+  const labelId = useId();
   const handleChange = (nextValue: string): void => {
     const parsed = Number(nextValue);
     if (Number.isFinite(parsed)) onChange(parsed);
@@ -190,11 +191,11 @@ function NumberParameterControl({
     : 0;
 
   return (
-    <label
+    <div
       className={`imagine-capability-slider imagine-capability-slider--range${compact ? " imagine-capability-slider--compact" : ""}`}
     >
       <span className={`imagine-capability-range-header${compact ? " imagine-capability-range-header--compact" : ""}`}>
-        <span className="imagine-capability-field-label">{label}</span>
+        <span id={labelId} className="imagine-capability-field-label">{label}</span>
         <input
           type="number"
           min={descriptor.min}
@@ -203,7 +204,7 @@ function NumberParameterControl({
           value={value}
           onChange={event => handleChange(event.target.value)}
           className={`imagine-capability-number${compact ? " imagine-capability-number--compact" : ""}`}
-          aria-label={label}
+          aria-labelledby={labelId}
         />
       </span>
       <div
@@ -218,10 +219,10 @@ function NumberParameterControl({
           value={value}
           onChange={event => handleChange(event.target.value)}
           className="imagine-capability-range"
-          aria-label={label}
+          aria-labelledby={labelId}
         />
       </div>
-    </label>
+    </div>
   );
 }
 
@@ -289,7 +290,7 @@ function ReferenceParameterControl({
           </div>
         </div>
       ) : (
-        <label className="imagine-reference-add-tile min-h-20">
+        <label className="imagine-reference-add-tile min-h-20 focus-within:ring-2 focus-within:ring-[var(--iw-accent)] focus-within:ring-offset-2 focus-within:ring-offset-[var(--iw-bg)]">
           <ImagePlus className="h-4 w-4" />
           <span className="mt-0.5 text-[9px] font-semibold">{t("parameters.uploadLabel")}</span>
           <input
@@ -298,7 +299,7 @@ function ReferenceParameterControl({
             accept={accept}
             aria-label={t("parameters.uploadLabel") + label}
             onChange={handleUpload}
-            className="hidden"
+            className="sr-only"
           />
         </label>
       )}

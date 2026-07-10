@@ -14,6 +14,7 @@ interface ReferenceImagePickerProps {
   addLabel: string;
   browseClassName: string;
   clearLabel: string;
+  constraintText?: string;
   emptyHelp: string;
   emptyLabel: string;
   label: string;
@@ -79,6 +80,7 @@ export default function ReferenceImagePicker({
   addLabel,
   browseClassName,
   clearLabel,
+  constraintText,
   emptyHelp,
   emptyLabel,
   label,
@@ -142,19 +144,24 @@ export default function ReferenceImagePicker({
 
   return (
     <div onDragOver={handleDragOver} onDrop={handleDrop}>
-      <div className="flex items-center justify-between mb-2">
-        <label className="imagine-reference-label">
-          <Layers className="h-3.5 w-3.5 text-[var(--iw-faint)]" />
-          {label}
-        </label>
-        {visibleReferenceItems.length > 0 && (
-          <button
-            type="button"
-            onClick={onClear}
-            className="cursor-pointer text-[10px] text-[var(--iw-tone-danger-text)] transition hover:text-[var(--iw-tone-danger-text)]"
-          >
-            {clearLabel}
-          </button>
+      <div className="mb-2">
+        <div className="flex items-center justify-between">
+          <div className="imagine-reference-label">
+            <Layers className="h-3.5 w-3.5 text-[var(--iw-faint)]" />
+            {label}
+          </div>
+          {visibleReferenceItems.length > 0 && (
+            <button
+              type="button"
+              onClick={onClear}
+              className="cursor-pointer text-[10px] text-[var(--iw-tone-danger-text)] transition hover:text-[var(--iw-tone-danger-text)]"
+            >
+              {clearLabel}
+            </button>
+          )}
+        </div>
+        {constraintText && (
+          <p className="mt-1 text-[10px] leading-4 text-[var(--iw-faint)]">{constraintText}</p>
         )}
       </div>
 
@@ -242,7 +249,7 @@ export default function ReferenceImagePicker({
 
           {canAdd && (
             <>
-              <label className="imagine-reference-add-tile">
+              <label className="imagine-reference-add-tile focus-within:ring-2 focus-within:ring-[var(--iw-accent)] focus-within:ring-offset-2 focus-within:ring-offset-[var(--iw-bg)]">
                 <span className="font-bold text-lg leading-none">+</span>
                 <span className="mt-0.5 text-[9px] font-semibold">{addLabel}</span>
                 <input
@@ -251,7 +258,7 @@ export default function ReferenceImagePicker({
                   accept={accept}
                   aria-label={uploadInputLabel}
                   onChange={onUpload}
-                  className="hidden"
+                  className="sr-only"
                 />
               </label>
               {showLibrary && (
@@ -274,7 +281,7 @@ export default function ReferenceImagePicker({
           <span className="text-xs text-[var(--iw-muted)]">
             {emptyLabel} /{" "}
               {maxCount > 0 ? (
-                <label className={browseClassName}>
+                <label className={`${browseClassName} rounded-sm focus-within:ring-2 focus-within:ring-[var(--iw-accent)] focus-within:ring-offset-2 focus-within:ring-offset-[var(--iw-bg)]`}>
                   {uploadLabel}
                   <input
                     type="file"
@@ -282,7 +289,7 @@ export default function ReferenceImagePicker({
                     accept={accept}
                     aria-label={uploadInputLabel}
                     onChange={onUpload}
-                    className="hidden"
+                    className="sr-only"
                   />
                 </label>
               ) : (

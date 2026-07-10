@@ -5,6 +5,7 @@ import {
   audioFunctionValue,
   audioOperationFormatOptions,
   audioOperationReferenceValidationMessage,
+  audioReferenceConstraintSummary,
   audioOperationRequiresStylePrompt,
   audioOperationRequiresTextInput,
   audioProviderOptions,
@@ -12,6 +13,7 @@ import {
   readOptionalAudioFormat,
   resolveAudioFunctionSelection,
 } from "../lib/audio-operation-rules";
+import { createT } from "../lib/i18n-core";
 import { getAudioModelCapabilities } from "../lib/providers/model-catalog";
 import type { AudioModelCapabilities } from "../lib/providers/model-catalog";
 
@@ -69,6 +71,19 @@ test("audio operation rules count speaker voice profile as an audio reference", 
       { extraReferenceTypes: ["audio"] },
     ),
     "当前音频模型最多支持 3 个参考媒体",
+  );
+});
+
+test("audio reference constraint summary derives Seed Audio media limits", () => {
+  const capabilities = getAudioModelCapabilities("volcengine:seed-audio-1.0");
+
+  assert.equal(
+    audioReferenceConstraintSummary(capabilities, createT("zh", "media")),
+    "图片最多 1 张，或音频最多 3 个；不可混用",
+  );
+  assert.equal(
+    audioReferenceConstraintSummary(capabilities, createT("en", "media")),
+    "image references: up to 1, or audio references: up to 3; do not mix types",
   );
 });
 

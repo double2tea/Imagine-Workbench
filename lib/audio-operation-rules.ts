@@ -1,6 +1,10 @@
 import { t as globalT, type TFunction } from "@/lib/i18n-core";
 import { getMediaReferenceType, mediaReferenceLabel, type MediaReference, type MediaReferenceType } from "./media-references";
-import { ModelCapabilityValidationError, validateInputModalityReferenceCompatibility } from "./providers/model-capabilities";
+import {
+  ModelCapabilityValidationError,
+  validateInputModalityReferenceCompatibility,
+  type ModelMediaInputProfile,
+} from "./providers/model-capabilities";
 import {
   getAudioModelCapabilities,
   getModelCapabilities,
@@ -47,6 +51,50 @@ export interface AudioOperationReferenceValidationOptions {
   extraReferenceTypes?: readonly MediaReferenceType[];
   skipMinReferenceMedia?: boolean;
   t?: TFunction;
+}
+
+export function audioReferenceConstraintSummary(
+  capabilities: AudioModelCapabilities,
+  t?: TFunction,
+): string {
+  const translate = (key: string, params?: Record<string, string | number>): string =>
+    t ? t(key, params) : globalT(`media.${key}`, params);
+  const limits = capabilities.referenceMediaTypes.flatMap(type => {
+    const profile = audioReferenceMediaInput(capabilities, type);
+    return profile
+      ? [translate(`referenceConstraint.limits.${type}`, { count: profile.maxCount })]
+      : [];
+  });
+  if (limits.length === 0) return translate("referenceConstraint.none");
+
+  const allowedCombinations = capabilities.inputModalities.mixed?.allowedCombinations;
+  const mutuallyExclusive = limits.length > 1
+    && allowedCombinations !== undefined
+    && !allowedCombinations.some(combination => combination.includes("+"));
+  const separator = translate(mutuallyExclusive
+    ? "referenceConstraint.exclusiveSeparator"
+    : "referenceConstraint.separator");
+  const limitSummary = limits.join(separator);
+  if (mutuallyExclusive) {
+    return translate("referenceConstraint.exclusiveSummary", { limits: limitSummary });
+  }
+
+  const totalLimit = capabilities.inputModalities.mixed?.maxTotalCount;
+  const individualLimitTotal = capabilities.referenceMediaTypes.reduce((total, type) => {
+    return total + (audioReferenceMediaInput(capabilities, type)?.maxCount ?? 0);
+  }, 0);
+  return totalLimit !== undefined && totalLimit < individualLimitTotal
+    ? translate("referenceConstraint.totalSummary", { limits: limitSummary, total: totalLimit })
+    : limitSummary;
+}
+
+function audioReferenceMediaInput(
+  capabilities: AudioModelCapabilities,
+  type: MediaReferenceType,
+): ModelMediaInputProfile | undefined {
+  if (type === "image") return capabilities.inputModalities.images;
+  if (type === "video") return capabilities.inputModalities.videos;
+  return capabilities.inputModalities.audio;
 }
 
 const AUDIO_MODE_LABELS_FALLBACK: Record<AudioOperationMode, string> = {

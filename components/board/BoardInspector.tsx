@@ -24,6 +24,7 @@ import {
   audioFunctionOptionsForProvider,
   audioFunctionValue,
   audioOperationFormatOptions,
+  audioReferenceConstraintSummary,
   audioProviderFromModel,
   audioProviderOptions,
   parseAudioFunctionValue,
@@ -806,6 +807,7 @@ function AudioOperationInspector({
   onUpdateGenerate: (nodeId: string, input: BoardGenerateNodeUpdate) => void;
 }) {
   const { t } = useTranslations("board");
+  const { t: mediaT } = useTranslations("media");
   const capabilities = getAudioModelCapabilities(node.model);
   const formatOptions = audioOperationFormatOptions(capabilities);
   const requiredReferenceTypes = getInputReferenceTypes(inputSummary);
@@ -1002,7 +1004,7 @@ function AudioOperationInspector({
         </label>
       )}
       <p className={infoChipClass}>
-        {t('inspector.referenceMediaSupport', { types: capabilities.referenceMediaTypes.join(" / "), maxCount: String(capabilities.maxReferenceMedia) })}
+        {audioReferenceConstraintSummary(capabilities, mediaT)}
       </p>
     </div>
   );

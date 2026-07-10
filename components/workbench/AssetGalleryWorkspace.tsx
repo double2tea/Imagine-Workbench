@@ -23,6 +23,7 @@ interface AssetGalleryWorkspaceProps {
   compareItems: { first?: StorageItem; second?: StorageItem };
   compareSliderPos: number;
   compareViewType: CompareViewType;
+  creationMode: "image" | "video" | "audio";
   filterType: AssetTypeFilter;
   filteredItems: StorageItem[];
   inFlightCount: number;
@@ -92,6 +93,7 @@ export default function AssetGalleryWorkspace({
   compareItems,
   compareSliderPos,
   compareViewType,
+  creationMode,
   filterType,
   filteredItems,
   inFlightCount,
@@ -292,7 +294,7 @@ export default function AssetGalleryWorkspace({
             <div className="imagine-gallery-empty-steps">
               <div className="imagine-gallery-empty-step">
                 <span className="imagine-gallery-empty-step-index">1</span>
-                <span>{t("gallery.step1")}</span>
+                <span>{t(`gallery.step1.${creationMode}`)}</span>
               </div>
               <div className="imagine-gallery-empty-step">
                 <span className="imagine-gallery-empty-step-index">2</span>
