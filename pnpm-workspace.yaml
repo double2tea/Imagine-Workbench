@@ -3,3 +3,6 @@ allowBuilds:
   re2: true
   sharp: true
   unrs-resolver: true
+
+overrides:
+  "next@15.5.18>postcss": "8.5.16"
