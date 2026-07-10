@@ -644,7 +644,12 @@ export function openDatabase(): Promise<IDBDatabase> {
       }
     };
 
-    request.onsuccess = () => resolve(request.result);
+    request.onsuccess = () => {
+      const db = request.result;
+      db.onversionchange = () => db.close();
+      resolve(db);
+    };
+    request.onblocked = () => reject(new Error("IndexedDB open blocked by another tab; close or refresh other Imagine Workbench tabs"));
     request.onerror = () => reject(request.error ?? new Error("IndexedDB open failed"));
   });
 }

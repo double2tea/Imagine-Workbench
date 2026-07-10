@@ -1,6 +1,7 @@
 "use client";
 
 import { useCallback, useEffect, useLayoutEffect, useRef, useState } from "react";
+import { writeBoardTextDraft } from "@/lib/board/text-draft-journal";
 
 const DEFAULT_DELAY_MS = 400;
 
@@ -8,6 +9,7 @@ export function useDebouncedTextCommit(
   committedValue: string,
   onCommit: (value: string) => void,
   delayMs: number = DEFAULT_DELAY_MS,
+  journalKey?: string,
 ): {
   flush: (value?: string) => void;
   getValue: () => string;
@@ -52,6 +54,7 @@ export function useDebouncedTextCommit(
   }, []);
 
   const setValue = useCallback((next: string) => {
+    if (journalKey) writeBoardTextDraft(journalKey, next);
     setDraft(next);
     if (timerRef.current !== null) {
       window.clearTimeout(timerRef.current);
@@ -63,7 +66,7 @@ export function useDebouncedTextCommit(
         onCommitRef.current(next);
       }
     }, delayMs);
-  }, [delayMs]);
+  }, [delayMs, journalKey]);
 
   const getValue = useCallback(() => draft, [draft]);
 

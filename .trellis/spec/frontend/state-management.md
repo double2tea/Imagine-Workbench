@@ -2,6 +2,50 @@
 
 > How state is stored and updated in Imagine Workbench.
 
+## Scenario: Board Text Journal and Serialized Persistence
+
+### 1. Scope / Trigger
+- Trigger: Board text editors, autosave, `saveNow()`, switching, or team optimistic concurrency.
+
+### 2. Signatures
+- `writeBoardTextDraft(nodeId, value)`, `applyBoardTextDrafts(board)`, `clearCommittedBoardTextDrafts(board)`.
+- `createBoardSaveCoordinator(saveBoard).save(board)` serializes writes.
+
+### 3. Contracts
+- Prompt/generation/RunningHub/Agent/Note editors synchronously journal before debounced React commits.
+- Load normalizes persisted data, then overlays drafts; drafts clear only after the exact value saves.
+- Autosave and `saveNow()` share one coordinator; parallel direct saves are forbidden.
+- Async Board work captures the starting board id and stops UI mutation after switching.
+- No-op board mutations do not push undo snapshots.
+
+### 4. Validation & Error Matrix
+- Immediate reload -> exact draft restored.
+- Earlier save failure -> later queued save still executes after the failure is surfaced.
+- Board changes during split/poll -> no mutation of the new Board UI.
+- Updater returns the same object -> no undo entry.
+
+### 5. Good/Base/Bad Cases
+- Good: type, reload immediately, recover, then clear after persistence.
+- Base: ordinary autosave has no visible behavior change.
+- Bad: rely on async IndexedDB work from `beforeunload`.
+
+### 6. Tests Required
+- Unit: ordered non-overlapping saves; journal restore/clear.
+- Browser: immediate Prompt reload.
+- Team: autosave plus `saveNow()` consumes successive versions.
+
+### 7. Wrong vs Correct
+#### Wrong
+```typescript
+storage.saveBoard(board);
+await storage.saveBoard(boardRef.current);
+```
+#### Correct
+```typescript
+await saveCoordinator.save(boardRef.current);
+clearCommittedBoardTextDrafts(boardRef.current);
+```
+
 ---
 
 ## Overview

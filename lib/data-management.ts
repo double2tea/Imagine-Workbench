@@ -92,6 +92,8 @@ import {
   LIBRARY_INDEX_FILE,
   MANIFEST_FILE,
   MAX_BACKUP_FILE_COUNT,
+  MAX_BACKUP_ENTRY_UNCOMPRESSED_BYTES,
+  MAX_BACKUP_UNCOMPRESSED_BYTES,
   SETTINGS_FILE,
   SUPPORTED_WORKSPACE_BACKUP_SCHEMA_VERSIONS,
   VOICE_PROFILE_INDEX_FILE,
@@ -558,30 +560,18 @@ export async function importWorkspaceBackup(
   includeCredentials: boolean,
 ): Promise<WorkspaceImportResult> {
   const parsed = await parseWorkspaceBackup(file);
+  const previous = await readBrowserWorkspaceState(includeCredentials);
   await createWorkspaceSafetySnapshot("restore-workspace");
-  await clearAllDB();
-  await clearBoardsFromDB();
-  clearManagedLocalStorage(includeCredentials);
-
-  for (const asset of parsed.assets) {
-    await saveToDB(asset);
+  try {
+    await replaceBrowserWorkspace(parsed, includeCredentials);
+  } catch (error) {
+    try {
+      await replaceBrowserWorkspace(previous, includeCredentials);
+    } catch (rollbackError) {
+      throw new AggregateError([error, rollbackError], "Workspace restore failed and rollback could not be completed");
+    }
+    throw error;
   }
-  for (const board of parsed.boards) {
-    await saveBoardToDB(board);
-  }
-  for (const record of parsed.libraryAssets) {
-    await saveLibraryAssetRecord(record);
-  }
-  for (const task of parsed.generationTasks) {
-    await saveGenerationTask(task);
-  }
-  for (const profile of await listVoiceProfiles()) {
-    await deleteVoiceProfile(profile.id);
-  }
-  for (const profile of parsed.voiceProfiles) {
-    await saveVoiceProfile(profile);
-  }
-  writeManagedLocalStorage(parsed.settings.localStorage, includeCredentials);
 
   return {
     assetCount: parsed.assets.length,
@@ -593,6 +583,37 @@ export async function importWorkspaceBackup(
     ).length,
     voiceProfileCount: parsed.voiceProfiles.length,
   };
+}
+
+async function readBrowserWorkspaceState(includeCredentials: boolean): Promise<ParsedBackup> {
+  const [assets, boards, generationTasks, libraryAssets, voiceProfiles] = await Promise.all([
+    getAllFromDB(),
+    listBoardsFromDB(),
+    listGenerationTasks(),
+    listLibraryAssetRecords(),
+    listVoiceProfiles(),
+  ]);
+  return {
+    assets,
+    boards,
+    generationTasks,
+    libraryAssets,
+    settings: { localStorage: readManagedLocalStorage(includeCredentials) },
+    voiceProfiles,
+  };
+}
+
+async function replaceBrowserWorkspace(workspace: ParsedBackup, includeCredentials: boolean): Promise<void> {
+  await clearAllDB();
+  await clearBoardsFromDB();
+  clearManagedLocalStorage(includeCredentials);
+  for (const profile of await listVoiceProfiles()) await deleteVoiceProfile(profile.id);
+  for (const asset of workspace.assets) await saveToDB(asset);
+  for (const board of workspace.boards) await saveBoardToDB(board);
+  for (const record of workspace.libraryAssets) await saveLibraryAssetRecord(record);
+  for (const task of workspace.generationTasks) await saveGenerationTask(task);
+  for (const profile of workspace.voiceProfiles) await saveVoiceProfile(profile);
+  writeManagedLocalStorage(workspace.settings.localStorage, includeCredentials);
 }
 
 export async function resetBoardsToDefault(): Promise<void> {
@@ -1092,6 +1113,7 @@ function addAssetToZip(zip: JSZip, asset: StorageItem): WorkspaceBackupAssetReco
 async function parseWorkspaceBackup(file: File): Promise<ParsedBackup> {
   const zip = await JSZip.loadAsync(file);
   validateZipFileCount(zip);
+  validateZipUncompressedSize(zip);
   const manifest = parseManifest(await readRequiredZipText(zip, MANIFEST_FILE));
   const assetRecords = parseAssetRecords(await readRequiredZipText(zip, manifest.assetsFile));
   const libraryRecords = manifest.libraryFile
@@ -1107,13 +1129,15 @@ async function parseWorkspaceBackup(file: File): Promise<ParsedBackup> {
   const settings = manifest.settingsFile
     ? parseSettings(await readRequiredZipText(zip, manifest.settingsFile))
     : { localStorage: {} };
-  const assets = await Promise.all(assetRecords.map(record => restoreAssetRecord(zip, record)));
+  const assets: StorageItem[] = [];
+  for (const record of assetRecords) assets.push(await restoreAssetRecord(zip, record));
 
   if (manifest.counts.assets !== assets.length) throw new Error("备份资产数量与 manifest 不一致");
   if (manifest.counts.boards !== boards.length) throw new Error("备份画板数量与 manifest 不一致");
   if ((manifest.counts.generationTasks ?? 0) !== generationTasks.length) throw new Error("备份任务数量与 manifest 不一致");
   if ((manifest.counts.libraryAssets ?? 0) !== libraryRecords.length) throw new Error("备份素材库数量与 manifest 不一致");
   if ((manifest.counts.voiceProfiles ?? 0) !== voiceProfiles.length) throw new Error("备份音色数量与 manifest 不一致");
+  if (manifest.counts.settingsKeys !== Object.keys(settings.localStorage).length) throw new Error("备份设置数量与 manifest 不一致");
   validateBoardAssetReferences(boards, new Set(assets.map(asset => asset.id)));
   validateLibraryAssetReferences(libraryRecords, new Set(assets.map(asset => asset.id)));
   validateGenerationTaskAssetReferences(generationTasks, new Set(assets.map(asset => asset.id)));
@@ -1125,6 +1149,18 @@ async function parseWorkspaceBackup(file: File): Promise<ParsedBackup> {
 function validateZipFileCount(zip: JSZip): void {
   if (Object.keys(zip.files).length > MAX_BACKUP_FILE_COUNT) {
     throw new Error("备份文件数量超过限制");
+  }
+}
+
+function validateZipUncompressedSize(zip: JSZip): void {
+  let totalBytes = 0;
+  for (const file of Object.values(zip.files)) {
+    if (file.dir) continue;
+    const size = (file as JSZip.JSZipObject & { _data?: { uncompressedSize?: number } })._data?.uncompressedSize;
+    if (size === undefined) throw new Error("无法验证备份文件解压大小");
+    if (size > MAX_BACKUP_ENTRY_UNCOMPRESSED_BYTES) throw new Error("备份单个文件解压后超过限制");
+    totalBytes += size;
+    if (totalBytes > MAX_BACKUP_UNCOMPRESSED_BYTES) throw new Error("备份解压后总大小超过限制");
   }
 }
 

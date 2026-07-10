@@ -1,6 +1,6 @@
 "use client";
 
-import { useCallback, useEffect, useState, type Dispatch, type SetStateAction } from "react";
+import { useCallback, useEffect, useRef, useState, type Dispatch, type SetStateAction } from "react";
 import {
   indexedDbGenerationTaskStorage,
   type GenerationTask,
@@ -21,14 +21,20 @@ export interface GenerationTaskStore {
 export function useGenerationTaskStore(options: UseGenerationTaskStoreOptions = {}): GenerationTaskStore {
   const [generationTasks, setGenerationTasks] = useState<GenerationTask[]>([]);
   const storage = options.storage ?? indexedDbGenerationTaskStorage;
+  const reloadScopeRef = useRef(0);
 
   const reloadGenerationTasks = useCallback(async () => {
+    const scope = ++reloadScopeRef.current;
     const tasks = await storage.list({ boardId: options.boardId });
+    if (scope !== reloadScopeRef.current) return;
     setGenerationTasks(tasks);
   }, [options.boardId, storage]);
 
   useEffect(() => {
     void reloadGenerationTasks();
+    return () => {
+      reloadScopeRef.current += 1;
+    };
   }, [reloadGenerationTasks]);
 
   return {

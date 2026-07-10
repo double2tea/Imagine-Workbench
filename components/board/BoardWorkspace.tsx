@@ -1550,6 +1550,10 @@ export default function BoardWorkspace({
     updateNoteBody,
     updatePromptNode,
   } = controller;
+  const boardIdRef = useRef(board.id);
+  useLayoutEffect(() => {
+    boardIdRef.current = board.id;
+  }, [board.id]);
   const boardStructureNodeIds = useMemo(
     () => board.nodes.map(node => node.id).join("\u001f"),
     [board.nodes],
@@ -1625,14 +1629,14 @@ export default function BoardWorkspace({
     const instance = flowInstanceRef.current;
     if (!instance || !flowReady || board.nodes.length === 0) return;
     if (typeof window === "undefined" || window.innerWidth >= 1024) return;
-    const fitKey = `${board.id}:${boardGraphContentKey}`;
+    const fitKey = board.id;
     if (mobileViewportFittedGraphKeyRef.current === fitKey) return;
     mobileViewportFittedGraphKeyRef.current = fitKey;
     const frameId = window.requestAnimationFrame(() => {
       void instance.fitView({ padding: 0.2, duration: 0, maxZoom: 0.72 });
     });
     return () => window.cancelAnimationFrame(frameId);
-  }, [board.id, board.nodes.length, boardGraphContentKey, flowReady]);
+  }, [board.id, board.nodes.length, flowReady]);
   const boardPromptReferenceGraphIndex = useMemo(
     () => buildBoardPromptReferenceGraphIndex(board.nodes, board.edges),
     // graph key includes node content and edge order; positions do not affect reference resolution
@@ -1678,6 +1682,7 @@ export default function BoardWorkspace({
   }, [galleryItemById, onResolveOriginalAsset]);
 
   const handleSplitImageGrid = useCallback((nodeId: string, mode: BoardImageGridSplitMode): void => {
+    const operationBoardId = board.id;
     const sourceNode = board.nodes.find(node => node.id === nodeId);
     if (!sourceNode || (sourceNode.kind !== "asset" && sourceNode.kind !== "result") || sourceNode.asset.type !== "image") {
       onWorkspaceNotice("error", tb("workspace.selectImageNode"));
@@ -1712,6 +1717,7 @@ export default function BoardWorkspace({
 
     void (async () => {
       const originalItem = await onResolveOriginalAsset(sourceItem);
+      if (boardIdRef.current !== operationBoardId) throw new Error("Board changed while splitting the image grid");
       const sourceUrl = await imageUrlToDataUrl(originalItem.url);
       const split = await splitBoardImageGrid(sourceUrl, mode);
       const splitCount = split.crops.length;
@@ -1747,6 +1753,7 @@ export default function BoardWorkspace({
         if (!savedItem) throw new Error(tb("workspace.gridSplitFailed"));
         savedItems.push(savedItem);
       }
+      if (boardIdRef.current !== operationBoardId) throw new Error("Board changed while splitting the image grid");
 
       const sourcePosition = boardNodeAbsolutePosition(board.nodes, sourceNode.id) ?? sourceNode.position;
       const splitSizes = split.crops.map(crop => mediaNodeSizeForAspectRatio(crop.rect.width / crop.rect.height));

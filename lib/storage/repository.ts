@@ -60,6 +60,12 @@ export interface WorkspaceAssetPayloadRepository {
     contentHash?: string;
     mimeType: string;
   }): Promise<WorkspaceAssetPayloadRef>;
+  writeWithStatus?(input: {
+    assetId: string;
+    blob: Blob;
+    contentHash?: string;
+    mimeType: string;
+  }): Promise<{ created: boolean; ref: WorkspaceAssetPayloadRef }>;
 }
 
 export interface WorkspaceAssetPreviewRepository {

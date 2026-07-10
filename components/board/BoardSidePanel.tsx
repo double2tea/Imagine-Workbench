@@ -47,6 +47,9 @@ export default function BoardSidePanel({
   const [collapsedPreference, setCollapsedPreference] = useState(false);
   const [activeTab, setActiveTab] = useState<BoardSidePanelTab>("inspector");
   const [mobileOpen, setMobileOpen] = useState(false);
+  const mobileOpenerRef = useRef<HTMLButtonElement | null>(null);
+  const mobilePanelRef = useRef<HTMLElement | null>(null);
+  const mobileCloseRef = useRef<HTMLButtonElement | null>(null);
   const previousRevealKeyRef = useRef<string | null>(null);
   const collapsed = collapsedPreference && !(revealCanExpand && revealKey);
 
@@ -72,6 +75,39 @@ export default function BoardSidePanel({
     setActiveTab(current => preserveTasksTab && current === "tasks" ? current : "inspector");
     if (preserveTasksRevealKey) onPreserveTasksRevealConsumed?.();
   }, [onPreserveTasksRevealConsumed, preserveTasksRevealKey, revealKey]);
+
+  useEffect(() => {
+    if (!mobileOpen) return;
+    const panel = mobilePanelRef.current;
+    const opener = mobileOpenerRef.current;
+    mobileCloseRef.current?.focus();
+    const handleKeyDown = (event: KeyboardEvent): void => {
+      if (event.key === "Escape") {
+        event.preventDefault();
+        setMobileOpen(false);
+        return;
+      }
+      if (event.key !== "Tab" || !panel) return;
+      const focusable = Array.from(panel.querySelectorAll<HTMLElement>(
+        'button:not([disabled]), select:not([disabled]), input:not([disabled]), textarea:not([disabled]), [href], [tabindex]:not([tabindex="-1"])',
+      )).filter(element => !element.hasAttribute("hidden"));
+      const first = focusable[0];
+      const last = focusable[focusable.length - 1];
+      if (!first || !last) return;
+      if (event.shiftKey && document.activeElement === first) {
+        event.preventDefault();
+        last.focus();
+      } else if (!event.shiftKey && document.activeElement === last) {
+        event.preventDefault();
+        first.focus();
+      }
+    };
+    document.addEventListener("keydown", handleKeyDown);
+    return () => {
+      document.removeEventListener("keydown", handleKeyDown);
+      opener?.focus();
+    };
+  }, [mobileOpen]);
 
   const selectTab = (tab: BoardSidePanelTab) => {
     setActiveTab(tab);
@@ -123,7 +159,11 @@ export default function BoardSidePanel({
   return (
     <>
       <button
+        ref={mobileOpenerRef}
         type="button"
+        aria-controls="board-mobile-side-panel"
+        aria-expanded={mobileOpen}
+        aria-haspopup="dialog"
         onClick={() => setMobileOpen(true)}
         className="imagine-board-mobile-panel-btn fixed bottom-28 right-4 z-40 flex h-10 items-center gap-2 rounded-full border border-[var(--iw-border)] bg-[var(--iw-panel)] px-3.5 text-[11px] font-semibold text-[var(--iw-text)] shadow-lg lg:hidden"
       >
@@ -134,11 +174,17 @@ export default function BoardSidePanel({
         <button
           type="button"
           aria-label={commonT.t("close")}
+          tabIndex={-1}
           className="fixed inset-0 z-40 bg-black/45 lg:hidden"
           onClick={() => setMobileOpen(false)}
         />
       ) : null}
       <aside
+        ref={mobilePanelRef}
+        id="board-mobile-side-panel"
+        role={mobileOpen ? "dialog" : undefined}
+        aria-modal={mobileOpen ? true : undefined}
+        aria-labelledby={mobileOpen ? "board-mobile-side-panel-title" : undefined}
         data-collapsed={collapsed}
         data-mobile-open={mobileOpen}
         style={{ width: collapsed ? 44 : 360 }}
@@ -161,10 +207,12 @@ export default function BoardSidePanel({
         </button>
         {mobileOpen ? (
           <button
+            ref={mobileCloseRef}
             type="button"
             onClick={() => setMobileOpen(false)}
             className="flex h-10 items-center justify-end border-b border-[var(--iw-border)] px-3 text-xs font-semibold text-[var(--iw-muted)] lg:hidden"
           >
+            <span id="board-mobile-side-panel-title" className="mr-auto">{t('inspector.title')}</span>
             {commonT.t('buttons.close')}
           </button>
         ) : null}

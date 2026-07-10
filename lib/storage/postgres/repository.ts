@@ -253,6 +253,15 @@ class PostgresAssetPayloadRepository implements WorkspaceAssetPayloadRepository 
   }): Promise<WorkspaceAssetPayloadRef> {
     return this.payloadStore.write(input);
   }
+
+  async writeWithStatus(input: {
+    assetId: string;
+    blob: Blob;
+    contentHash?: string;
+    mimeType: string;
+  }): Promise<{ created: boolean; ref: WorkspaceAssetPayloadRef }> {
+    return this.payloadStore.writeWithStatus(input);
+  }
 }
 
 class PostgresAssetPreviewRepository implements WorkspaceAssetPreviewRepository {

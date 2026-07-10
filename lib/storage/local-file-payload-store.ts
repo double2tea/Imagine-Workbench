@@ -1,5 +1,6 @@
 import { createHash, randomUUID } from "node:crypto";
-import { mkdir, readFile, rename, rm, writeFile } from "node:fs/promises";
+import { constants } from "node:fs";
+import { copyFile, mkdir, readFile, rm, writeFile } from "node:fs/promises";
 import path from "node:path";
 import type { WorkspaceAssetPayloadRef } from "@/lib/storage/schema";
 
@@ -34,6 +35,10 @@ export class LocalFilePayloadStore {
   }
 
   async write(input: LocalFilePayloadWriteInput): Promise<WorkspaceAssetPayloadRef> {
+    return (await this.writeWithStatus(input)).ref;
+  }
+
+  async writeWithStatus(input: LocalFilePayloadWriteInput): Promise<{ created: boolean; ref: WorkspaceAssetPayloadRef }> {
     const data = Buffer.from(await input.blob.arrayBuffer());
     validatePayloadData(data, input.blob, input.mimeType, this.maxPayloadBytes);
     const contentHash = `sha256:${createHash("sha256").update(data).digest("hex")}`;
@@ -47,19 +52,27 @@ export class LocalFilePayloadStore {
     await mkdir(path.dirname(finalPath), { recursive: true });
     await mkdir(path.dirname(tmpPath), { recursive: true });
     await writeFile(tmpPath, data);
+    let created = false;
     try {
-      await rename(tmpPath, finalPath);
+      await copyFile(tmpPath, finalPath, constants.COPYFILE_EXCL);
+      created = true;
     } catch (error) {
+      if (!isAlreadyExistsError(error)) {
+        throw error;
+      }
+    } finally {
       await rm(tmpPath, { force: true });
-      throw error;
     }
 
     return {
-      contentHash,
-      kind: "local-file",
-      mimeType: input.mimeType,
-      sizeBytes: data.byteLength,
-      uri: storageKey,
+      created,
+      ref: {
+        contentHash,
+        kind: "local-file",
+        mimeType: input.mimeType,
+        sizeBytes: data.byteLength,
+        uri: storageKey,
+      },
     };
   }
 
@@ -73,6 +86,10 @@ export class LocalFilePayloadStore {
     }
     return resolved;
   }
+}
+
+function isAlreadyExistsError(error: unknown): boolean {
+  return error instanceof Error && "code" in error && error.code === "EEXIST";
 }
 
 function assertLocalFileRef(ref: WorkspaceAssetPayloadRef): void {

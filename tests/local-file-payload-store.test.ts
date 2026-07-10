@@ -87,3 +87,17 @@ test("LocalFilePayloadStore rejects payloads above the configured byte limit bef
     await assert.rejects(() => readFile(path.join(mediaDir, "originals", "transcript")), /ENOENT/);
   });
 });
+
+test("LocalFilePayloadStore reports content-addressed payload reuse without overwriting", async () => {
+  await withTempMediaDir(async mediaDir => {
+    const store = new LocalFilePayloadStore(mediaDir);
+    const input = { blob: new Blob(["same bytes"], { type: "image/png" }), mimeType: "image/png" };
+    const first = await store.writeWithStatus(input);
+    const second = await store.writeWithStatus(input);
+
+    assert.equal(first.created, true);
+    assert.equal(second.created, false);
+    assert.deepEqual(second.ref, first.ref);
+    assert.equal(await readFile(path.join(mediaDir, first.ref.uri), "utf8"), "same bytes");
+  });
+});

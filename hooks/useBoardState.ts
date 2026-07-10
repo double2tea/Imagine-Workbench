@@ -42,9 +42,6 @@ import {
   type BoardResultNode,
   type BoardRunningHubAppNode,
   type BoardRunningHubAppNodeUpdate,
-  type BoardRunningHubBindingDelivery,
-  type BoardRunningHubBindingSource,
-  type BoardRunningHubBindingValueType,
   type BoardRunningHubNodeInfoBinding,
   type BoardRunningHubOutputType,
   type BoardRunningHubTargetType,
@@ -71,6 +68,8 @@ import {
   resolveMovedBoardNodeParents,
 } from "@/lib/board";
 import { indexedDbBoardStorageAdapter, type BoardStorageAdapter } from "@/lib/board/storage-adapter";
+import { createBoardSaveCoordinator } from "@/lib/board/save-coordinator";
+import { applyBoardTextDrafts, clearCommittedBoardTextDrafts } from "@/lib/board/text-draft-journal";
 import {
   DEFAULT_BOARD_MULTI_GRID_ASPECT_RATIO,
   DEFAULT_BOARD_MULTI_GRID_SIZE,
@@ -96,6 +95,7 @@ import {
 import { clampBoardTextNodeSize, estimateBoardNoteSize, estimateBoardPromptSize } from "@/lib/board/text-node-size";
 import { findConnectedResultNodeForSourceStack, findResultNodeForSourceStack, isResultSourceNode, resultNodeDefaultPosition, resultNodeIdsOwnedBySource } from "@/lib/board/utils";
 import { findAvailableBoardNodePosition } from "@/lib/board/placement";
+import { normalizePersistedRunningHubBindings } from "@/lib/board/runninghub-bindings";
 
 export type BoardSaveStatus = "idle" | "loading" | "saving" | "saved" | "error";
 
@@ -884,7 +884,9 @@ function normalizeBoardNode(node: unknown, index: number): BoardNode | null {
       ...shell,
       kind: "runninghub-app",
       accessPassword: readOptionalString(node.accessPassword),
-      bindings: Array.isArray(node.bindings) ? normalizeRunningHubBindings(node.bindings) : defaultRunningHubBindings(),
+      bindings: Array.isArray(node.bindings)
+        ? normalizePersistedRunningHubBindings(node.bindings, () => createBoardId("rh_bind"))
+        : defaultRunningHubBindings(),
       outputType: readRunningHubOutputType(node.outputType),
       prompt: typeof node.prompt === "string" ? node.prompt : "",
       resultStackKey: readOptionalString(node.resultStackKey),
@@ -992,53 +994,6 @@ function readRunningHubTargetType(value: unknown): BoardRunningHubTargetType {
 function readRunningHubOutputType(value: unknown): BoardRunningHubOutputType {
   if (value === "video" || value === "audio") return value;
   return "image";
-}
-
-function readRunningHubBindingSource(value: unknown): BoardRunningHubBindingSource {
-  if (value === "prompt" || value === "reference" || value === "randomSeed") return value;
-  return "literal";
-}
-
-function readRunningHubBindingDelivery(value: unknown): BoardRunningHubBindingDelivery {
-  if (value === "url" || value === "fileName") return value;
-  return "raw";
-}
-
-function readRunningHubBindingValueType(value: unknown): BoardRunningHubBindingValueType | undefined {
-  if (
-    value === "text" ||
-    value === "number" ||
-    value === "boolean" ||
-    value === "image" ||
-    value === "video" ||
-    value === "audio" ||
-    value === "raw"
-  ) {
-    return value;
-  }
-  return undefined;
-}
-
-function normalizeRunningHubBindings(bindings: unknown[]): BoardRunningHubNodeInfoBinding[] {
-  const normalized = bindings
-    .filter(isRecord)
-    .map((binding): BoardRunningHubNodeInfoBinding => ({
-      id: readNonEmptyString(binding.id, createBoardId("rh_bind")),
-      nodeId: readOptionalString(binding.nodeId) ?? "",
-      fieldName: readOptionalString(binding.fieldName) ?? "",
-      label: readOptionalString(binding.label),
-      source: readRunningHubBindingSource(binding.source),
-      value: readOptionalString(binding.value) ?? "",
-      valueType: readRunningHubBindingValueType(binding.valueType),
-      enabled: typeof binding.enabled === "boolean" ? binding.enabled : true,
-      required: typeof binding.required === "boolean" ? binding.required : undefined,
-      referenceIndex: typeof binding.referenceIndex === "number" && Number.isInteger(binding.referenceIndex) && binding.referenceIndex >= 0
-        ? binding.referenceIndex
-        : undefined,
-      referenceType: binding.referenceType === "video" || binding.referenceType === "audio" ? binding.referenceType : "image",
-      deliveryMode: readRunningHubBindingDelivery(binding.deliveryMode),
-    }));
-  return normalized;
 }
 
 function normalizeImageModel(value: unknown): string {
@@ -1710,6 +1665,7 @@ export function useBoardState(
   const redoStackRef = useRef<BoardHistorySnapshot[]>([]);
   const dragUndoCapturedRef = useRef(false);
   const boardRef = useRef(board);
+  const saveCoordinator = useMemo(() => createBoardSaveCoordinator(boardToSave => storage.saveBoard(boardToSave)), [storage]);
 
   useLayoutEffect(() => {
     boardRef.current = board;
@@ -1740,8 +1696,9 @@ export function useBoardState(
     options?: { skipUndo?: boolean },
   ) => {
     setBoardState(current => {
-      if (!options?.skipUndo && hasLoaded) pushUndoSnapshot(current);
       const nextBoard = updater(current);
+      if (nextBoard === current) return current;
+      if (!options?.skipUndo && hasLoaded) pushUndoSnapshot(current);
       boardRef.current = nextBoard;
       return nextBoard;
     });
@@ -1815,7 +1772,8 @@ export function useBoardState(
       if (!isActive) return;
 
       clearUndoHistory();
-      setBoardState(storedBoard ? normalizeBoard(storedBoard, boardId) : createEmptyBoard(boardId, t("board.workspace.boardLabel")));
+      const loadedBoard = storedBoard ? normalizeBoard(storedBoard, boardId) : createEmptyBoard(boardId, t("board.workspace.boardLabel"));
+      setBoardState(applyBoardTextDrafts(loadedBoard));
       setSelectedNodeId(null);
       setSelectedEdgeId(null);
       setSaveError(null);
@@ -1851,9 +1809,10 @@ export function useBoardState(
     let isActive = true;
     const saveTimer = window.setTimeout(() => {
       setSaveStatus("saving");
-      storage.saveBoard(board)
+      saveCoordinator.save(board)
         .then(() => {
           if (!isActive) return;
+          clearCommittedBoardTextDrafts(board);
           setSaveError(null);
           setSaveStatus("saved");
         })
@@ -1868,14 +1827,15 @@ export function useBoardState(
       isActive = false;
       window.clearTimeout(saveTimer);
     };
-  }, [board, boardId, hasLoaded, storage]);
+  }, [board, boardId, hasLoaded, saveCoordinator]);
 
   const saveNow = useCallback(async () => {
     const currentBoard = boardRef.current;
     if (!hasLoaded || currentBoard.id !== boardId) return;
     setSaveStatus("saving");
     try {
-      await storage.saveBoard(currentBoard);
+      await saveCoordinator.save(currentBoard);
+      clearCommittedBoardTextDrafts(currentBoard);
       setSaveError(null);
       setSaveStatus("saved");
     } catch (error: unknown) {
@@ -1883,7 +1843,7 @@ export function useBoardState(
       setSaveStatus("error");
       throw error;
     }
-  }, [boardId, hasLoaded, storage]);
+  }, [boardId, hasLoaded, saveCoordinator]);
 
   const addAssetNode = useCallback((input: CreateAssetNodeInput): string => {
     const node = createAssetBoardNode(input, board.nodes);

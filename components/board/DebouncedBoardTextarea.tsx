@@ -14,7 +14,7 @@ interface DebouncedBoardTextareaProps {
 }
 
 export default function DebouncedBoardTextarea({ className, commitId, name, onChange, placeholder, value }: DebouncedBoardTextareaProps) {
-  const { flush, getValue, setValue, value: draftValue } = useDebouncedTextCommit(value, onChange);
+  const { flush, getValue, setValue, value: draftValue } = useDebouncedTextCommit(value, onChange, undefined, commitId);
 
   useEffect(() => {
     registerBoardTextCommit(commitId, { flush, getValue });

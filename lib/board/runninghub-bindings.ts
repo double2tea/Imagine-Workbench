@@ -44,6 +44,57 @@ export function createDefaultRunningHubBinding(): BoardRunningHubNodeInfoBinding
   };
 }
 
+export function normalizePersistedRunningHubBindings(
+  bindings: unknown[],
+  createId: () => string = createRunningHubBindingId,
+): BoardRunningHubNodeInfoBinding[] {
+  return bindings.filter(isRecord).map(binding => ({
+    id: optionalString(binding, "id") ?? createId(),
+    nodeId: optionalString(binding, "nodeId") ?? "",
+    nodeName: optionalString(binding, "nodeName"),
+    fieldName: optionalString(binding, "fieldName") ?? "",
+    fieldData: optionalString(binding, "fieldData"),
+    description: optionalString(binding, "description"),
+    descriptionEn: optionalString(binding, "descriptionEn"),
+    label: optionalString(binding, "label"),
+    source: readPersistedSource(binding.source),
+    value: optionalString(binding, "value") ?? "",
+    valueType: readPersistedValueType(binding.valueType),
+    options: readPersistedOptions(binding.options),
+    enabled: typeof binding.enabled === "boolean" ? binding.enabled : true,
+    required: typeof binding.required === "boolean" ? binding.required : undefined,
+    referenceIndex: typeof binding.referenceIndex === "number" && Number.isInteger(binding.referenceIndex) && binding.referenceIndex >= 0
+      ? binding.referenceIndex
+      : undefined,
+    referenceType: binding.referenceType === "video" || binding.referenceType === "audio" ? binding.referenceType : "image",
+    deliveryMode: readPersistedDelivery(binding.deliveryMode),
+  }));
+}
+
+function readPersistedSource(value: unknown): BoardRunningHubBindingSource {
+  return value === "prompt" || value === "reference" || value === "randomSeed" ? value : "literal";
+}
+
+function readPersistedDelivery(value: unknown): BoardRunningHubBindingDelivery {
+  return value === "url" || value === "fileName" ? value : "raw";
+}
+
+function readPersistedValueType(value: unknown): BoardRunningHubBindingValueType | undefined {
+  return value === "text" || value === "number" || value === "boolean" || value === "image" || value === "video" || value === "audio" || value === "raw"
+    ? value
+    : undefined;
+}
+
+function readPersistedOptions(value: unknown): BoardRunningHubBindingOption[] | undefined {
+  if (!Array.isArray(value)) return undefined;
+  const options = value.filter(isRecord).flatMap(option => {
+    const optionValue = optionalString(option, "value");
+    const label = optionalString(option, "label");
+    return optionValue && label ? [{ label, value: optionValue, description: optionalString(option, "description") }] : [];
+  });
+  return options.length > 0 ? options : undefined;
+}
+
 export function analyzeRunningHubBindings(
   bindings: BoardRunningHubNodeInfoBinding[],
   prompt: string,

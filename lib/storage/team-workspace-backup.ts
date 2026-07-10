@@ -43,6 +43,8 @@ import {
   LIBRARY_INDEX_FILE,
   MANIFEST_FILE,
   MAX_BACKUP_FILE_COUNT,
+  MAX_BACKUP_ENTRY_UNCOMPRESSED_BYTES,
+  MAX_BACKUP_UNCOMPRESSED_BYTES,
   SETTINGS_FILE,
   SUPPORTED_WORKSPACE_BACKUP_SCHEMA_VERSIONS,
   VOICE_PROFILE_INDEX_FILE,
@@ -726,12 +728,16 @@ async function restoreTeamAsset(
   await repository.assets.put({ meta });
   const payloadInput = await teamBackupAssetPayload(asset);
   if (!payloadInput) return undefined;
-  const payload = await repository.payloads.write({
+  const writeInput = {
     assetId: meta.id,
     blob: payloadInput.blob,
     mimeType: payloadInput.mimeType,
-  });
-  writtenPayloads.push(payload);
+  };
+  const result = repository.payloads.writeWithStatus
+    ? await repository.payloads.writeWithStatus(writeInput)
+    : { created: false, ref: await repository.payloads.write(writeInput) };
+  const payload = result.ref;
+  if (result.created) writtenPayloads.push(payload);
   return payload;
 }
 
@@ -813,6 +819,7 @@ async function parseTeamWorkspaceBackup(file: Blob): Promise<ParsedTeamWorkspace
   if (Object.keys(zip.files).length > MAX_BACKUP_FILE_COUNT) {
     throw badRequest("Backup file count exceeds the limit", "invalid_team_backup");
   }
+  validateTeamZipUncompressedSize(zip);
   const manifest = parseTeamBackupManifest(await readRequiredZipText(zip, MANIFEST_FILE));
   const assetRecords = parseTeamAssetRecords(await readRequiredZipText(zip, manifest.assetsFile));
   const libraryAssets = manifest.libraryFile
@@ -848,14 +855,32 @@ async function parseTeamWorkspaceBackup(file: Blob): Promise<ParsedTeamWorkspace
     libraryAssets,
     voiceProfiles,
   });
+  const assets: ParsedTeamBackupAsset[] = [];
+  for (const record of assetRecords) assets.push(await parseTeamBackupAssetMedia(zip, record));
   return {
-    assets: await Promise.all(assetRecords.map(record => parseTeamBackupAssetMedia(zip, record))),
+    assets,
     boards,
     generationTasks,
     libraryAssets,
     settings,
     voiceProfiles,
   };
+}
+
+function validateTeamZipUncompressedSize(zip: JSZip): void {
+  let totalBytes = 0;
+  for (const file of Object.values(zip.files)) {
+    if (file.dir) continue;
+    const size = (file as JSZip.JSZipObject & { _data?: { uncompressedSize?: number } })._data?.uncompressedSize;
+    if (size === undefined) throw badRequest("Backup entry size cannot be validated", "invalid_team_backup");
+    if (size > MAX_BACKUP_ENTRY_UNCOMPRESSED_BYTES) {
+      throw badRequest("Backup entry exceeds the uncompressed size limit", "invalid_team_backup");
+    }
+    totalBytes += size;
+    if (totalBytes > MAX_BACKUP_UNCOMPRESSED_BYTES) {
+      throw badRequest("Backup exceeds the total uncompressed size limit", "invalid_team_backup");
+    }
+  }
 }
 
 async function parseTeamBackupAssetMedia(

@@ -20,6 +20,7 @@ interface UseMediaPollingParams {
   updateGenerationTask: GenerationTaskStorage["update"];
   setGenerationTasks: Dispatch<SetStateAction<GenerationTask[]>>;
   setItems: Dispatch<SetStateAction<StorageItem[]>>;
+  scopeKey: string;
 }
 
 function getStringField(value: unknown, field: string): string | null {
@@ -163,11 +164,13 @@ export function useMediaPolling({
   updateGenerationTask,
   setGenerationTasks,
   setItems,
+  scopeKey,
 }: UseMediaPollingParams) {
   const materializingTaskIdsRef = useRef<Set<string>>(new Set());
   const materializedTaskIdsRef = useRef<Set<string>>(new Set());
 
   useEffect(() => {
+    const abortController = new AbortController();
     const activeTasks = generationTasks.filter(task => task.status === "pending" || task.status === "processing");
     const activeTaskIds = new Set(activeTasks.map(task => task.id));
     for (const taskId of materializingTaskIdsRef.current) {
@@ -179,6 +182,7 @@ export function useMediaPolling({
     if (activeTasks.length === 0) return;
 
     const interval = setInterval(async () => {
+      if (abortController.signal.aborted) return;
       const completedItems: StorageItem[] = [];
 
       for (const task of activeTasks) {
@@ -225,7 +229,9 @@ export function useMediaPolling({
               method: "POST",
               headers: { "Content-Type": "application/json", ...headers },
               body: JSON.stringify({ operationName: task.operationName, model: task.model }),
+              signal: abortController.signal,
             });
+            if (abortController.signal.aborted) return;
 
             if (!res.ok) {
               throw new Error(await readFetchError(res, t("common.notices.taskStatusQueryFailed")));
@@ -278,7 +284,9 @@ export function useMediaPolling({
                     method: "POST",
                     headers: { "Content-Type": "application/json", ...headers },
                     body: JSON.stringify({ operationName: task.operationName, model: task.model, outputIndex }),
+                    signal: abortController.signal,
                   });
+                  if (abortController.signal.aborted) return;
 
                   if (!dlRes.ok) {
                     throw new Error(await readFetchError(dlRes, t("common.notices.resultDownloadFailed")));
@@ -390,6 +398,7 @@ export function useMediaPolling({
               }
             }
           } catch (error) {
+            if (abortController.signal.aborted) return;
             if (await stopIfTaskLocallyCanceled(task, locallyCanceledItemIdsRef, pushWorkspaceNotice, updateGenerationTask, setGenerationTasks)) continue;
             const previousFailures = pollingFailuresRef.current[task.id] ?? 0;
             const nextFailures = previousFailures + 1;
@@ -414,7 +423,7 @@ export function useMediaPolling({
         }
       }
 
-      if (completedItems.length > 0) {
+      if (!abortController.signal.aborted && completedItems.length > 0) {
         setItems(current => {
           const merged = new Map(current.map(entry => [entry.id, entry]));
           for (const entry of completedItems) {
@@ -427,6 +436,9 @@ export function useMediaPolling({
       }
     }, 4000);
 
-    return () => clearInterval(interval);
-  }, [buildProviderHeaders, deleteAssetById, generationTasks, locallyCanceledItemIdsRef, pollingFailuresRef, pushWorkspaceNotice, saveAssetWithPreview, setGenerationTasks, setItems, updateGenerationTask]);
+    return () => {
+      abortController.abort();
+      clearInterval(interval);
+    };
+  }, [buildProviderHeaders, deleteAssetById, generationTasks, locallyCanceledItemIdsRef, pollingFailuresRef, pushWorkspaceNotice, saveAssetWithPreview, scopeKey, setGenerationTasks, setItems, updateGenerationTask]);
 }

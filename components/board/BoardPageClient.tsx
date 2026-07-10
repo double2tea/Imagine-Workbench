@@ -2,11 +2,11 @@
 
 import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import { useRouter } from "next/navigation";
+import dynamic from "next/dynamic";
 import { flushSync } from "react-dom";
 import { useConfirm } from "@/components/confirm/ConfirmProvider";
 import { t as i18nT, useTranslations, type Locale } from "@/lib/i18n";
-import AgentDock from "@/components/agent/AgentDock";
-import SaveVoiceProfileDialog, { type SaveVoiceProfileDialogInput } from "@/components/audio/SaveVoiceProfileDialog";
+import type { SaveVoiceProfileDialogInput } from "@/components/audio/SaveVoiceProfileDialog";
 import {
   AGENT_BOARD_PATCH_MAX_OPERATIONS,
   type AgentBoardPatch,
@@ -18,17 +18,12 @@ import {
 } from "@/lib/agent-actions";
 import { isCustomImageResolutionValue } from "@/lib/agent-tool-action";
 import AtReferenceDropdown from "@/components/reference/AtReferenceDropdown";
-import CanvasMaskEditor, { type CanvasMaskEditorOutput } from "@/components/CanvasMaskEditor";
-import VisualPromptAdjustEditor from "@/components/VisualPromptAdjustEditor";
-import FullscreenPreview from "@/components/assets/FullscreenPreview";
-import AssetLibraryModal from "@/components/library/AssetLibraryModal";
-import PanoramaOverlay from "@/components/panorama/PanoramaOverlay";
+import type { CanvasMaskEditorOutput } from "@/components/CanvasMaskEditor";
 import BoardInspector from "@/components/board/BoardInspector";
 import BoardSidePanel from "@/components/board/BoardSidePanel";
 import BoardSideAssetList from "@/components/board/BoardSideAssetList";
 import BoardTaskQueuePanel from "@/components/board/BoardTaskQueuePanel";
 import BoardWorkspace from "@/components/board/BoardWorkspace";
-import SettingsModal from "@/components/settings/SettingsModal";
 import WorkspaceNotices, { type WorkspaceNotice } from "@/components/workbench/WorkspaceNotices";
 import { useWorkbenchThemeShellSync } from "@/lib/theme-mode";
 import type { AgentBoardContext, AgentBoardContextSnapshot, AgentBoardNodeDetail, AgentBoardNodeParams, AgentBoardNodeSummary } from "@/lib/agent-context";
@@ -202,6 +197,15 @@ import {
   saveTeamGenerationTask,
   updateTeamGenerationTask,
 } from "@/lib/storage/team-client";
+
+const AgentDock = dynamic(() => import("@/components/agent/AgentDock"), { ssr: false });
+const CanvasMaskEditor = dynamic(() => import("@/components/CanvasMaskEditor"), { ssr: false });
+const VisualPromptAdjustEditor = dynamic(() => import("@/components/VisualPromptAdjustEditor"), { ssr: false });
+const SaveVoiceProfileDialog = dynamic(() => import("@/components/audio/SaveVoiceProfileDialog"), { ssr: false });
+const FullscreenPreview = dynamic(() => import("@/components/assets/FullscreenPreview"), { ssr: false });
+const AssetLibraryModal = dynamic(() => import("@/components/library/AssetLibraryModal"), { ssr: false });
+const PanoramaOverlay = dynamic(() => import("@/components/panorama/PanoramaOverlay"), { ssr: false });
+const SettingsModal = dynamic(() => import("@/components/settings/SettingsModal"), { ssr: false });
 
 type NoticeType = "error" | "info" | "success";
 type MaskDestination = "creative" | "agent" | "board-asset";
@@ -2350,6 +2354,7 @@ export default function BoardPage({ boardId = DEFAULT_BOARD_ID }: BoardPageProps
     updateGenerationTask: boardGenerationTaskStorage.update,
     setGenerationTasks,
     setItems,
+    scopeKey: resolvedBoardId,
   });
 
   const { generateManualAudio, generateManualImage, generateManualVideo } = useGenerationActions({

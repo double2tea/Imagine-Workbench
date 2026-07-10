@@ -302,7 +302,7 @@ const BoardPromptTextarea = forwardRef<BoardPromptTextareaHandle, BoardPromptTex
   const renderedReferencesSignatureRef = useRef("");
   const [atSearch, setAtSearch] = useState<string | null>(null);
   const [dropdownAnchor, setDropdownAnchor] = useState<{ left: number; top: number; width: number } | null>(null);
-  const { flush, getValue, setValue, value: draftValue } = useDebouncedTextCommit(value, onChange);
+  const { flush, getValue, setValue, value: draftValue } = useDebouncedTextCommit(value, onChange, undefined, commitId);
   const displayValue = readOnly ? value : draftValue;
   const referencesSignature = useMemo(
     () => references.map(reference => `${reference.id}:${reference.type}:${reference.url}`).join("|"),

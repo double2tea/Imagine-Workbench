@@ -17,6 +17,8 @@ export const GENERATION_TASK_INDEX_FILE = "generation-tasks/index.json";
 export const VOICE_PROFILE_INDEX_FILE = "voice-profiles/index.json";
 export const SETTINGS_FILE = "settings/local-storage.json";
 export const MAX_BACKUP_FILE_COUNT = 10000;
+export const MAX_BACKUP_ENTRY_UNCOMPRESSED_BYTES = 512 * 1024 * 1024;
+export const MAX_BACKUP_UNCOMPRESSED_BYTES = 2 * 1024 * 1024 * 1024;
 
 export interface WorkspaceBackupManifest {
   app: typeof BACKUP_APP_NAME;
