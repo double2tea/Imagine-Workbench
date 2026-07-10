@@ -12,7 +12,7 @@ const noopBoolean = (_value: boolean): void => {};
 
 test("agent input Enter submits only when a ready prompt is present", async () => {
   registerCompiledPathAlias();
-  const { shouldSubmitAgentInputOnKeyDown } = await import("../components/agent/AgentDock");
+  const { shouldSubmitAgentInputOnKeyDown } = await import("../components/agent/AgentDock.js");
 
   assert.equal(shouldSubmitAgentInputOnKeyDown({
     input: "生成一张太空港概念图",
@@ -60,7 +60,7 @@ test("agent input Enter submits only when a ready prompt is present", async () =
 
 test("agent dock static markup keeps the send control accessible", async () => {
   registerCompiledPathAlias();
-  const { default: AgentDock } = await import("../components/agent/AgentDock");
+  const AgentDock = (await import("../components/agent/AgentDock.js")).default.default;
   type AgentDockProps = React.ComponentProps<typeof AgentDock>;
   const props: AgentDockProps = {
     activeCountdownId: null,

@@ -3,8 +3,8 @@
   "compilerOptions": {
     "allowJs": false,
     "jsx": "react-jsx",
-    "module": "CommonJS",
-    "moduleResolution": "node",
+    "module": "Node16",
+    "moduleResolution": "Node16",
     "noEmit": false,
     "outDir": "../.tmp/provider-tests",
     "rootDir": "..",

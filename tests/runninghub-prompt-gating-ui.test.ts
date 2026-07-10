@@ -38,7 +38,7 @@ const videoCapabilities: VideoModelCapabilities = {
 
 test("image generation panel generate button follows promptRequired", async () => {
   registerCompiledPathAlias();
-  const { default: ImageGenerationPanel } = await import("../components/creation/ImageGenerationPanel");
+  const ImageGenerationPanel = (await import("../components/creation/ImageGenerationPanel.js")).default.default;
   type ImagePanelProps = React.ComponentProps<typeof ImageGenerationPanel>;
   const baseProps: ImagePanelProps = {
     atDropdownNode: null,
@@ -94,7 +94,7 @@ test("image generation panel generate button follows promptRequired", async () =
 
 test("video generation panel generate button follows promptRequired", async () => {
   registerCompiledPathAlias();
-  const { default: VideoGenerationPanel } = await import("../components/creation/VideoGenerationPanel");
+  const VideoGenerationPanel = (await import("../components/creation/VideoGenerationPanel.js")).default.default;
   type VideoPanelProps = React.ComponentProps<typeof VideoGenerationPanel>;
   const baseProps: VideoPanelProps = {
     atDropdownNode: null,

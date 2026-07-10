@@ -22,7 +22,7 @@ test("team migrations route rate-limits invalid setup token attempts with generi
     process.env.IMAGINE_STORAGE_TARGET = "postgres";
     process.env.IMAGINE_TEAM_SETUP_TOKEN = "setup-token";
     process.env.NEXT_PUBLIC_APP_VERSION = "0.1.0";
-    const { POST: postMigrations } = await import("../app/api/storage/team/migrations/route");
+    const { POST: postMigrations } = await import("../app/api/storage/team/migrations/route.js");
 
     for (let attempt = 0; attempt < 5; attempt += 1) {
       const response = await postMigrations(invalidSetupTokenRequest());
@@ -85,7 +85,7 @@ test("team migrations route rejects untrusted origins before setup token validat
     process.env.IMAGINE_STORAGE_TARGET = "postgres";
     process.env.IMAGINE_TEAM_SETUP_TOKEN = "setup-token";
     process.env.NEXT_PUBLIC_APP_VERSION = "0.1.0";
-    const { POST: postMigrations } = await import("../app/api/storage/team/migrations/route");
+    const { POST: postMigrations } = await import("../app/api/storage/team/migrations/route.js");
 
     const response = await postMigrations(new Request("http://localhost:3000/api/storage/team/migrations", {
       headers: {

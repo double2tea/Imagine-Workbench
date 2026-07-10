@@ -6,9 +6,9 @@ import { RUNNINGHUB_CONTROL_IMAGE_APP_MODEL } from "../lib/providers/runninghub"
 
 test("media download routes return request errors for missing operation names", async () => {
   registerCompiledPathAlias();
-  const { POST: postImageDownload } = await import("../app/api/media/image-download/route");
-  const { POST: postAudioDownload } = await import("../app/api/media/audio-download/route");
-  const { POST: postVideoDownload } = await import("../app/api/media/video-download/route");
+  const { POST: postImageDownload } = await import("../app/api/media/image-download/route.js");
+  const { POST: postAudioDownload } = await import("../app/api/media/audio-download/route.js");
+  const { POST: postVideoDownload } = await import("../app/api/media/video-download/route.js");
 
   const imageResponse = await postImageDownload(jsonRequest({}) as Parameters<typeof postImageDownload>[0]);
   const audioResponse = await postAudioDownload(jsonRequest({}) as Parameters<typeof postAudioDownload>[0]);
@@ -21,7 +21,7 @@ test("media download routes return request errors for missing operation names", 
 
 test("media download routes return request errors for wrong media operation type", async () => {
   registerCompiledPathAlias();
-  const { POST: postImageDownload } = await import("../app/api/media/image-download/route");
+  const { POST: postImageDownload } = await import("../app/api/media/image-download/route.js");
 
   const response = await postImageDownload(jsonRequest({ operationName: "runninghub:video:task-output:123" }) as Parameters<typeof postImageDownload>[0]);
 
@@ -31,9 +31,9 @@ test("media download routes return request errors for wrong media operation type
 
 test("media download routes reject invalid output indexes", async () => {
   registerCompiledPathAlias();
-  const { POST: postImageDownload } = await import("../app/api/media/image-download/route");
-  const { POST: postAudioDownload } = await import("../app/api/media/audio-download/route");
-  const { POST: postVideoDownload } = await import("../app/api/media/video-download/route");
+  const { POST: postImageDownload } = await import("../app/api/media/image-download/route.js");
+  const { POST: postAudioDownload } = await import("../app/api/media/audio-download/route.js");
+  const { POST: postVideoDownload } = await import("../app/api/media/video-download/route.js");
   const headers = { Authorization: "Bearer rh_key" };
 
   const imageResponse = await postImageDownload(jsonRequest({
@@ -59,7 +59,7 @@ test("media download routes reject invalid output indexes", async () => {
 
 test("native image generation route preserves RunningHub structured provider errors", async () => {
   registerCompiledPathAlias();
-  const { POST: postGenerateImage } = await import("../app/api/media/generate-image/route");
+  const { POST: postGenerateImage } = await import("../app/api/media/generate-image/route.js");
   const originalFetch = globalThis.fetch;
   globalThis.fetch = async (): Promise<Response> => Response.json({
     code: 1014,
@@ -82,7 +82,7 @@ test("native image generation route preserves RunningHub structured provider err
 
 test("native image generation route does not let empty nodeInfoList bypass prompt validation", async () => {
   registerCompiledPathAlias();
-  const { POST: postGenerateImage } = await import("../app/api/media/generate-image/route");
+  const { POST: postGenerateImage } = await import("../app/api/media/generate-image/route.js");
 
   const response = await postGenerateImage(jsonRequest({
     model: "12ai:gemini-3.1-flash-image-preview",
@@ -96,7 +96,7 @@ test("native image generation route does not let empty nodeInfoList bypass promp
 
 test("native video generation route does not let empty nodeInfoList bypass prompt validation", async () => {
   registerCompiledPathAlias();
-  const { POST: postGenerateVideo } = await import("../app/api/media/generate-video/route");
+  const { POST: postGenerateVideo } = await import("../app/api/media/generate-video/route.js");
 
   const response = await postGenerateVideo(jsonRequest({
     model: "12ai:veo_3_1-fast",
@@ -109,7 +109,7 @@ test("native video generation route does not let empty nodeInfoList bypass promp
 
 test("native image generation route injects registered RunningHub app bindings", async () => {
   registerCompiledPathAlias();
-  const { POST: postGenerateImage } = await import("../app/api/media/generate-image/route");
+  const { POST: postGenerateImage } = await import("../app/api/media/generate-image/route.js");
   const originalFetch = globalThis.fetch;
   const calls: Array<{ url: string; body: unknown }> = [];
   globalThis.fetch = async (input: RequestInfo | URL, init?: RequestInit): Promise<Response> => {

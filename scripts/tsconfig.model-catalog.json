@@ -2,8 +2,8 @@
   "extends": "../tsconfig.json",
   "compilerOptions": {
     "allowJs": false,
-    "module": "CommonJS",
-    "moduleResolution": "node",
+    "module": "Node16",
+    "moduleResolution": "Node16",
     "noEmit": false,
     "outDir": "../.tmp/model-catalog-generator",
     "rootDir": "..",
