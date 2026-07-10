@@ -26,12 +26,15 @@ tests/                       helper 和供应商行为的 Node 测试
 
 ```bash
 pnpm run lint
+pnpm run lint:eslint
 pnpm run typecheck
 pnpm run check
 pnpm run test:providers
+pnpm run build:isolated
 ```
 
 `pnpm run check` 包含 lint、typecheck、应用版本校验和模型能力目录校验。
+`pnpm run build` 会生成 standalone 服务并检查 `/`、`/board` 的首屏 JavaScript 预算。构建后使用 `pnpm start`；`output: "standalone"` 不支持 `next start`。`build:isolated` 输出到 `.next-production`，避免与正在运行的开发服务器共享 `.next`。
 
 ## Cloudflare Pages
 
@@ -44,6 +47,7 @@ pnpm run pages:deploy
 配置 `ENABLE_CLOUDFLARE_PAGES_DEPLOY=true`、`CLOUDFLARE_ACCOUNT_ID` 和 `CLOUDFLARE_API_TOKEN` 后，GitHub Actions 才会将 `main` 部署到 Cloudflare Pages。
 
 Cloudflare Pages 构建浏览器 BYOK surface。构建会设置 `NEXT_PUBLIC_IMAGINE_BROWSER_BYOK=1`，隐藏已分类的 Node runtime API route 文件，运行 Pages adapter 后再在本地恢复源码。Pages 模式下，生成请求从浏览器用本地 provider 凭据直连所选 provider；team mode 保存的密钥仍只在自托管 Node 部署可用。
+Pages 模式下 Seed Audio 使用固定的同源 Edge 路由；只接受 `volcengine:seed-audio-1.0`，且不会持久化、记录或缓存凭据。
 启用 workflow 或手动 Pages 部署前，先运行 `pnpm run pages:build`。
 
 ## 依赖说明

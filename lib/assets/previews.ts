@@ -85,7 +85,6 @@ function createVideoPreview(item: StorageItem): Promise<AssetPreviewRecord> {
     video.playsInline = true;
     video.preload = "auto";
     let didFinish = false;
-    let timeout: number | undefined;
 
     const cleanup = (): void => {
       if (timeout !== undefined) window.clearTimeout(timeout);
@@ -117,7 +116,7 @@ function createVideoPreview(item: StorageItem): Promise<AssetPreviewRecord> {
       }
     };
 
-    timeout = window.setTimeout(() => fail(new Error(t("common.notices.videoPreviewTimeout"))), 8000);
+    const timeout = window.setTimeout(() => fail(new Error(t("common.notices.videoPreviewTimeout"))), 8000);
     video.onerror = () => {
       fail(new Error(t("common.errors.videoPreviewLoadFailed")));
     };

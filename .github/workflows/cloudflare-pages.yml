@@ -65,7 +65,7 @@ jobs:
 
       - name: Deploy to Cloudflare Pages
         run: |
-          pnpm dlx wrangler pages deploy .vercel/output/static \
+          pnpm dlx wrangler@4.40.2 pages deploy .vercel/output/static \
             --project-name=imagine-workbench \
             --branch=main \
             --commit-hash="$GITHUB_SHA" \

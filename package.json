@@ -30,8 +30,9 @@
   "scripts": {
     "dev": "DISABLE_HMR=false next dev",
     "dev:no-hmr": "DISABLE_HMR=true next dev",
-    "build": "next build",
-    "start": "next start",
+    "build": "next build && node scripts/check-bundle-budget.mjs .next",
+    "build:isolated": "node scripts/build-isolated.mjs",
+    "start": "node scripts/start-standalone.mjs",
     "lint": "oxlint .",
     "lint:fix": "oxlint . --fix",
     "lint:eslint": "eslint .",
@@ -46,8 +47,8 @@
     "db:migrate": "node scripts/team-migrate.mjs",
     "test:e2e:audio": "node scripts/e2e-audio-workflow.mjs",
     "pages:build": "node scripts/build-cloudflare-pages.mjs",
-    "pages:preview": "pnpm run pages:build && pnpm dlx wrangler pages dev .vercel/output/static",
-    "pages:deploy": "pnpm run pages:build && pnpm dlx wrangler pages deploy .vercel/output/static --project-name=imagine-workbench --commit-dirty=true",
+    "pages:preview": "pnpm run pages:build && pnpm dlx wrangler@4.40.2 pages dev .vercel/output/static",
+    "pages:deploy": "pnpm run pages:build && pnpm dlx wrangler@4.40.2 pages deploy .vercel/output/static --project-name=imagine-workbench --commit-dirty=true",
     "test:providers": "tsc -p tests/tsconfig.json && IMAGINE_COMPILED_ALIAS_ROOT=.tmp/provider-tests node -r ./scripts/register-compiled-alias.cjs --test .tmp/provider-tests/tests/*.test.js",
     "clean": "rm -rf .next/types",
     "local": "bash scripts/run-local.sh"
@@ -62,7 +63,7 @@
     "jszip": "^3.10.1",
     "lucide-react": "^0.553.0",
     "motion": "^12.40.0",
-    "next": "^15.4.9",
+    "next": "15.5.18",
     "pannellum": "^2.5.7",
     "pg": "^8.22.0",
     "postcss": "^8.5.6",
@@ -73,6 +74,7 @@
     "zod": "^4.4.3"
   },
   "devDependencies": {
+    "@eslint/eslintrc": "3.3.1",
     "@tailwindcss/postcss": "4.3.1",
     "@tailwindcss/typography": "^0.5.20",
     "@types/jszip": "^3.4.0",
@@ -84,7 +86,7 @@
     "@types/retry": "^0.12.5",
     "@types/three": "^0.184.1",
     "eslint": "9.39.1",
-    "eslint-config-next": "16.0.8",
+    "eslint-config-next": "15.5.18",
     "firebase-tools": "^15.22.0",
     "oxlint": "^1.70.0",
     "tailwindcss": "4.3.1",

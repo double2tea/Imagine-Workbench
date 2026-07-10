@@ -8,7 +8,7 @@ import {
 import { getMediaReferencePromptToken, getMediaReferenceType, mediaReferenceLabel, mediaReferenceTypeFromMime, type MediaReference, type MediaReferenceType } from "@/lib/media-references";
 import { t as globalT, useTranslations } from "@/lib/i18n";
 
-export interface ReferenceImageRef extends MediaReference {}
+export type ReferenceImageRef = MediaReference;
 
 interface ReferenceImagePickerProps {
   addLabel: string;

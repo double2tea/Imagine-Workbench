@@ -83,6 +83,7 @@ pnpm run typecheck
 pnpm run check
 pnpm run check:docker
 pnpm run build
+pnpm start
 pnpm run pages:build
 pnpm run test:providers
 ```
@@ -108,6 +109,8 @@ docker compose up --build
 ```bash
 pnpm run pages:deploy
 ```
+
+Cloudflare Pages 默认使用浏览器 BYOK。Seed Audio 是严格限定的例外：Pages 仅允许 `volcengine:seed-audio-1.0` 通过固定的同源 Edge 路由转发，该路由不会持久化、记录或缓存请求凭据。
 
 如需启用基于 PostgreSQL 和服务端媒体卷的局域网/自托管团队工作区，请使用 `docker-compose.team.yml`，并查看[本地团队部署](docs/zh-CN/deployment/team-local.md)。浏览器 IndexedDB 仍是默认存储模式。
 

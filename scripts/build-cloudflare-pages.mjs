@@ -154,7 +154,7 @@ await rm(path.join(".vercel", "output"), { force: true, recursive: true });
 try {
   await moveRoutesOut();
   console.log("Running @cloudflare/next-on-pages...");
-  const exitCode = await run("pnpm", ["dlx", "@cloudflare/next-on-pages@1"], {
+  const exitCode = await run("pnpm", ["dlx", "@cloudflare/next-on-pages@1.13.16"], {
     ...process.env,
     IMAGINE_CLOUDFLARE_PAGES_BUILD: "1",
     IMAGINE_BROWSER_BYOK: "1",

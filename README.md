@@ -83,6 +83,7 @@ pnpm run typecheck
 pnpm run check
 pnpm run check:docker
 pnpm run build
+pnpm start
 pnpm run test:providers
 ```
 
@@ -110,6 +111,7 @@ pnpm run pages:deploy
 ```
 
 Cloudflare Pages builds enable browser BYOK mode (`NEXT_PUBLIC_IMAGINE_BROWSER_BYOK=1`) and hide classified Node runtime API routes before running the Pages adapter, then restore them locally after the build. In Pages mode, generation calls go from the browser to the selected provider using the user's local provider credentials. Team-mode saved provider secrets stay self-hosted/Node-only.
+Seed Audio is the narrow exception: because its upstream does not expose the required browser CORS path, Pages sends only `volcengine:seed-audio-1.0` through a fixed same-origin Edge route. The route does not persist, log, or cache the request credential.
 Run `pnpm run pages:build` before enabling or manually running Pages deployment.
 
 For opt-in LAN/self-hosted team workspaces backed by PostgreSQL and a server media volume, use `docker-compose.team.yml` and see [Local team deployment](docs/deployment/team-local.md). Browser IndexedDB remains the default storage mode.

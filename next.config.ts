@@ -6,6 +6,7 @@ const projectRoot = path.resolve(process.cwd());
 const isCloudflarePagesBuild = process.env.IMAGINE_CLOUDFLARE_PAGES_BUILD === '1';
 
 const nextConfig: NextConfig = {
+  distDir: process.env.NEXT_DIST_DIR ?? ".next",
   env: {
     NEXT_PUBLIC_APP_VERSION: packageJson.version,
     NEXT_PUBLIC_IMAGINE_BROWSER_BYOK:

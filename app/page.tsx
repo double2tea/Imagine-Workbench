@@ -1,17 +1,13 @@
 'use client';
 
 import React, { useCallback, useMemo, useState, useEffect, useRef } from "react";
+import dynamic from "next/dynamic";
 import { useWorkbenchThemeShellSync } from "@/lib/theme-mode";
 import { createPortal } from "react-dom";
 import { useConfirm } from "@/components/confirm/ConfirmProvider";
-import AgentDock from "@/components/agent/AgentDock";
-import CanvasMaskEditor, { type CanvasEditorMode, type CanvasMaskEditorOutput } from "@/components/CanvasMaskEditor";
-import VisualPromptAdjustEditor from "@/components/VisualPromptAdjustEditor";
-import SaveVoiceProfileDialog, { type SaveVoiceProfileDialogInput } from "@/components/audio/SaveVoiceProfileDialog";
+import type { CanvasEditorMode, CanvasMaskEditorOutput } from "@/components/CanvasMaskEditor";
+import type { SaveVoiceProfileDialogInput } from "@/components/audio/SaveVoiceProfileDialog";
 import FloatingCompareButton from "@/components/assets/FloatingCompareButton";
-import FullscreenPreview from "@/components/assets/FullscreenPreview";
-import AssetLibraryModal from "@/components/library/AssetLibraryModal";
-import PanoramaOverlay from "@/components/panorama/PanoramaOverlay";
 import CreationModeTabs, { type CreationMode } from "@/components/creation/CreationModeTabs";
 
 const CREATION_PANEL_MODES: CreationMode[] = ["image", "video", "audio"];
@@ -22,7 +18,6 @@ import VideoGenerationPanel from "@/components/creation/VideoGenerationPanel";
 import AtReferenceDropdown from "@/components/reference/AtReferenceDropdown";
 import PromptReferenceDropdown from "@/components/reference/PromptReferenceDropdown";
 import type { ReferenceImageRef } from "@/components/reference/ReferenceImagePicker";
-import SettingsModal from "@/components/settings/SettingsModal";
 import AssetGalleryWorkspace from "@/components/workbench/AssetGalleryWorkspace";
 import MobileWorkbenchTabs, { type MobileWorkbenchPanel } from "@/components/workbench/MobileWorkbenchTabs";
 
@@ -153,6 +148,15 @@ import {
 import { useTranslations, t as translate } from "@/lib/i18n";
 import { readFetchError, toErrorMessage } from "@/lib/client-fetch-error";
 import { getClearWorkspaceAssetsMessage } from "@/lib/workspace-messages";
+
+const AgentDock = dynamic(() => import("@/components/agent/AgentDock"), { ssr: false });
+const CanvasMaskEditor = dynamic(() => import("@/components/CanvasMaskEditor"), { ssr: false });
+const VisualPromptAdjustEditor = dynamic(() => import("@/components/VisualPromptAdjustEditor"), { ssr: false });
+const SaveVoiceProfileDialog = dynamic(() => import("@/components/audio/SaveVoiceProfileDialog"), { ssr: false });
+const FullscreenPreview = dynamic(() => import("@/components/assets/FullscreenPreview"), { ssr: false });
+const AssetLibraryModal = dynamic(() => import("@/components/library/AssetLibraryModal"), { ssr: false });
+const PanoramaOverlay = dynamic(() => import("@/components/panorama/PanoramaOverlay"), { ssr: false });
+const SettingsModal = dynamic(() => import("@/components/settings/SettingsModal"), { ssr: false });
 
 type NoticeType = "error" | "info" | "success";
 type MaskDestination = "creative" | "agent";
@@ -875,6 +879,7 @@ export default function Home() {
     updateGenerationTask: workspaceGenerationTaskStorage.update,
     setGenerationTasks,
     setItems,
+    scopeKey: "workspace",
   });
   const {
     generateManualAudio,
