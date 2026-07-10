@@ -295,10 +295,7 @@ Kept generation submit controls usable while tasks are pending, resolved image c
 
 ### Main Changes
 
-- Added a read-only Seed Audio model summary while preserving MiMo's real operation selector.
-- Derived reference limits from model capabilities and synchronized the same summary across workspace and Board.
-- Moved reference media ahead of advanced controls, grouped Seed Audio sound/provenance parameters, and hid disabled metadata fields.
-- Improved form and upload accessibility and made gallery empty-state guidance creation-mode aware.
+(Add details)
 
 ### Git Commits
 
@@ -504,7 +501,10 @@ Clarified Seed Audio as one generic generation function, derived reference const
 
 ### Main Changes
 
-(Add details)
+- Added a read-only Seed Audio model summary while preserving MiMo's real operation selector.
+- Derived reference limits from model capabilities and synchronized the same summary across workspace and Board.
+- Moved reference media ahead of advanced controls, grouped Seed Audio sound/provenance parameters, and hid disabled metadata fields.
+- Improved form and upload accessibility and made gallery empty-state guidance creation-mode aware.
 
 ### Git Commits
 
