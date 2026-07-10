@@ -31,6 +31,30 @@ function isBlockedHostname(hostname: string): boolean {
   return isBlockedIpv6(hostname);
 }
 
+export function assertPublicIpAddress(address: string, code = "unsafe_remote_url"): void {
+  const normalized = normalizeHostname(address);
+  if (isBlockedIpv4(normalized) || isBlockedIpv6(normalized)) {
+    throw new ApiError(502, code, "Provider result URL cannot resolve to local or private network addresses");
+  }
+}
+
+export async function fetchPublicHttpUrlWithRedirectValidation(
+  value: string,
+  init: RequestInit = {},
+  code = "unsafe_remote_url",
+): Promise<Response> {
+  let url = assertPublicHttpUrl(value, code);
+  for (let redirectCount = 0; redirectCount <= 4; redirectCount += 1) {
+    const response = await fetch(url, { ...init, redirect: "manual" });
+    if (![301, 302, 303, 307, 308].includes(response.status)) return response;
+    if (redirectCount === 4) throw new ApiError(502, code, "Provider result URL exceeded the redirect limit");
+    const location = response.headers.get("Location");
+    if (!location) throw new ApiError(502, code, "Provider result redirect is missing Location");
+    url = assertPublicHttpUrl(new URL(location, url).href, code);
+  }
+  throw new ApiError(502, code, "Provider result URL exceeded the redirect limit");
+}
+
 function isBlockedIpv4(hostname: string): boolean {
   const parts = hostname.split(".");
   if (parts.length !== 4) return false;

@@ -9,7 +9,7 @@ import { audioOperationApiError } from "./audio-errors";
 import { ApiError, apiErrorResponse, badRequest, requireApiText } from "./errors";
 import { assertOpenAiCompatibleGatewayAccess } from "./openai-auth";
 import { resolveOpenAiCompatibleProviderConfigForRequest } from "./openai-provider-config";
-import { assertPublicHttpUrl } from "./url-safety";
+import { fetchPublicHttpUrlWithRedirectValidation } from "./url-safety";
 import { REFERENCE_IMAGE_MAX_BYTES, REFERENCE_IMAGE_REQUEST_BODY_MAX_BYTES, dataUriByteSize } from "../reference-images";
 
 const IMAGE_EDIT_OPERATIONS = new Set<ImageEditOperation>(["redraw", "erase", "outpaint", "cutout", "angle", "lighting"]);
@@ -240,9 +240,7 @@ async function openAiImageResponse(imageUrls: string[], responseFormat: ImageRes
 
 async function imageUrlToBase64(imageUrl: string): Promise<string> {
   if (imageUrl.startsWith("data:")) return parseDataUri(imageUrl).base64;
-  const url = assertPublicHttpUrl(imageUrl, "unsafe_image_result_url");
-
-  const response = await fetch(url);
+  const response = await fetchPublicHttpUrlWithRedirectValidation(imageUrl, {}, "unsafe_image_result_url");
   if (!response.ok) throw new Error(`Image result download failed with HTTP ${response.status}`);
   const contentType = response.headers.get("Content-Type") ?? "";
   if (!contentType.startsWith("image/")) throw new Error("Image result URL did not return an image");

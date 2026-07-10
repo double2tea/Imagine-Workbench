@@ -6,6 +6,7 @@ import {
   type ModelKind,
   type ModelOption,
 } from "./model-catalog";
+import { getProviderMeta, isKnownProvider } from "./registry";
 
 export type DynamicModelKind = ModelKind | "all";
 
@@ -13,6 +14,13 @@ export function isSelectableModelOptionForKind(option: ModelOption, kind: Dynami
   const parsed = tryParseProviderModel(option.value, "12ai");
   if (!parsed) return false;
   if (kind === "chat") return true;
+  if (!isKnownProvider(parsed.provider)) {
+    const meta = getProviderMeta(parsed.provider);
+    if (kind === "all") return true;
+    if (kind === "image") return !parsed.async && meta.supportsImage;
+    if (kind === "video") return meta.supportsVideo;
+    return meta.supportsAudio;
+  }
   if (kind === "all") return isKnownMediaModel(option.value) || !isMediaLookingModelId(parsed.model);
   if (kind === "image" && parsed.async) return false;
   const capability = getOptionalModelCapability(option.value, kind);

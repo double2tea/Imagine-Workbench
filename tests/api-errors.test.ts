@@ -2,7 +2,7 @@ import assert from "node:assert/strict";
 import test from "node:test";
 
 import { audioOperationApiError } from "../lib/api/audio-errors";
-import { ApiError, apiErrorResponse, badRequest, requireApiText } from "../lib/api/errors";
+import { ApiError, apiErrorResponse, badRequest, requireApiText, upstreamApiError } from "../lib/api/errors";
 import { postJson } from "../lib/providers/utils";
 
 test("requireApiText maps missing values to a structured 400 error", () => {
@@ -39,6 +39,17 @@ test("apiErrorResponse converts unknown failures to internal errors", () => {
   assert.deepEqual(response.body, {
     error: "Provider failed",
     code: "internal_error",
+  });
+});
+
+test("upstreamApiError preserves rate-limit status", () => {
+  assert.deepEqual(apiErrorResponse(upstreamApiError(429, "slow down"), "fallback"), {
+    status: 429,
+    body: {
+      error: "slow down",
+      code: "provider_rate_limited",
+      details: { providerStatus: 429 },
+    },
   });
 });
 

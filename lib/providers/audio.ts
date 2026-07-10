@@ -1,5 +1,5 @@
 import { t } from "@/lib/i18n-core";
-import { generateRunningHubMedia, getRunningHubMediaStatus, downloadRunningHubMedia } from "./image";
+import { generateRunningHubMedia, getRunningHubMediaStatus, downloadRunningHubMedia, type MediaResultFetcher } from "./image";
 import { getRunningHubStandardModel } from "./runninghub";
 import {
   generateMimoTts,
@@ -176,9 +176,14 @@ export async function getAudioStatus(config: ProviderConfig, taskId: string): Pr
   return getRunningHubMediaStatus(config, "audio", taskId);
 }
 
-export async function downloadAudio(config: ProviderConfig, taskId: string, outputIndex = 0): Promise<Response> {
+export async function downloadAudio(
+  config: ProviderConfig,
+  taskId: string,
+  outputIndex = 0,
+  fetcher: MediaResultFetcher = fetch,
+): Promise<Response> {
   if (config.provider !== "runninghub") {
     throw new Error(`${config.provider} audio download is not supported yet`);
   }
-  return downloadRunningHubMedia(config, "audio", taskId, outputIndex);
+  return downloadRunningHubMedia(config, "audio", taskId, outputIndex, fetcher);
 }

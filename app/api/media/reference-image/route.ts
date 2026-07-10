@@ -1,5 +1,6 @@
 import { NextRequest, NextResponse } from "next/server";
 import { REFERENCE_IMAGE_REQUEST_BODY_MAX_BYTES } from "@/lib/reference-images";
+import { readBoundedJsonRequest } from "@/lib/api/request-body";
 
 export const runtime = "edge";
 
@@ -9,7 +10,7 @@ interface ReferenceImageBody {
 
 export async function POST(req: NextRequest) {
   try {
-    const body = (await req.json()) as ReferenceImageBody;
+    const body = await readBoundedJsonRequest(req, 64 * 1024) as ReferenceImageBody;
     if (typeof body.url !== "string" || body.url.trim().length === 0) {
       return NextResponse.json({ error: "Reference image URL is required" }, { status: 400 });
     }
@@ -19,7 +20,7 @@ export async function POST(req: NextRequest) {
     const allowError = getAllowedReferenceImageError(imageUrl);
     if (allowError) return NextResponse.json({ error: allowError }, { status: 400 });
 
-    const response = await fetch(imageUrl.href, { headers: { Accept: "image/*" } });
+    const response = await fetchAllowedReferenceImage(imageUrl);
     if (!response.ok) {
       return NextResponse.json({ error: `Reference image download failed: HTTP ${response.status}` }, { status: 502 });
     }
@@ -50,6 +51,21 @@ export async function POST(req: NextRequest) {
     const message = error instanceof Error ? error.message : "Reference image download failed";
     return NextResponse.json({ error: message }, { status: 500 });
   }
+}
+
+async function fetchAllowedReferenceImage(initialUrl: URL): Promise<Response> {
+  let url = initialUrl;
+  for (let redirectCount = 0; redirectCount <= 4; redirectCount += 1) {
+    const allowError = getAllowedReferenceImageError(url);
+    if (allowError) throw new Error(allowError);
+    const response = await fetch(url.href, { headers: { Accept: "image/*" }, redirect: "manual" });
+    if (![301, 302, 303, 307, 308].includes(response.status)) return response;
+    if (redirectCount === 4) throw new Error("Reference image redirect limit exceeded");
+    const location = response.headers.get("Location");
+    if (!location) throw new Error("Reference image redirect is missing Location");
+    url = new URL(location, url);
+  }
+  throw new Error("Reference image redirect limit exceeded");
 }
 
 function parseReferenceImageUrl(value: string): URL | null {

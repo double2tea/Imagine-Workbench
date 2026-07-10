@@ -1,5 +1,6 @@
 import { NextRequest, NextResponse } from "next/server";
 import { apiErrorResponse, badRequest, requireApiText } from "@/lib/api/errors";
+import { fetchPublicHttpUrl } from "@/lib/api/public-http-fetch";
 import { downloadVideo } from "@/lib/providers/video";
 import { resolveProviderConfigForRequest } from "@/lib/providers/team-config";
 import { optionalText, parseMediaOperationName } from "@/lib/providers/utils";
@@ -21,7 +22,12 @@ export async function POST(req: NextRequest) {
     }
 
     const config = await resolveProviderConfigForRequest(req, operation.provider);
-    return await downloadVideo(config, operation.id, optionalText(body.model), optionalOutputIndex(body.outputIndex));
+    return await downloadVideo(config, operation.id, optionalText(body.model), optionalOutputIndex(body.outputIndex), (url, init) =>
+      fetchPublicHttpUrl(url, {
+        code: "unsafe_video_result_url",
+        headers: init?.headers,
+        signal: init?.signal ?? undefined,
+      }));
   } catch (err) {
     const response = apiErrorResponse(err, "Failed to download video file");
     if (response.status >= 500) console.error("Video proxy download failed:", err);

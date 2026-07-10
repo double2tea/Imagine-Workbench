@@ -147,7 +147,7 @@ export const PROVIDER_REGISTRY = [
       envBaseUrl: "SEED_AUDIO_BASE_URL",
       defaultBaseUrl: "https://openspeech.bytedance.com",
       apiKeyPlaceholder: "your_volcengine_tts_api_key",
-      credentialHint: "Uses Volcengine / BytePlus OpenSpeech tts/create X-Api-Key authentication.",
+      credentialHint: "Cloudflare Pages sends this key through a fixed same-origin Seed Audio Edge proxy. The proxy does not persist or cache the key.",
       endpointInfo: [
         "Seed Audio: https://openspeech.bytedance.com/api/v3/tts/create",
       ],
@@ -181,7 +181,7 @@ export function getProviderMeta(provider: AiProvider): ProviderMeta {
     hasEditableBaseUrl: true,
     supportsImage: true,
     supportsVideo: true,
-    supportsAudio: true,
+    supportsAudio: false,
     supportsChat: true,
   };
 }

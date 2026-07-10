@@ -1,5 +1,6 @@
 import { NextRequest, NextResponse } from "next/server";
 import { apiErrorResponse, badRequest, requireApiText } from "@/lib/api/errors";
+import { fetchPublicHttpUrl } from "@/lib/api/public-http-fetch";
 import { downloadAudio } from "@/lib/providers/audio";
 import { resolveProviderConfigForRequest } from "@/lib/providers/team-config";
 import { parseMediaOperationName } from "@/lib/providers/utils";
@@ -20,7 +21,12 @@ export async function POST(req: NextRequest) {
     }
 
     const config = await resolveProviderConfigForRequest(req, operation.provider);
-    return await downloadAudio(config, operation.id, optionalOutputIndex(body.outputIndex));
+    return await downloadAudio(config, operation.id, optionalOutputIndex(body.outputIndex), (url, init) =>
+      fetchPublicHttpUrl(url, {
+        code: "unsafe_audio_result_url",
+        headers: init?.headers,
+        signal: init?.signal ?? undefined,
+      }));
   } catch (err) {
     const response = apiErrorResponse(err, "Failed to download audio file");
     if (response.status >= 500) console.error("Audio proxy download failed:", err);

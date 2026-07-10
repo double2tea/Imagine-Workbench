@@ -16,7 +16,7 @@ import {
   runningHubPresetNodeInfoList,
   runningHubResolvedNodeInfoAllowsEmptyPrompt,
 } from "../lib/providers/runninghub-node-info";
-import { parseRunningHubBindingsFromJsonText } from "../lib/board/runninghub-bindings";
+import { normalizePersistedRunningHubBindings, parseRunningHubBindingsFromJsonText } from "../lib/board/runninghub-bindings";
 import { ChatJsonParseError, createChatCompletionText, createChatCompletionWithTools, parseJsonObjectText } from "../lib/providers/chat";
 import { generateAudio, getAudioStatus } from "../lib/providers/audio";
 import { downloadRunningHubMedia, generateRunningHubMedia, getRunningHubMediaStatus } from "../lib/providers/image";
@@ -30,6 +30,28 @@ const runningHubConfig: ProviderConfig = {
   baseUrl: "https://www.runninghub.cn",
   videoBaseUrl: "https://www.runninghub.cn",
 };
+
+test("persisted RunningHub bindings preserve imported display metadata", () => {
+  const [binding] = normalizePersistedRunningHubBindings([{
+    id: "binding_1",
+    nodeId: "12",
+    nodeName: "Model parameters",
+    fieldName: "ratio",
+    fieldData: "raw-field-data",
+    description: "输出比例",
+    descriptionEn: "Output ratio",
+    label: "Ratio",
+    source: "literal",
+    value: "16:9",
+    valueType: "text",
+    options: [{ label: "16:9", value: "16:9", description: "Wide" }],
+    deliveryMode: "raw",
+  }]);
+  assert.equal(binding?.nodeName, "Model parameters");
+  assert.equal(binding?.fieldData, "raw-field-data");
+  assert.equal(binding?.descriptionEn, "Output ratio");
+  assert.deepEqual(binding?.options, [{ label: "16:9", value: "16:9", description: "Wide" }]);
+});
 
 test("runninghub standard image model builds documented node field body", () => {
   const model = getRunningHubStandardModel("api:/openapi/v2/rhart-image/f-2-dev/text-to-image", "image");
@@ -1344,11 +1366,11 @@ test("runninghub audio download preserves upstream audio extension", async () =>
         msg: "success",
         data: [
           { fileUrl: "https://runninghub.example/output-a.wav", fileType: "wav" },
-          { fileUrl: "https://runninghub.example/output-b.wav", fileType: "wav" },
+          { fileUrl: "https://93.184.216.34/output-b.wav", fileType: "wav" },
         ],
       });
     }
-    if (url === "https://runninghub.example/output-b.wav") {
+    if (url === "https://93.184.216.34/output-b.wav") {
       return new Response("audio-data-b", { headers: { "Content-Type": "audio/wav" } });
     }
     return Response.json({ code: 999, msg: "unexpected endpoint" }, { status: 500 });

@@ -40,6 +40,13 @@ export function resolveProviderConfig(
   const credentialScope = options.credentialScope ?? "default";
   const requestKey = readProviderRequestApiKey(req, options);
   const headerBaseUrl = trimCredential(req.headers.get(providerBaseUrlHeaderName(credentialScope)) ?? "");
+  if (headerBaseUrl && !requestKey) {
+    throw new ApiError(
+      400,
+      "provider_base_url_requires_request_api_key",
+      `${providerBaseUrlHeaderName(credentialScope)} requires ${providerApiKeyHeaderName(credentialScope)} or a provider Authorization bearer token`,
+    );
+  }
   const providerLabel = optionalText(req.headers.get("x-ai-provider-label")) ?? optionalText(options.providerLabelOverride);
   const envKey = trimCredential(resolveProviderApiKey(provider, credentialScope));
   const overrideKey = trimCredential(options.apiKeyOverride ?? "");

@@ -1,6 +1,7 @@
 import type { GenerateVideoInput, GenerateVideoResult, MediaStatusResult, ProviderConfig } from "./types";
+import { limitedResponseBody } from "@/lib/api/response-body";
 import { isAudioDataUri, isImageDataUri, isVideoDataUri } from "@/lib/reference-images";
-import { generateRunningHubMedia, getRunningHubMediaStatus } from "./image";
+import { generateRunningHubMedia, getRunningHubMediaStatus, type MediaResultFetcher } from "./image";
 import {
   aspectRatioToVideoSize,
   authHeaders,
@@ -168,12 +169,18 @@ export async function getVideoStatus(config: ProviderConfig, taskId: string, mod
   };
 }
 
-export async function downloadVideo(config: ProviderConfig, taskId: string, model?: string, outputIndex = 0): Promise<Response> {
+export async function downloadVideo(
+  config: ProviderConfig,
+  taskId: string,
+  model?: string,
+  outputIndex = 0,
+  fetcher: MediaResultFetcher = fetch,
+): Promise<Response> {
   if (config.provider === "runninghub") {
     const result = await getRunningHubMediaStatus(config, "video", taskId);
     const url = result.urls?.[outputIndex] ?? (outputIndex === 0 ? result.url : undefined);
     if (!url) throw new Error(`Video task is complete but did not expose video #${outputIndex + 1}`);
-    return downloadVideoUrl(config, config.baseUrl, url);
+    return downloadVideoUrl(config, config.baseUrl, url, fetcher);
   }
 
   const task = parseVideoTaskId(config, taskId, model);
@@ -187,17 +194,17 @@ export async function downloadVideo(config: ProviderConfig, taskId: string, mode
     videoContentEndpointUrl(config, baseUrl, task.id);
   if (!videoUrl) throw new Error("Video task is complete but did not expose a video URL");
 
-  return downloadVideoUrl(config, baseUrl, videoUrl);
+  return downloadVideoUrl(config, baseUrl, videoUrl, fetcher);
 }
 
-async function downloadVideoUrl(config: ProviderConfig, baseUrl: string, videoUrl: string): Promise<Response> {
-  const res = await fetch(videoUrl, {
+async function downloadVideoUrl(config: ProviderConfig, baseUrl: string, videoUrl: string, fetcher: MediaResultFetcher): Promise<Response> {
+  const res = await fetcher(videoUrl, {
     headers: videoUrl.startsWith(baseUrl) ? authHeaders(config) : {},
     signal: config.signal,
   });
   if (!res.ok) throw new Error(`Failed to download video: HTTP ${res.status}`);
 
-  return new Response(res.body, {
+  return new Response(limitedResponseBody(res, 512 * 1024 * 1024), {
     headers: {
       "Content-Type": res.headers.get("Content-Type") ?? "video/mp4",
       "Content-Disposition": `inline; filename="video_${Date.now()}.mp4"`,

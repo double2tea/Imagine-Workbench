@@ -1,5 +1,6 @@
 import { NextRequest, NextResponse } from "next/server";
 import { apiErrorResponse, badRequest, requireApiText } from "@/lib/api/errors";
+import { fetchPublicHttpUrl } from "@/lib/api/public-http-fetch";
 import { downloadImage } from "@/lib/providers/image";
 import { resolveProviderConfigForRequest } from "@/lib/providers/team-config";
 import { parseMediaOperationName } from "@/lib/providers/utils";
@@ -20,7 +21,12 @@ export async function POST(req: NextRequest) {
     }
 
     const config = await resolveProviderConfigForRequest(req, operation.provider);
-    return await downloadImage(config, operation.id, optionalOutputIndex(body.outputIndex));
+    return await downloadImage(config, operation.id, optionalOutputIndex(body.outputIndex), (url, init) =>
+      fetchPublicHttpUrl(url, {
+        code: "unsafe_image_result_url",
+        headers: init?.headers,
+        signal: init?.signal ?? undefined,
+      }));
   } catch (err) {
     const response = apiErrorResponse(err, "Failed to download image file");
     if (response.status >= 500) console.error("Image proxy download failed:", err);

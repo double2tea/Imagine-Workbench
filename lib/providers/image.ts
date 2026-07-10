@@ -1,5 +1,6 @@
 import type { AiProvider } from "./model-catalog";
-import { ApiError } from "../api/errors";
+import { ApiError, upstreamApiError } from "../api/errors";
+import { limitedResponseBody } from "../api/response-body";
 import { isKnownProvider } from "./registry";
 import {
   buildRunningHubStandardBody,
@@ -241,17 +242,26 @@ export async function editImage(config: ProviderConfig, input: EditImageInput): 
   return generate12AiGeminiImage(config, editInputToGenerateInput(input));
 }
 
-export async function downloadImage(config: ProviderConfig, taskId: string, outputIndex = 0): Promise<Response> {
+export type MediaResultFetcher = (url: string, init?: RequestInit) => Promise<Response>;
+
+export async function downloadImage(
+  config: ProviderConfig,
+  taskId: string,
+  outputIndex = 0,
+  fetcher: MediaResultFetcher = fetch,
+): Promise<Response> {
   const status = await getAsyncImageStatus(config, taskId);
   const url = readStatusUrlAt(status, outputIndex);
   if (!url) throw new Error(`Image task is complete but did not expose image #${outputIndex + 1}`);
 
-  const res = await fetch(url, { signal: config.signal });
+  const res = await fetcher(url, { signal: config.signal });
   if (!res.ok) throw new Error(`Failed to download image: HTTP ${res.status}`);
+  const contentType = res.headers.get("Content-Type") ?? "image/png";
+  if (!contentType.startsWith("image/")) throw new Error("Image result URL did not return an image");
 
-  return new Response(res.body, {
+  return new Response(limitedResponseBody(res, 90 * 1024 * 1024), {
     headers: {
-      "Content-Type": res.headers.get("Content-Type") ?? "image/png",
+      "Content-Type": contentType,
       "Content-Disposition": `inline; filename="image_${Date.now()}.png"`,
       "Cache-Control": "public, max-age=31536000",
     },
@@ -340,15 +350,17 @@ export async function downloadRunningHubMedia(
   mediaType: ProviderMediaType,
   taskId: string,
   outputIndex = 0,
+  fetcher: MediaResultFetcher = fetch,
 ): Promise<Response> {
   const status = await getRunningHubMediaStatus(config, mediaType, taskId);
   const url = readStatusUrlAt(status, outputIndex);
   if (!url) throw new Error(`RunningHub ${mediaType} task is complete but did not expose result #${outputIndex + 1}`);
 
-  const res = await fetch(url, { signal: config.signal });
+  const res = await fetcher(url, { signal: config.signal });
   if (!res.ok) throw new Error(`Failed to download RunningHub ${mediaType}: HTTP ${res.status}`);
+  const maxBytes = mediaType === "video" ? 512 * 1024 * 1024 : mediaType === "audio" ? 128 * 1024 * 1024 : 90 * 1024 * 1024;
 
-  return new Response(res.body, {
+  return new Response(limitedResponseBody(res, maxBytes), {
     headers: {
       "Content-Type": runningHubDownloadContentType(res, mediaType),
       "Content-Disposition": `inline; filename="${mediaType}_${Date.now()}.${runningHubDownloadExtension(res, url, mediaType)}"`,
@@ -484,7 +496,7 @@ async function generateModelScopeImage(config: ProviderConfig, input: GenerateIm
   });
   const json = parseProviderResponseBody(await response.text()) as ModelScopeImageCreateResponse;
   if (!response.ok) {
-    throw new Error(readProviderError(json) ?? `ModelScope image request failed with HTTP ${response.status}`);
+    throw upstreamApiError(response.status, readProviderError(json) ?? `ModelScope image request failed with HTTP ${response.status}`);
   }
 
   const taskId = json.task_id ?? json.id;
@@ -510,7 +522,7 @@ async function getModelScopeImageStatus(config: ProviderConfig, taskId: string):
   });
   const json = parseProviderResponseBody(await response.text()) as ModelScopeImageStatusResponse;
   if (!response.ok) {
-    throw new Error(readProviderError(json) ?? `ModelScope image status failed with HTTP ${response.status}`);
+    throw upstreamApiError(response.status, readProviderError(json) ?? `ModelScope image status failed with HTTP ${response.status}`);
   }
 
   const status = (json.task_status ?? json.status ?? "PENDING").toLowerCase();
@@ -1172,7 +1184,7 @@ async function generate12AiGeminiImage(config: ProviderConfig, input: GenerateIm
 
   const json = parseProviderResponseBody(await response.text());
   if (!response.ok) {
-    throw new Error(readProviderError(json) ?? `Gemini image request failed with HTTP ${response.status}`);
+    throw upstreamApiError(response.status, readProviderError(json) ?? `Gemini image request failed with HTTP ${response.status}`);
   }
 
   const data = readGeminiInlineImage(json);

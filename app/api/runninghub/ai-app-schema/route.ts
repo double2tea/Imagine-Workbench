@@ -1,4 +1,5 @@
 import { NextRequest, NextResponse } from "next/server";
+import { apiErrorResponse } from "@/lib/api/errors";
 import { fetchRunningHubAiAppSchema } from "@/lib/providers/runninghub-app";
 import { resolveProviderConfigForRequest } from "@/lib/providers/team-config";
 
@@ -22,8 +23,9 @@ export async function POST(req: NextRequest) {
     if (error instanceof RunningHubSchemaRequestError) {
       return NextResponse.json({ error: message }, { status: 400 });
     }
-    console.error("RunningHub AI App schema route error:", error);
-    return NextResponse.json({ error: message }, { status: 500 });
+    const response = apiErrorResponse(error, "RunningHub AI App schema request failed");
+    if (response.status >= 500) console.error("RunningHub AI App schema route error:", error);
+    return NextResponse.json(response.body, { status: response.status });
   }
 }
 

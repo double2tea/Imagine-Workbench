@@ -3,6 +3,8 @@ import test from "node:test";
 
 import { formatDisplayedAspectRatio } from "../lib/media-display";
 import { readRunningHubNodeInfoList } from "../lib/providers/runninghub-node-info";
+import { dynamicProviderModelOption } from "../lib/providers/model-gating";
+import { getProviderMeta } from "../lib/providers/registry";
 import {
   aspectRatioToOpenAiSize,
   aspectRatioToVideoSize,
@@ -101,6 +103,17 @@ test("resolveProviderConfig uses request credentials before injected team creden
   assert.equal(requestConfig.baseUrl, "https://api.xiaomimimo.com/v1");
 });
 
+test("resolveProviderConfig never combines a request Base URL with a trusted credential", () => {
+  assert.throws(
+    () => resolveProviderConfig(
+      new Request("https://local.test", { headers: { "x-ai-base-url": "https://attacker.example/v1" } }),
+      "mimo",
+      { apiKeyOverride: "team-secret" },
+    ),
+    (error: unknown) => error instanceof Error && error.message.includes("x-ai-base-url requires x-ai-api-key"),
+  );
+});
+
 test("resolveProviderConfig uses Volcengine audio credential scope", () => {
   const config = resolveProviderConfig(
     new Request("https://local.test", {
@@ -184,4 +197,13 @@ test("readRunningHubNodeInfoList parses route binding payloads", () => {
       },
     ],
   );
+});
+
+test("custom provider capability metadata matches executable adapters", () => {
+  assert.equal(getProviderMeta("custom-api").supportsImage, true);
+  assert.equal(getProviderMeta("custom-api").supportsVideo, true);
+  assert.equal(getProviderMeta("custom-api").supportsAudio, false);
+  assert.ok(dynamicProviderModelOption("custom-api", "image-model", "image", "Custom"));
+  assert.ok(dynamicProviderModelOption("custom-api", "video-model", "video", "Custom"));
+  assert.equal(dynamicProviderModelOption("custom-api", "audio-model", "audio", "Custom"), null);
 });

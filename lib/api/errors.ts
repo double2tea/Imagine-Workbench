@@ -22,6 +22,16 @@ export function badRequest(message: string, code = "bad_request", details?: unkn
   return new ApiError(400, code, message, details);
 }
 
+export function upstreamApiError(status: number, message: string): ApiError {
+  const codeByStatus: Partial<Record<number, string>> = {
+    401: "provider_unauthorized",
+    403: "provider_forbidden",
+    429: "provider_rate_limited",
+  };
+  const code = codeByStatus[status] ?? "provider_error";
+  return new ApiError(status, code, message, { providerStatus: status });
+}
+
 export function apiErrorResponse(error: unknown, fallbackMessage: string): {
   body: ApiErrorResponse;
   status: number;

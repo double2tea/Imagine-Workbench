@@ -1,6 +1,7 @@
 import { NextRequest, NextResponse } from "next/server";
 import { ApiError, apiErrorResponse, requireApiText } from "@/lib/api/errors";
-import { assertPublicHttpUrl } from "@/lib/api/url-safety";
+import { readBoundedJsonRequest } from "@/lib/api/request-body";
+import { fetchPublicHttpUrl, limitedResponseBody, readResponseBytesWithLimit } from "@/lib/api/public-http-fetch";
 import { DEFAULT_IMAGE_MODEL, getImageModelCapabilities, getImageResolutionOptions, getModelCapability, parseProviderModel, ProviderModelParseError } from "@/lib/providers/model-catalog";
 import { ModelCapabilityValidationError, validateInputModalityReferences } from "@/lib/providers/model-capabilities";
 import { generateImage } from "@/lib/providers/image";
@@ -38,10 +39,7 @@ class ImageRequestValidationError extends Error {}
 
 export async function POST(req: NextRequest) {
   try {
-    const bodySizeError = getRequestBodySizeError(req);
-    if (bodySizeError) return NextResponse.json({ error: bodySizeError }, { status: 413 });
-
-    const body = (await req.json()) as GenerateImageBody;
+    const body = await readBoundedJsonRequest(req, REFERENCE_IMAGE_REQUEST_BODY_MAX_BYTES) as GenerateImageBody;
     const modelValue = optionalText(body.model) ?? DEFAULT_IMAGE_MODEL;
     const parsed = parseProviderModel(modelValue, "12ai");
     const isRunningHubImageTask = parsed.provider === "runninghub" && isRunningHubTaskTarget(parsed.model, "image");
@@ -211,7 +209,7 @@ function isRecord(value: unknown): value is Record<string, unknown> {
 }
 
 async function imageUrlResponse(imageUrl: string, source: string): Promise<Response> {
-  const response = await fetch(assertPublicHttpUrl(imageUrl, "unsafe_image_result_url"));
+  const response = await fetchPublicHttpUrl(imageUrl, { code: "unsafe_image_result_url" });
   if (!response.ok) {
     throw new Error(`Image result download failed: HTTP ${response.status}`);
   }
@@ -221,7 +219,7 @@ async function imageUrlResponse(imageUrl: string, source: string): Promise<Respo
     throw new Error("Image result is not an image response");
   }
 
-  return new Response(response.body, {
+  return new Response(limitedResponseBody(response, REFERENCE_IMAGE_REQUEST_BODY_MAX_BYTES), {
     headers: {
       "Content-Type": contentType,
       "Cache-Control": "no-store",
@@ -248,7 +246,7 @@ async function localizeImageResultUrl(imageUrl: string): Promise<string> {
     throw new Error("Image result URL format is not supported");
   }
 
-  const response = await fetch(assertPublicHttpUrl(imageUrl, "unsafe_image_result_url"));
+  const response = await fetchPublicHttpUrl(imageUrl, { code: "unsafe_image_result_url" });
   if (!response.ok) {
     throw new Error(`Image result download failed: HTTP ${response.status}`);
   }
@@ -258,10 +256,11 @@ async function localizeImageResultUrl(imageUrl: string): Promise<string> {
     throw new Error("Image result is not an image response");
   }
 
-  return `data:${contentType};base64,${arrayBufferToBase64(await response.arrayBuffer())}`;
+  const bytes = await readResponseBytesWithLimit(response, REFERENCE_IMAGE_REQUEST_BODY_MAX_BYTES);
+  return `data:${contentType};base64,${arrayBufferToBase64(bytes.buffer.slice(bytes.byteOffset, bytes.byteOffset + bytes.byteLength))}`;
 }
 
-function arrayBufferToBase64(buffer: ArrayBuffer): string {
+function arrayBufferToBase64(buffer: ArrayBufferLike): string {
   const bytes = new Uint8Array(buffer);
   let binary = "";
   const chunkSize = 0x8000;
@@ -331,15 +330,6 @@ function greatestCommonDivisor(a: number, b: number): number {
     right = next;
   }
   return left;
-}
-
-function getRequestBodySizeError(req: NextRequest): string | null {
-  const contentLength = req.headers.get("content-length");
-  if (!contentLength) return null;
-
-  const bytes = Number(contentLength);
-  if (!Number.isFinite(bytes) || bytes <= REFERENCE_IMAGE_REQUEST_BODY_MAX_BYTES) return null;
-  return "Reference image request body is too large, please compress or remove reference images and retry";
 }
 
 function readReferenceImages(referenceImages: unknown, referenceImage: unknown): string[] {

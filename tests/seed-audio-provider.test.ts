@@ -174,6 +174,7 @@ test("Seed Audio browser edge route uses audio-scoped request credentials", asyn
     }));
 
     assert.equal(response.status, 200);
+    assert.equal(response.headers.get("Cache-Control"), "no-store");
     const body = await response.json() as {
       audioBase64?: unknown;
       format?: unknown;

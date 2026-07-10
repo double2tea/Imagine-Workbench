@@ -1,5 +1,6 @@
 import { NextRequest, NextResponse } from "next/server";
 import { apiErrorResponse, requireApiText } from "@/lib/api/errors";
+import { readBoundedJsonRequest } from "@/lib/api/request-body";
 import { DEFAULT_VIDEO_MODEL, getModelCapability, parseProviderModel, ProviderModelParseError } from "@/lib/providers/model-catalog";
 import { ModelCapabilityValidationError, validateInputModalityReferences } from "@/lib/providers/model-capabilities";
 import { generateVideo } from "@/lib/providers/video";
@@ -35,10 +36,7 @@ interface GenerateVideoBody {
 
 export async function POST(req: NextRequest) {
   try {
-    const bodySizeError = getRequestBodySizeError(req);
-    if (bodySizeError) return NextResponse.json({ error: bodySizeError }, { status: 413 });
-
-    const body = (await req.json()) as GenerateVideoBody;
+    const body = await readBoundedJsonRequest(req, REFERENCE_IMAGE_REQUEST_BODY_MAX_BYTES) as GenerateVideoBody;
     const modelValue = optionalText(body.model) ?? DEFAULT_VIDEO_MODEL;
     const parsed = parseProviderModel(modelValue, "12ai");
     const config = await resolveProviderConfigForRequest(req, parsed.provider);
@@ -92,15 +90,6 @@ export async function POST(req: NextRequest) {
 
 function readReferenceMode(value: unknown): "reference" | "firstLast" | undefined {
   return value === "reference" || value === "firstLast" ? value : undefined;
-}
-
-function getRequestBodySizeError(req: NextRequest): string | null {
-  const contentLength = req.headers.get("content-length");
-  if (!contentLength) return null;
-
-  const bytes = Number(contentLength);
-  if (!Number.isFinite(bytes) || bytes <= REFERENCE_IMAGE_REQUEST_BODY_MAX_BYTES) return null;
-  return "Reference media request body is too large, please compress or remove reference media and retry";
 }
 
 function readReferenceMedia(referenceMedia: unknown, images: unknown, image: unknown, lastFrame: unknown): ReferenceMedia[] {

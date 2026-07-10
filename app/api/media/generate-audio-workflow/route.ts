@@ -1,5 +1,6 @@
 import { NextRequest, NextResponse } from "next/server";
 import { apiErrorResponse, badRequest, requireApiText } from "@/lib/api/errors";
+import { readBoundedJsonRequest } from "@/lib/api/request-body";
 import { isRunningHubWorkflowAudioTarget } from "@/lib/audio-generation-routing";
 import { mediaReferenceTypeFromBase64DataUri, type MediaReferenceType } from "@/lib/media-references";
 import { getReferenceMediaPayloadError, REFERENCE_IMAGE_REQUEST_BODY_MAX_BYTES } from "@/lib/reference-images";
@@ -22,10 +23,7 @@ interface GenerateAudioBody {
 
 export async function POST(req: NextRequest) {
   try {
-    const bodySizeError = getRequestBodySizeError(req);
-    if (bodySizeError) return NextResponse.json({ error: bodySizeError, code: "payload_too_large" }, { status: 413 });
-
-    const body = (await req.json()) as GenerateAudioBody;
+    const body = await readBoundedJsonRequest(req, REFERENCE_IMAGE_REQUEST_BODY_MAX_BYTES) as GenerateAudioBody;
     const modelValue = requireApiText(body.model, "model");
     const parsed = parseProviderModel(modelValue, "runninghub");
     if (parsed.provider !== "runninghub") {
@@ -72,15 +70,6 @@ export async function POST(req: NextRequest) {
     if (response.status >= 500) console.error("RunningHub audio generation route error:", err);
     return NextResponse.json(response.body, { status: response.status });
   }
-}
-
-function getRequestBodySizeError(req: NextRequest): string | null {
-  const contentLength = req.headers.get("content-length");
-  if (!contentLength) return null;
-
-  const bytes = Number(contentLength);
-  if (!Number.isFinite(bytes) || bytes <= REFERENCE_IMAGE_REQUEST_BODY_MAX_BYTES) return null;
-  return "Reference media request body is too large, please compress or remove reference media and retry";
 }
 
 function readReferenceMedia(referenceMedia: unknown): ReferenceMedia[] {

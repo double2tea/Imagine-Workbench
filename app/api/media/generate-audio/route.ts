@@ -1,6 +1,7 @@
 import { NextRequest, NextResponse } from "next/server";
 import { z } from "zod";
 import { audioOperationApiError } from "@/lib/api/audio-errors";
+import { readBoundedJsonRequest } from "@/lib/api/request-body";
 import { apiErrorResponse, badRequest, requireApiText } from "@/lib/api/errors";
 import { isRunningHubWorkflowAudioTarget } from "@/lib/audio-generation-routing";
 import { readOptionalAudioFormat } from "@/lib/audio-operation-rules";
@@ -37,10 +38,7 @@ const audioGenerateBodySchema = z.object({
 
 export async function POST(req: NextRequest) {
   try {
-    const bodySizeError = getRequestBodySizeError(req);
-    if (bodySizeError) return NextResponse.json({ error: bodySizeError, code: "payload_too_large" }, { status: 413 });
-
-    const body = audioGenerateBodySchema.parse(await req.json());
+    const body = audioGenerateBodySchema.parse(await readBoundedJsonRequest(req, REFERENCE_IMAGE_REQUEST_BODY_MAX_BYTES));
     if (body.mode === "voice_clone" && body.voiceCloneConsentAccepted !== true) {
       throw badRequest("Voice cloning requires confirming reference audio authorization first", "voice_clone_consent_required");
     }
@@ -104,15 +102,6 @@ export async function POST(req: NextRequest) {
     if (response.status >= 500) console.error("Audio operation route error:", err);
     return NextResponse.json(response.body, { status: response.status });
   }
-}
-
-function getRequestBodySizeError(req: NextRequest): string | null {
-  const contentLength = req.headers.get("content-length");
-  if (!contentLength) return null;
-
-  const bytes = Number(contentLength);
-  if (!Number.isFinite(bytes) || bytes <= REFERENCE_IMAGE_REQUEST_BODY_MAX_BYTES) return null;
-  return "Reference media request body is too large, please compress or remove reference media and retry";
 }
 
 function readReferenceMedia(referenceMedia: unknown): ReferenceMedia[] {

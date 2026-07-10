@@ -1,5 +1,6 @@
 import { z } from "zod";
 import { audioOperationApiError } from "@/lib/api/audio-errors";
+import { readBoundedJsonRequest } from "@/lib/api/request-body";
 import { apiErrorResponse, badRequest, requireApiText } from "@/lib/api/errors";
 import { isRunningHubWorkflowAudioTarget } from "@/lib/audio-generation-routing";
 import { readOptionalAudioFormat } from "@/lib/audio-operation-rules";
@@ -33,10 +34,7 @@ const seedAudioGenerateBodySchema = z.object({
 
 export async function postBrowserSeedAudioOperation(req: Request): Promise<Response> {
   try {
-    const bodySizeError = getRequestBodySizeError(req);
-    if (bodySizeError) return Response.json({ error: bodySizeError, code: "payload_too_large" }, { status: 413 });
-
-    const body = seedAudioGenerateBodySchema.parse(await req.json());
+    const body = seedAudioGenerateBodySchema.parse(await readBoundedJsonRequest(req, REFERENCE_IMAGE_REQUEST_BODY_MAX_BYTES));
     if (body.mode === "voice_clone" && body.voiceCloneConsentAccepted !== true) {
       throw badRequest("Voice cloning requires confirming reference audio authorization first", "voice_clone_consent_required");
     }
@@ -64,7 +62,7 @@ export async function postBrowserSeedAudioOperation(req: Request): Promise<Respo
     validateInputModalityReferences(capability.inputModalities, referenceMedia);
     const parameterValues = readAudioParameterValues(body.parameterValues, capability.parameterDescriptors);
     const payloadError = getReferenceMediaPayloadError(referenceMedia.map(reference => reference.dataUri));
-    if (payloadError) return Response.json({ error: payloadError, code: "payload_too_large" }, { status: 413 });
+    if (payloadError) return noStoreJson({ error: payloadError, code: "payload_too_large" }, 413);
 
     const config = resolveProviderConfig(req, parsed.provider, { credentialScope: "audio" });
     const result = await generateAudioOperation(config, {
@@ -83,7 +81,7 @@ export async function postBrowserSeedAudioOperation(req: Request): Promise<Respo
       runningHubNodeInfoList,
     });
 
-    return Response.json(result);
+    return noStoreJson(result);
   } catch (error) {
     return seedAudioErrorResponse(error);
   }
@@ -92,26 +90,21 @@ export async function postBrowserSeedAudioOperation(req: Request): Promise<Respo
 function seedAudioErrorResponse(error: unknown): Response {
   const message = error instanceof Error ? error.message : "Failed to generate Seed Audio";
   if (error instanceof z.ZodError) {
-    return Response.json({ error: message, code: "invalid_request" }, { status: 400 });
+    return noStoreJson({ error: message, code: "invalid_request" }, 400);
   }
   if (error instanceof ProviderModelParseError) {
-    return Response.json({ error: message, code: "invalid_provider_model" }, { status: 400 });
+    return noStoreJson({ error: message, code: "invalid_provider_model" }, 400);
   }
   if (error instanceof ModelCapabilityValidationError) {
-    return Response.json({ error: message, code: "invalid_reference_media" }, { status: 400 });
+    return noStoreJson({ error: message, code: "invalid_reference_media" }, 400);
   }
   const response = apiErrorResponse(audioOperationApiError(error) ?? error, "Failed to generate Seed Audio");
   if (response.status >= 500) console.error("Seed Audio browser route error:", error);
-  return Response.json(response.body, { status: response.status });
+  return noStoreJson(response.body, response.status);
 }
 
-function getRequestBodySizeError(req: Request): string | null {
-  const contentLength = req.headers.get("content-length");
-  if (!contentLength) return null;
-
-  const bytes = Number(contentLength);
-  if (!Number.isFinite(bytes) || bytes <= REFERENCE_IMAGE_REQUEST_BODY_MAX_BYTES) return null;
-  return "Reference media request body is too large, please compress or remove reference media and retry";
+function noStoreJson(body: unknown, status = 200): Response {
+  return Response.json(body, { status, headers: { "Cache-Control": "no-store" } });
 }
 
 function readReferenceMedia(referenceMedia: unknown): ReferenceMedia[] {
