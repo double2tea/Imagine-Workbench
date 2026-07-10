@@ -8,7 +8,7 @@
 
 <!-- @@@auto:current-status -->
 - **Active File**: `journal-4.md`
-- **Total Sessions**: 188
+- **Total Sessions**: 189
 - **Last Active**: 2026-07-10
 <!-- @@@/auto:current-status -->
 
@@ -19,7 +19,7 @@
 <!-- @@@auto:active-documents -->
 | File | Lines | Status |
 |------|-------|--------|
-| `journal-4.md` | ~415 | Active |
+| `journal-4.md` | ~449 | Active |
 | `journal-3.md` | ~1985 | Archived |
 | `journal-2.md` | ~1973 | Archived |
 | `journal-1.md` | ~1988 | Archived |
@@ -32,6 +32,7 @@
 <!-- @@@auto:session-history -->
 | # | Date | Title | Commits | Branch |
 |---|------|-------|---------|--------|
+| 189 | 2026-07-10 | Fix Next PostCSS advisory | `22f3b2c4`, `b0776cb8` | `codex/integrate-dependency-updates` |
 | 188 | 2026-07-10 | Integrate pending dependency updates | `be108093`, `794ade59` | `codex/integrate-dependency-updates` |
 | 187 | 2026-07-10 | Eliminate ESLint warnings | `e256b91c` | `codex/refactor-architecture-fixes` |
 | 186 | 2026-07-10 | Architecture refactor and audited issue fixes | `abc10eea`, `4ea22529`, `3d8b82b2` | `codex/refactor-architecture-fixes` |
