@@ -60,7 +60,8 @@ test("agent input Enter submits only when a ready prompt is present", async () =
 
 test("agent dock static markup keeps the send control accessible", async () => {
   registerCompiledPathAlias();
-  const AgentDock = (await import("../components/agent/AgentDock.js")).default.default;
+  const agentDockModule = (await import("../components/agent/AgentDock.js")).default as unknown as typeof import("../components/agent/AgentDock.js");
+  const { default: AgentDock } = agentDockModule;
   type AgentDockProps = React.ComponentProps<typeof AgentDock>;
   const props: AgentDockProps = {
     activeCountdownId: null,
