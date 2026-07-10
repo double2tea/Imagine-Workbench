@@ -295,7 +295,10 @@ Kept generation submit controls usable while tasks are pending, resolved image c
 
 ### Main Changes
 
-(Add details)
+- Added a read-only Seed Audio model summary while preserving MiMo's real operation selector.
+- Derived reference limits from model capabilities and synchronized the same summary across workspace and Board.
+- Moved reference media ahead of advanced controls, grouped Seed Audio sound/provenance parameters, and hid disabled metadata fields.
+- Improved form and upload accessibility and made gallery empty-state guidance creation-mode aware.
 
 ### Git Commits
 
@@ -479,6 +482,43 @@ Aligned Seed Audio with the official single generate operation, removed fake fun
 - [OK] `pnpm run build`
 - [OK] OCR review (0 comments)
 - [OK] Browser UI verification for MiMo and Volcengine audio controls
+
+### Status
+
+[OK] **Completed**
+
+### Next Steps
+
+- None - task complete
+
+
+## Session 191: Optimize Seed Audio UI UX
+
+**Date**: 2026-07-10
+**Task**: Optimize Seed Audio UI UX
+**Branch**: `main`
+
+### Summary
+
+Clarified Seed Audio as one generic generation function, derived reference constraints from capabilities, reordered the creation flow, grouped advanced controls, improved accessibility, and synchronized gallery and board copy.
+
+### Main Changes
+
+(Add details)
+
+### Git Commits
+
+| Hash | Message |
+|------|---------|
+| `0bcaab62` | `fix(audio): refine Seed Audio creation UX` |
+
+### Testing
+
+- [OK] `pnpm run check`
+- [OK] `pnpm run lint:eslint`
+- [OK] `pnpm run test:providers` (619 passed)
+- [OK] `pnpm run build:isolated`
+- [OK] Desktop and 390 px mobile browser verification
 
 ### Status
 
