@@ -120,7 +120,7 @@ const AssetBoardNode = memo(function AssetBoardNode({
   const fallbackItem = useMemo(() => boardAssetToStorageItem(node, boardId), [boardId, node]);
   const item = useMemo(
     () => stackItems.find(stackItem => stackItem.id === node.asset.assetId) ?? fallbackItem,
-    [fallbackItem, node.asset.assetId, node.asset.type, stackItems],
+    [fallbackItem, node.asset.assetId, stackItems],
   );
   const isComplete = item.status === "complete";
   const shouldMeasureAspectRatio = !item.maskOriginalId;

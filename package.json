@@ -35,7 +35,7 @@
     "start": "node scripts/start-standalone.mjs",
     "lint": "oxlint .",
     "lint:fix": "oxlint . --fix",
-    "lint:eslint": "eslint .",
+    "lint:eslint": "eslint . --max-warnings=0",
     "typecheck": "tsc --noEmit",
     "check": "pnpm run lint && pnpm run typecheck && pnpm run check:version && pnpm run check:model-capabilities",
     "check:version": "node scripts/check-app-version.mjs",

@@ -156,7 +156,7 @@ export default function VisualPromptAdjustEditor({
       img.onload = null;
       img.onerror = null;
     };
-  }, [imageUrl, isOpen]);
+  }, [imageUrl, isOpen, t]);
 
   useEffect(() => {
     if (!isOpen) return;
@@ -199,7 +199,7 @@ export default function VisualPromptAdjustEditor({
     } finally {
       setIsApplying(false);
     }
-  }, [imageSize, lightingState, onApply, operation, prompt, selectedImageResolution, t]);
+  }, [aspectRatio, imageSize, lightingState, onApply, operation, prompt, selectedImageResolution, t]);
 
   if (!isOpen) return null;
 
@@ -1161,6 +1161,8 @@ function AngleOrbitMap({
         <circle cx={camera.x} cy={camera.y} r="5" fill="white" />
       </svg>
       <div className="absolute left-1/2 top-1/2 h-9 w-12 -translate-x-1/2 -translate-y-1/2 overflow-hidden rounded-md border border-white/35 bg-[#111] shadow-[0_8px_24px_rgba(0,0,0,0.4)]">
+        {/* The preview may be a browser-local blob/data URL and must render without Next image optimization. */}
+        {/* eslint-disable-next-line @next/next/no-img-element */}
         <img src={imageUrl} alt="" className="h-full w-full object-cover" draggable={false} />
       </div>
       <div className="pointer-events-none absolute left-1/2 top-1/2 h-11 w-14 -translate-x-1/2 -translate-y-1/2 rounded-md border border-white/10" />
@@ -1222,6 +1224,8 @@ function LightingCompassMap({
         <circle cx={point.x} cy={point.y} r="13" fill={lightColor} opacity="0.18" />
       </svg>
       <div className="absolute left-1/2 top-1/2 h-8 w-11 -translate-x-1/2 -translate-y-1/2 overflow-hidden rounded border border-white/30 bg-[#111]">
+        {/* The preview may be a browser-local blob/data URL and must render without Next image optimization. */}
+        {/* eslint-disable-next-line @next/next/no-img-element */}
         <img src={imageUrl} alt="" className="h-full w-full object-cover" draggable={false} />
       </div>
       <span className="pointer-events-none absolute left-1/2 top-1 -translate-x-1/2 text-[10px] font-semibold text-white/45">T</span>

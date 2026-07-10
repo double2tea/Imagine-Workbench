@@ -555,6 +555,7 @@ const MultiGridBoardNode = memo(function MultiGridBoardNode({
                       ? boardMultiGridCoverFrame(imageAspectRatio, ratioValue)
                       : null;
                     return (
+                      // eslint-disable-next-line @next/next/no-img-element -- Grid items use arbitrary local/data URLs and native dimensions for interactive cover transforms.
                       <img
                         src={item.url}
                         alt=""
@@ -685,6 +686,7 @@ const MultiGridBoardNode = memo(function MultiGridBoardNode({
                 top: extractPreview.clientY + 18,
               }}
             >
+              {/* eslint-disable-next-line @next/next/no-img-element -- The transient drag preview renders arbitrary local/data URLs without an optimized image lifecycle. */}
               <img src={previewItem.url} alt="" className="h-full w-full object-contain" draggable={false} />
               <div className="absolute inset-0 border border-white/70" />
             </div>

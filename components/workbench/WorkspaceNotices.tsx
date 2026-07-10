@@ -48,11 +48,12 @@ export default function WorkspaceNotices({ notices, onDismiss }: WorkspaceNotice
   }, [notices, onDismiss]);
 
   useEffect(() => {
+    const timeouts = timeoutRef.current;
     return () => {
-      for (const timer of timeoutRef.current.values()) {
+      for (const timer of timeouts.values()) {
         clearTimeout(timer);
       }
-      timeoutRef.current.clear();
+      timeouts.clear();
     };
   }, []);
 

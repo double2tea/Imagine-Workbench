@@ -487,7 +487,7 @@ export default function Home() {
       throw new Error(t("common.errors.originalMediaNotFound"));
     }
     return { ...storedItem, url: originalUrl };
-  }, [items]);
+  }, [items, t]);
 
   const deleteWorkspaceAssetById = useCallback(async (id: string): Promise<void> => {
     if (workspaceStorageTarget === "postgres") {
@@ -529,15 +529,15 @@ export default function Home() {
       return;
     }
     openOriginalItem(item, setFullscreenItem, t("common.notices.originalMediaReadFailed"));
-  }, [openOriginalItem]);
+  }, [openOriginalItem, t]);
 
   const handleOpenPanorama = useCallback((item: StorageItem): void => {
     openOriginalItem(item, setPanoramaItem, t("common.notices.originalImageReadFailed"));
-  }, [openOriginalItem]);
+  }, [openOriginalItem, t]);
 
   const handleSaveVoiceProfileSource = useCallback((item: StorageItem): void => {
     openOriginalItem(item, setVoiceProfileSourceItem, t("common.notices.originalAudioReadFailed"));
-  }, [openOriginalItem]);
+  }, [openOriginalItem, t]);
 
   const promoteItemToOriginal = useCallback((item: StorageItem): void => {
     if (item.status !== "complete") return;
@@ -616,7 +616,7 @@ export default function Home() {
       fallbackProvider: selectedProvider,
     });
     pushWorkspaceNotice("success", t("common.notices.voiceProfileSaved"));
-  }, [pushWorkspaceNotice, selectedProvider, voiceProfileSourceItem]);
+  }, [pushWorkspaceNotice, selectedProvider, t, voiceProfileSourceItem]);
 
   const imageCapabilities = getImageModelCapabilities(selectedModel);
   const audioCapabilities = getAudioModelCapabilities(selectedAudioModel);
@@ -638,7 +638,8 @@ export default function Home() {
     ? audioFormat
     : audioFormatOptions[0]?.value ?? "";
   useEffect(() => {
-    setAudioParameterValues(current => pruneCapabilityParameterValues(audioCapabilities.parameterDescriptors, current));
+    const parameterDescriptors = getAudioModelCapabilities(selectedAudioModel).parameterDescriptors;
+    setAudioParameterValues(current => pruneCapabilityParameterValues(parameterDescriptors, current));
   }, [selectedAudioModel]);
   const activePresetImageResolution = imageResolution !== "custom" && imageResolutionOptions.some(option => option.value === imageResolution)
     ? imageResolution
@@ -749,7 +750,7 @@ export default function Home() {
       setReferenceImages([nextReference]);
       setTraditionalSubTab("video");
     }, t("common.notices.originalMediaReadFailed"));
-  }, [openOriginalItem, setReferenceImage, setReferenceImages]);
+  }, [openOriginalItem, setReferenceImage, setReferenceImages, t]);
 
   const handleUseAgentReference = useCallback((asset: StorageItem): void => {
     openOriginalItem(asset, originalAsset => {
@@ -758,7 +759,7 @@ export default function Home() {
       setAgentReferences([{ id: originalAsset.id, url: originalAsset.url }]);
       setIsAgentDockOpen(true);
     }, t("common.notices.originalMediaReadFailed"));
-  }, [openOriginalItem, setAgentReferenceId, setAgentReferenceUrl, setAgentReferences]);
+  }, [openOriginalItem, setAgentReferenceId, setAgentReferenceUrl, setAgentReferences, t]);
   const audioReferenceImages = referenceImages.filter(reference =>
     audioCapabilities.referenceMediaTypes.includes(getMediaReferenceType(reference)),
   );
@@ -1033,6 +1034,7 @@ export default function Home() {
     pushWorkspaceNotice,
     setCancelingItemIds,
     setGenerationTasks,
+    t,
     workspaceGenerationTaskStorage,
   ]);
 
@@ -1786,7 +1788,7 @@ export default function Home() {
       void assetLibrary.reload().catch(() => undefined);
       pushWorkspaceNotice("error", toErrorMessage(error, t("common.dataManagement.localAssetsCleanFailed")));
     }
-  }, [assetLibrary, pushWorkspaceNotice, requireBrowserDataManagementAction, setCompareItemIds, setSelectedItemIds]);
+  }, [assetLibrary, pushWorkspaceNotice, requireBrowserDataManagementAction, setCompareItemIds, setSelectedItemIds, t]);
 
   const handleClearProject = async () => {
     if (!(await confirmAction({
@@ -1831,7 +1833,7 @@ export default function Home() {
     } catch (error) {
       pushWorkspaceNotice("error", toErrorMessage(error, t("common.notices.addToLibraryFailed")));
     }
-  }, [assetLibrary, pushWorkspaceNotice]);
+  }, [assetLibrary, pushWorkspaceNotice, t]);
 
   const handleImportFilesToLibrary = useCallback(async (files: File[]) => {
     try {
@@ -1843,7 +1845,7 @@ export default function Home() {
     } catch (error) {
       pushWorkspaceNotice("error", toErrorMessage(error, t("common.notices.libraryImportFailed")));
     }
-  }, [assetLibrary, pushWorkspaceNotice]);
+  }, [assetLibrary, pushWorkspaceNotice, t]);
 
   const handleSelectLibraryEntry = useCallback((entry: { item: StorageItem | null }) => {
     const item = entry.item;
@@ -1857,7 +1859,7 @@ export default function Home() {
     }
     handleSelectAtItem(item.url, item.id, assetLibraryTarget, item.type);
     setIsAssetLibraryOpen(false);
-  }, [assetLibraryTarget, handleSelectAtItem, pushWorkspaceNotice]);
+  }, [assetLibraryTarget, handleSelectAtItem, pushWorkspaceNotice, t]);
 
   const handleDataExportWorkspace = useCallback(async (includeCredentials: boolean) => {
     if (!requireBrowserDataManagementAction()) return;
@@ -1867,7 +1869,7 @@ export default function Home() {
     } catch (error) {
       pushWorkspaceNotice("error", toErrorMessage(error, t("common.dataManagement.exportFailed")));
     }
-  }, [pushWorkspaceNotice, requireBrowserDataManagementAction]);
+  }, [pushWorkspaceNotice, requireBrowserDataManagementAction, t]);
 
   const handleDataDownloadSafetySnapshot = useCallback(async () => {
     if (!requireBrowserDataManagementAction()) return;
@@ -1877,7 +1879,7 @@ export default function Home() {
     } catch (error) {
       pushWorkspaceNotice("error", toErrorMessage(error, t("common.dataManagement.snapshotDownloadFailed")));
     }
-  }, [pushWorkspaceNotice, requireBrowserDataManagementAction]);
+  }, [pushWorkspaceNotice, requireBrowserDataManagementAction, t]);
 
   const handleDataImportWorkspace = useCallback(async (file: File, includeCredentials: boolean) => {
     if (!requireBrowserDataManagementAction()) return;
@@ -1899,7 +1901,7 @@ export default function Home() {
     } catch (error) {
       pushWorkspaceNotice("error", toErrorMessage(error, t("common.dataManagement.workspaceRestoreFailed")));
     }
-  }, [confirmAction, pushWorkspaceNotice, requireBrowserDataManagementAction]);
+  }, [confirmAction, pushWorkspaceNotice, requireBrowserDataManagementAction, t]);
 
   const handleDataImportLocalAssets = useCallback(async (files: File[]) => {
     const importedItems: StorageItem[] = [];
@@ -1921,7 +1923,7 @@ export default function Home() {
       ...prev.filter(item => !importedItems.some(importedItem => importedItem.id === item.id)),
     ]);
     pushWorkspaceNotice("success", t("common.notices.importedLocalMedia", { count: importedItems.length }));
-  }, [pushWorkspaceNotice, saveWorkspaceAssetDirect]);
+  }, [pushWorkspaceNotice, saveWorkspaceAssetDirect, t]);
 
   const handleDataCleanupAssets = useCallback(async (kind: WorkspaceCleanupKind) => {
     if (!requireBrowserDataManagementAction()) return;
@@ -1934,7 +1936,7 @@ export default function Home() {
     } catch (error) {
       pushWorkspaceNotice("error", toErrorMessage(error, t("common.dataManagement.assetsCleanupFailed")));
     }
-  }, [pushWorkspaceNotice, reloadWorkspaceAssets, requireBrowserDataManagementAction, setCompareItemIds, setSelectedItemIds]);
+  }, [pushWorkspaceNotice, reloadWorkspaceAssets, requireBrowserDataManagementAction, setCompareItemIds, setSelectedItemIds, t]);
 
   const handleDataRepairAssetSources = useCallback(async () => {
     if (!requireBrowserDataManagementAction()) return;
@@ -1945,7 +1947,7 @@ export default function Home() {
     } catch (error) {
       pushWorkspaceNotice("error", toErrorMessage(error, t("common.dataManagement.sourceLinkRepairFailed")));
     }
-  }, [pushWorkspaceNotice, reloadWorkspaceAssets, requireBrowserDataManagementAction]);
+  }, [pushWorkspaceNotice, reloadWorkspaceAssets, requireBrowserDataManagementAction, t]);
 
   const handleDataClearLocalStorage = useCallback(async (kind: LocalStorageCleanupKind) => {
     if (!requireBrowserDataManagementAction()) return;
@@ -1961,7 +1963,7 @@ export default function Home() {
     } catch (error) {
       pushWorkspaceNotice("error", toErrorMessage(error, t("common.dataManagement.boardsResetFailed")));
     }
-  }, [pushWorkspaceNotice, requireBrowserDataManagementAction]);
+  }, [pushWorkspaceNotice, requireBrowserDataManagementAction, t]);
 
   const renderAssetGalleryWorkspace = () => (
     <AssetGalleryWorkspace

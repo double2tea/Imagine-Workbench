@@ -1,6 +1,6 @@
 import { Check, Compass, Copy, Download, FileText, Film, Info, Mic2, Music, X } from "lucide-react";
 import { AnimatePresence, motion } from "motion/react";
-import { useEffect, useRef, useState } from "react";
+import { useEffect, useMemo, useRef, useState } from "react";
 import AudioWaveformPreview from "@/components/audio/AudioWaveformPreview";
 import VideoFrameMenu from "@/components/assets/VideoFrameMenu";
 import VideoAssetPlayer, { type VideoFrameCaptureRequest } from "@/components/assets/VideoAssetPlayer";
@@ -40,8 +40,9 @@ type ImagePanDragState = {
 const MIN_ZOOM = 0.25;
 const MAX_ZOOM = 3;
 const ZOOM_STEP = 0.25;
+const EMPTY_PREVIEW_ITEMS: StorageItem[] = [];
 
-export default function FullscreenPreview({ item, items = [], onCaptureVideoFrame, onSavePanoramaScreenshots, onDownload, onSaveVoiceProfile, onClose, onSelectItem }: FullscreenPreviewProps) {
+export default function FullscreenPreview({ item, items = EMPTY_PREVIEW_ITEMS, onCaptureVideoFrame, onSavePanoramaScreenshots, onDownload, onSaveVoiceProfile, onClose, onSelectItem }: FullscreenPreviewProps) {
   const { t } = useTranslations("common");
   const [copyResult, setCopyResult] = useState<CopyResult>(null);
   const [isFrameMenuOpen, setIsFrameMenuOpen] = useState(false);
@@ -58,7 +59,7 @@ export default function FullscreenPreview({ item, items = [], onCaptureVideoFram
   const imageWheelDeltaRef = useRef(0);
   const imageWheelFrameRef = useRef<number | null>(null);
   const previewItemsRef = useRef<StorageItem[]>([]);
-  const previewItems = items.length > 0 ? items : item ? [item] : [];
+  const previewItems = useMemo(() => items.length > 0 ? items : item ? [item] : [], [item, items]);
   const showPreviewStrip = previewItems.length > 1 && Boolean(onSelectItem);
 
   const copyStatus: CopyStatus =
@@ -243,7 +244,7 @@ export default function FullscreenPreview({ item, items = [], onCaptureVideoFram
         imageWheelFrameRef.current = null;
       }
     };
-  }, [item?.id]);
+  }, [item?.id, item?.type]);
 
   return (
     <AnimatePresence>

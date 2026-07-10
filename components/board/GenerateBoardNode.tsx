@@ -25,6 +25,7 @@ import { useTranslations } from "@/lib/i18n";
 
 type GenerateNode = BoardImageGenerateNode | BoardVideoGenerateNode | BoardAudioOperationNode;
 const variantCountOptions: BoardGenerateVariantCount[] = [1, 2, 4];
+const EMPTY_REFERENCE_PREVIEWS: BoardGenerateReferencePreview[] = [];
 
 function effectiveVariantCount(node: GenerateNode): BoardGenerateVariantCount {
   return node.kind === "audio-operation" ? 1 : node.variantCount;
@@ -152,7 +153,7 @@ const GenerateBoardNode = memo(function GenerateBoardNode({
   const promptPreview = inputSummary?.promptPreview ?? null;
   const promptSourceTitle = inputSummary?.promptSourceTitle;
   const referenceCount = inputSummary?.referenceCount ?? 0;
-  const referencePreviews = inputSummary?.referencePreviews ?? [];
+  const referencePreviews = inputSummary?.referencePreviews ?? EMPTY_REFERENCE_PREVIEWS;
   const videoCapabilities = useMemo(
     () => isVideoNode ? getVideoModelCapabilities(node.model) : null,
     [isVideoNode, node.model],

@@ -255,7 +255,7 @@ export default function AssetLibraryModal({
     setDraftCategory(activeEntry.record.category);
     setDraftNotes(activeEntry.record.notes);
     setDraftTags(activeEntry.record.tags.join(", "));
-  }, [activeEntry?.record.id]);
+  }, [activeEntry]);
 
   if (!open) return null;
 

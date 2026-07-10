@@ -1976,7 +1976,7 @@ export default function BoardPage({ boardId = DEFAULT_BOARD_ID }: BoardPageProps
         ...previewItems,
         ...prev.filter(item => !previewItems.some(previewItem => previewItem.id === item.id)),
       ]);
-      boardController.updateAssetReferenceUrls(updates);
+      updateBoardAssetReferenceUrls(updates);
     })().catch(error => {
       if (isActive) pushWorkspaceNotice("error", toErrorMessage(error, "Old board media preview migration failed"));
     });
@@ -1986,7 +1986,7 @@ export default function BoardPage({ boardId = DEFAULT_BOARD_ID }: BoardPageProps
     };
   }, [
     boardController.board.nodes,
-    boardController.updateAssetReferenceUrls,
+    updateBoardAssetReferenceUrls,
     pushWorkspaceNotice,
     resolvedBoardId,
     setItems,
@@ -2081,7 +2081,7 @@ export default function BoardPage({ boardId = DEFAULT_BOARD_ID }: BoardPageProps
       name: schema.name,
       webappId: schema.webappId || webappId,
     };
-  }, [buildProviderHeaders]);
+  }, [buildProviderHeaders, t]);
 
   const {
     agentReferenceId,
@@ -2244,13 +2244,13 @@ export default function BoardPage({ boardId = DEFAULT_BOARD_ID }: BoardPageProps
       },
       error => pushWorkspaceNotice("error", toErrorMessage(error, "Original media download failed")),
     );
-  }, [pushWorkspaceNotice, resolveOriginalStorageItem, t]);
+  }, [pushWorkspaceNotice, resolveOriginalStorageItem]);
   const handleSaveVoiceProfileSource = useCallback((item: StorageItem) => {
     void resolveOriginalStorageItem(item).then(
       setVoiceProfileSourceItem,
       error => pushWorkspaceNotice("error", toErrorMessage(error, "Original audio read failed")),
     );
-  }, [pushWorkspaceNotice, resolveOriginalStorageItem, t]);
+  }, [pushWorkspaceNotice, resolveOriginalStorageItem]);
   const resolveOriginalReferences = useCallback(async (references: ReferenceImageRef[]): Promise<ReferenceImageRef[]> => {
     return Promise.all(references.map(async reference => {
       const item = items.find(entry => entry.id === reference.id);
@@ -2300,7 +2300,7 @@ export default function BoardPage({ boardId = DEFAULT_BOARD_ID }: BoardPageProps
         }}
       />
     );
-  }, [agentReferences, atDropdown.search, handleSelectAtItem, resolvedBoardId, searchableReferenceImages]);
+  }, [agentReferences, atDropdown.search, handleSelectAtItem, resolvedBoardId, searchableReferenceImages, t]);
 
   useEffect(() => {
     handledBoardItemIdsRef.current.clear();
@@ -3014,7 +3014,9 @@ export default function BoardPage({ boardId = DEFAULT_BOARD_ID }: BoardPageProps
     buildAgentBoardContext,
     buildProviderHeaders,
     items,
+    locale,
     pushWorkspaceNotice,
+    resolveBoardReferenceUrl,
     resolveOriginalReferences,
     selectedChatModel,
   ]);
@@ -4018,8 +4020,10 @@ export default function BoardPage({ boardId = DEFAULT_BOARD_ID }: BoardPageProps
     generateManualVideo,
     items,
     pushWorkspaceNotice,
+    resolveBoardReferenceUrl,
     resolveOriginalReferences,
     resolvedBoardId,
+    selectOnlyBoardNode,
     selectedAudioModel,
     selectedModel,
     selectedVideoModel,
@@ -4116,6 +4120,7 @@ export default function BoardPage({ boardId = DEFAULT_BOARD_ID }: BoardPageProps
     pushWorkspaceNotice,
     deleteBoardAssetById,
     setItems,
+    t,
   ]);
 
   const cancelBoardGenerationTask = useCallback(async (task: GenerationTask): Promise<void> => {
@@ -4190,6 +4195,7 @@ export default function BoardPage({ boardId = DEFAULT_BOARD_ID }: BoardPageProps
     pollingFailuresRef,
     pushWorkspaceNotice,
     setGenerationTasks,
+    t,
   ]);
 
   const cancelBoardGenerationNode = useCallback(async (nodeId: string): Promise<void> => {
@@ -4275,7 +4281,7 @@ export default function BoardPage({ boardId = DEFAULT_BOARD_ID }: BoardPageProps
     } catch (error) {
       pushWorkspaceNotice("error", error instanceof Error ? error.message : t("board.import.multiGridExportFailed"));
     }
-  }, [addAssetToBoard, boardController.board, pushWorkspaceNotice, saveBoardAssetWithPreview, t]);
+  }, [addAssetToBoard, boardController.board, pushWorkspaceNotice, saveBoardAssetWithPreview, setItems, t]);
 
   const handleCaptureVideoFrame = useCallback(async (
     sourceNodeId: string,
@@ -4297,7 +4303,7 @@ export default function BoardPage({ boardId = DEFAULT_BOARD_ID }: BoardPageProps
       : undefined;
     addAssetToBoard(savedFrameItem, position);
     pushWorkspaceNotice("success", t("board.import.frameSavedToBoard", { label: getVideoFrameCaptureLabel(frame.mode) }));
-  }, [addAssetToBoard, boardController.board.nodes, pushWorkspaceNotice, saveBoardAssetWithPreview, t]);
+  }, [addAssetToBoard, boardController.board.nodes, pushWorkspaceNotice, saveBoardAssetWithPreview, setItems, t]);
 
   const handleSavePanoramaScreenshots = useCallback(async (
     item: StorageItem,
@@ -4341,7 +4347,7 @@ export default function BoardPage({ boardId = DEFAULT_BOARD_ID }: BoardPageProps
       );
     });
     pushWorkspaceNotice("success", t("board.import.panoramaScreenshotsSaved", { count: savedItems.length }));
-  }, [addAssetToBoard, boardController.board.nodes, pushWorkspaceNotice, resolvedBoardId, saveBoardAssetWithPreview, t]);
+  }, [addAssetToBoard, boardController.board.nodes, pushWorkspaceNotice, resolvedBoardId, saveBoardAssetWithPreview, setItems, t]);
 
   const handleImportBoardFiles = useCallback(async (files: File[], position: BoardPoint): Promise<void> => {
     const boardFiles = files.filter(file => mediaReferenceTypeFromMime(file.type) !== null);
@@ -4387,7 +4393,7 @@ export default function BoardPage({ boardId = DEFAULT_BOARD_ID }: BoardPageProps
       ...prev.filter(item => !importedItems.some(imported => imported.item.id === item.id)),
     ]);
     pushWorkspaceNotice("success", t("board.import.filesImported", { count: importedItems.length }));
-  }, [boardController, pushWorkspaceNotice, resolvedBoardId, saveBoardAssetWithPreview, t]);
+  }, [boardController, pushWorkspaceNotice, resolvedBoardId, saveBoardAssetWithPreview, setItems, t]);
 
   const useSelectedBoardAssetAsReference = () => {
     const references = activeBoardReference(boardController.board.nodes, boardController.board.edges, boardController.selectedNodeId, items, resolveBoardReferenceUrl);
@@ -4482,6 +4488,7 @@ export default function BoardPage({ boardId = DEFAULT_BOARD_ID }: BoardPageProps
     pushWorkspaceNotice,
     resolvedBoardId,
     resolveOriginalStorageItem,
+    t,
   ]);
 
   const resolveExecutableNodeInputs = useCallback(<T extends ExecutableBoardNode,>(
@@ -4966,7 +4973,7 @@ export default function BoardPage({ boardId = DEFAULT_BOARD_ID }: BoardPageProps
         continue;
       }
     }
-  }, [boardAssetsLoading, boardController, generationTasks, items]);
+  }, [boardAssetsLoading, boardController, generationTasks, items, t]);
 
   useEffect(() => {
     if (boardController.saveStatus === "loading") return;
@@ -5052,7 +5059,7 @@ export default function BoardPage({ boardId = DEFAULT_BOARD_ID }: BoardPageProps
         }
       }
     }
-  }, [boardAssetsLoading, boardController, generationTasks, isBoardAssetScopeLoaded, items]);
+  }, [boardAssetsLoading, boardController, generationTasks, isBoardAssetScopeLoaded, items, t]);
 
   const clearProjectAssets = useCallback(async () => {
     if (!requireBrowserDataManagementAction()) return;
@@ -5067,7 +5074,7 @@ export default function BoardPage({ boardId = DEFAULT_BOARD_ID }: BoardPageProps
     } catch (error) {
       pushWorkspaceNotice("error", toErrorMessage(error, t("common.dataManagement.localAssetsCleanFailed")));
     }
-  }, [pushWorkspaceNotice, requireBrowserDataManagementAction]);
+  }, [pushWorkspaceNotice, requireBrowserDataManagementAction, setGenerationTasks, setItems, t]);
 
   const reloadBoardAssetsFromDB = useCallback(async () => {
     await reloadBoardAssets();
@@ -5081,7 +5088,7 @@ export default function BoardPage({ boardId = DEFAULT_BOARD_ID }: BoardPageProps
     } catch (error) {
       pushWorkspaceNotice("error", toErrorMessage(error, t("common.dataManagement.boardRenameFailed")));
     }
-  }, [pushWorkspaceNotice, requireBrowserDataManagementAction]);
+  }, [pushWorkspaceNotice, requireBrowserDataManagementAction, t]);
 
   const handleDataExportCurrentBoard = useCallback(async (includeCredentials: boolean) => {
     if (!requireBrowserDataManagementAction()) return;
@@ -5103,7 +5110,7 @@ export default function BoardPage({ boardId = DEFAULT_BOARD_ID }: BoardPageProps
     } catch (error) {
       pushWorkspaceNotice("error", toErrorMessage(error, t("common.dataManagement.snapshotDownloadFailed")));
     }
-  }, [pushWorkspaceNotice, requireBrowserDataManagementAction]);
+  }, [pushWorkspaceNotice, requireBrowserDataManagementAction, t]);
 
   const handleDataImportWorkspace = useCallback(async (file: File, includeCredentials: boolean) => {
     if (!requireBrowserDataManagementAction()) return;
@@ -5152,7 +5159,7 @@ export default function BoardPage({ boardId = DEFAULT_BOARD_ID }: BoardPageProps
       ...prev.filter(item => !importedItems.some(importedItem => importedItem.id === item.id)),
     ]);
     pushWorkspaceNotice("success", `Imported ${importedItems.length} local media`);
-  }, [pushWorkspaceNotice, resolvedBoardId, saveBoardAssetWithPreview, t]);
+  }, [pushWorkspaceNotice, resolvedBoardId, saveBoardAssetWithPreview, setItems, t]);
 
   const handleDataCleanupAssets = useCallback(async (kind: WorkspaceCleanupKind) => {
     if (!requireBrowserDataManagementAction()) return;
@@ -5163,7 +5170,7 @@ export default function BoardPage({ boardId = DEFAULT_BOARD_ID }: BoardPageProps
     } catch (error) {
       pushWorkspaceNotice("error", toErrorMessage(error, t("common.dataManagement.assetsCleanupFailed")));
     }
-  }, [pushWorkspaceNotice, reloadBoardAssetsFromDB, requireBrowserDataManagementAction]);
+  }, [pushWorkspaceNotice, reloadBoardAssetsFromDB, requireBrowserDataManagementAction, t]);
 
   const handleDataRepairAssetSources = useCallback(async () => {
     if (!requireBrowserDataManagementAction()) return;
@@ -5174,7 +5181,7 @@ export default function BoardPage({ boardId = DEFAULT_BOARD_ID }: BoardPageProps
     } catch (error) {
       pushWorkspaceNotice("error", toErrorMessage(error, t("common.dataManagement.sourceLinkRepairFailed")));
     }
-  }, [pushWorkspaceNotice, reloadBoardAssetsFromDB, requireBrowserDataManagementAction]);
+  }, [pushWorkspaceNotice, reloadBoardAssetsFromDB, requireBrowserDataManagementAction, t]);
 
   const handleDataClearLocalStorage = useCallback(async (kind: LocalStorageCleanupKind) => {
     if (!requireBrowserDataManagementAction()) return;
@@ -5191,7 +5198,7 @@ export default function BoardPage({ boardId = DEFAULT_BOARD_ID }: BoardPageProps
     } catch (error) {
       pushWorkspaceNotice("error", toErrorMessage(error, t("common.dataManagement.boardsResetFailed")));
     }
-  }, [pushWorkspaceNotice, requireBrowserDataManagementAction]);
+  }, [pushWorkspaceNotice, requireBrowserDataManagementAction, t]);
 
   const duplicateCurrentBoard = useCallback(async () => {
     try {
@@ -5270,7 +5277,7 @@ export default function BoardPage({ boardId = DEFAULT_BOARD_ID }: BoardPageProps
     router.push(boardRoute(nextBoardId));
     await boardStorage.deleteBoard(deletedBoardId);
     setBoardSummaries(prev => prev.filter(item => item.id !== deletedBoardId));
-  }, [boardController.board.id, boardController.board.title, boardStorage, boardSummaries, confirmAction, pushWorkspaceNotice, router, t]);
+  }, [boardController.board.id, boardStorage, boardSummaries, confirmAction, pushWorkspaceNotice, router, t]);
 
   const saveBoardNow = boardController.saveNow;
 

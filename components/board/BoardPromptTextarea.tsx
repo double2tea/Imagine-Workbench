@@ -9,7 +9,7 @@ import {
   useRef,
   useState,
   type ClipboardEvent,
-  type CompositionEvent,
+  type CompositionEventHandler,
   type KeyboardEvent,
   type ReactNode,
 } from "react";
@@ -398,11 +398,11 @@ const BoardPromptTextarea = forwardRef<BoardPromptTextareaHandle, BoardPromptTex
     syncEditorValue();
   };
 
-  const handleCompositionStart = (_event: CompositionEvent<HTMLDivElement>): void => {
+  const handleCompositionStart: CompositionEventHandler<HTMLDivElement> = () => {
     isComposingRef.current = true;
   };
 
-  const handleCompositionEnd = (_event: CompositionEvent<HTMLDivElement>): void => {
+  const handleCompositionEnd: CompositionEventHandler<HTMLDivElement> = () => {
     isComposingRef.current = false;
     syncEditorValue();
   };

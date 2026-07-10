@@ -72,7 +72,7 @@ export function ConfirmProvider({ children }: { children: ReactNode }) {
         tone: next.tone,
         confirmLabel: next.dismissLabel ?? next.confirmLabel ?? t('defaults.dismissAlert'),
       }).then(() => undefined),
-    [confirm],
+    [confirm, t],
   );
 
   const kind = request?.kind ?? "confirm";

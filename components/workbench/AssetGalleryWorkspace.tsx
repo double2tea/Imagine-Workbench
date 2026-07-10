@@ -209,7 +209,7 @@ export default function AssetGalleryWorkspace({
         if (b.dateKey === "unknown") return -1;
         return b.dateKey.localeCompare(a.dateKey);
       });
-  }, [visibleItems]);
+  }, [t, visibleItems]);
   useEffect(() => {
     if (assetStatusFilter !== "processing" && assetStatusFilter !== "pending") {
       return;

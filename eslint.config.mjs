@@ -11,6 +11,17 @@ export default defineConfig([
   { ignores: [".next*/**", ".tmp/**", ".vercel/**", "next-env.d.ts", "node_modules/**"] },
   ...compat.extends("next/core-web-vitals", "next/typescript"),
   {
+    rules: {
+      "@typescript-eslint/no-unused-vars": [
+        "error",
+        {
+          argsIgnorePattern: "^_",
+          ignoreRestSiblings: true,
+        },
+      ],
+    },
+  },
+  {
     files: ["scripts/**/*.js", "scripts/**/*.cjs", "tests/**/*.ts"],
     rules: { "@typescript-eslint/no-require-imports": "off" },
   },

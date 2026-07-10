@@ -1611,7 +1611,7 @@ export default function BoardWorkspace({
       strokeDasharray: "7 5",
       strokeWidth: 2,
     }),
-    [themeMode],
+    [],
   );
   const setFlowHostRef = useCallback((element: HTMLElement | null): void => {
     flowHostRef.current = element;
@@ -2208,8 +2208,9 @@ export default function BoardWorkspace({
     updateMultiGridItemTransform, onExportMultiGrid, measureAssetAspectRatio,
     updateNodeSize,
     updateNodeTitle, updateRunningHubAppNode, updateNoteBody, updatePromptNode,
-    assetCompareReferenceForNode, board.nodes, board.edges, boardPromptReferenceGraphIndex, galleryItemById, onConnectionError,
+    assetCompareReferenceForNode, board.nodes, galleryItemById, onConnectionError,
     onMarkGeneratedAssetsViewed, onResolveOriginalAsset, onWorkspaceNotice, promotableItemForNode, resolveCompareReferenceUrl, updateResultNodeAsset,
+    tb, tc,
   ]);
 
   const generateTaskByNodeId = useMemo(() => {
@@ -2869,7 +2870,7 @@ export default function BoardWorkspace({
       selectOnlyNodeIds([nodeId]);
       setQuickInsertMenu(null);
     }
-  }, [addAssetToMultiGrid, addGenerateNodeWithConnections, addMultiGridNode, addNoteNode, addReferenceGroupNodeWithAssets, addRunningHubAppNode, availableCenteredNodePosition, board.nodes, connectPorts, onConnectionError, selectOnlyNodeIds]);
+  }, [addAssetToMultiGrid, addGenerateNodeWithConnections, addMultiGridNode, addNoteNode, addReferenceGroupNodeWithAssets, addRunningHubAppNode, availableCenteredNodePosition, board.nodes, connectPorts, onConnectionError, selectOnlyNodeIds, tb]);
 
   const quickInsertMenuItems = useMemo(() => {
     const from = quickInsertMenu?.connectionFrom;
@@ -3517,6 +3518,7 @@ export default function BoardWorkspace({
     window.addEventListener("keydown", handleKeyDown);
     return () => window.removeEventListener("keydown", handleKeyDown);
   }, [
+    board.edges,
     board.nodes,
     canRedo,
     canUndo,
